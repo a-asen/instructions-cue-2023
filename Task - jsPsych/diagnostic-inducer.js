@@ -1,4 +1,25 @@
-const exp_debugging="Y" // 
+
+
+// const exp_debugging="Y" // 
+
+
+// function saveData(name, data){
+//     var xhr = new XMLHttpRequest();
+//     xhr.open('POST', 'write_data.php'); // 'write_data.php' is the path to the php file described above.
+//     xhr.setRequestHeader('Content-Type', 'application/json');
+//     xhr.send(JSON.stringify({filename: name, filedata: data}));
+//   }
+  
+
+// Date.prototype.today = function () { 
+//     return this.getFullYear() + "-" + (((this.getMonth()+1) < 10)?"0":"") + (this.getMonth()+1) +"-"+ ((this.getDate() < 10)?"0":"") + this.getDate();
+//   }
+//   Date.prototype.timeNow = function () {
+//      return ((this.getHours() < 10)?"0":"") + this.getHours() +"-"+ ((this.getMinutes() < 10)?"0":"") + this.getMinutes() +"-"+ ((this.getSeconds() < 10)?"0":"") + this.getSeconds();
+//   }
+//   var dateTime = new Date().today() + "_" + new Date().timeNow();
+// console.log(Date())
+  
 
 //// Trials ////
 // Fixation
@@ -40,8 +61,6 @@ const set_background_colour_wrong_response = {
 } 
   // https://github.com/jspsych/jsPsych/discussions/936
   // https://github.com/psychbruce/jspsych/blob/master/exp_demo/experiment/experiment.js
-
-
 
 
 const jsPsych = initJsPsych({
@@ -207,7 +226,7 @@ for(let i = 0; i < number_of_inducers; i++){ // less than, since we start at 0
     // Then we generate the diagnostic trials 
         // Should perhaps be a color? Or randomize a color? 
     for(let ii = 0; ii < run_diagnostic_length; ii++){
-        let run_rnd_stimulus = jsPsych.randomization.sampleWithReplacement(run_stimuli, 1, run_stimulus_bias)[0]
+        let run_rnd_stimulus = jsPsych.randomization.sampleWithReplacement(run_stimuli, 1)[0]
         let run_rnd_italic = jsPsych.randomization.sampleWithReplacement([true,false], 1, run_italic_bias)[0]
 
         let diagnostic_run = { 
@@ -297,7 +316,9 @@ for(let i = 0; i < number_of_inducers; i++){ // less than, since we start at 0
     }
 
     /// INDUCERN TASK HERE
-    let rnd_inducer_stimulus = jsPsych.randomization.sampleWithReplacement(run_stimuli, 1, run_stimulus_bias)[0]
+    let rnd_inducer_stimulus = jsPsych.randomization.sampleWithReplacement(run_stimuli, 1)[0]
+    let rnd_inducer_colour = jsPsych.randomization.sampleWithReplacement(inducer_colours, 1)[0]
+
     let inducer_task = {
         type: jsPsychHtmlKeyboardResponse,
         stimulus: () => { return `<p style="font-size: ${general_font_size};">${rnd_inducer_stimulus}` },
@@ -331,7 +352,7 @@ for(let i = 0; i < number_of_inducers; i++){ // less than, since we start at 0
         conditional_function: () => {
             let data = jsPsych.data.get().last(1).values()[0];
             if(data.response === null)  { 
-                if(exp_debugging="Y"){ console.log("TOO SLOW") } 
+                if(exp_debugging == "Y"){ console.log("TOO SLOW") } 
                 return true } 
             else { return false }
         }
@@ -343,22 +364,65 @@ for(let i = 0; i < number_of_inducers; i++){ // less than, since we start at 0
         conditional_function: () => {
             let data = jsPsych.data.get().last(1).values()[0];
             if( data.correct == false)  { 
-                if(exp_debugging=="Y"){ 
-                    if(exp_debugging=="Y"){ console.log("WRONG RESPONSE") } 
-                return true } 
-                else { return false }
+                if(exp_debugging == "Y"){ 
+                    if(exp_debugging == "Y"){ console.log("WRONG RESPONSE") } 
+                    return true } 
+                    else { return false }
+                }
             }
         }
+        timeline.push(wrong_response_trial)
+        
+        let inducer_fixation = {
+            timeline: [fixation2],
+            conditional_function: () => {
+                let data = jsPsych.data.get().last(1).values()[0];
+                console.log("INDUCERS PUSH")
+                if(i != number_of_inducers)
+                {return true } else {return false}
+        }
     }
-    timeline.push(wrong_response_trial)
-    
-    if(i!=number_of_inducers){
-        console.log("INDUCERS PUSH")
-        timeline.push(fixation2) // longer fixation
-    }
+    timeline.push(inducer_fixation)
 }
 
 
+let demographics = {
+    type: jsPsychSurvey,
+    button_label_finish: "Next",
+    required_question_label: "test",
+    required_error: "Please check whether you responded to all the questions.",
+    pages: [
+        [
+            {
+                type: 'html',
+                prompt: 'You have now completed the central part of the experiment.<br> To complete the study, please answer the following questions:',
+            },
+            {
+                type: 'multi-choice',
+                prompt: "Gender", 
+                name: 'gender', 
+                options: ['Female', 'Male', 'Other', 'I would rather not tell.'], 
+                required: true
+            }, 
+            {
+                type: 'text',
+                prompt: "What year were you born? (enter answer into text box below)", 
+                name: 'yearBorn', 
+                textbox_columns: 5,
+                required: true,
+            }
+        ]
+    ],
+    data: { stimulus: "demographics" }, 
+    on_finish: () => {
+        saveData("data_" + dateTime + "_" + unique, jsPsych.data.get().csv());
+        jsPsych.data.get().addToAll({ gender:    gender });
+        jsPsych.data.get().addToAll({ birthYear: birthYear });
+        jsPsych.data.get().addToAll({ id:        ID });
+    }
+}
+
+var comments = {}
 
 // exit fullscreen mode
     // before finish exit FS
@@ -366,5 +430,7 @@ timeline.push({
     type: jsPsychFullscreen,
     fullscreen_mode: false
 }); 
+
+var thanks = {}
 
 jsPsych.run(timeline)
