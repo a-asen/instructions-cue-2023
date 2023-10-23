@@ -2,15 +2,18 @@
 const default_background_colour = "#cccccc" // Light grey
 const wrong_response_colour = "#d22d2d"     // Blood red-ish 
 
-// Delay 
-const short_fixation = 2 // 750      // Main fixation delay
-const long_fixation = 1500    // second fixation delay (after each inducer)
-const wrong_response_delay = 2 // 300    // How long is wrong response displayed?
-const too_slow_delay = 300          // How long is too slow response displayed
+////    Delay   ////
+// general
 const instruction_delay = 10000     // How long is each s-r mapping displayed
 const trial_duration = 2000     // How long is a trial?
+// fixation
+const short_fixation_delay = 2 // 750      // Main fixation delay
+const long_fixation_delay = 1500    // second fixation delay (after each inducer)
+// Feedback
+const wrong_response_delay = 2 // 300    // How long is wrong response displayed?
+const too_slow_delay = 300          // How long is too slow response displayed
 
-// Font size
+////    Font size   ////
 const instruction_font_size = "36px"    // about the experiment / Consent / explanation
 const general_font_size = "42px"        // Diagnostic/inducer/stimulus size
 const fixation_size = "48px"            // Fixation 
