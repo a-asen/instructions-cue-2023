@@ -4,28 +4,30 @@ const exp_debugging="Y" //
 // Fixation
 let fixation = {
     type: jsPsychHtmlKeyboardResponse,
-    stimulus: () => {return `<div style='font-size: ${fixation_size}'> + </div>`},
+    stimulus: () => { return `<div style='font-size: ${fixation_size}'> + </div>` },
     choices: "NO_KEYS",
     trial_duration: fixation_delay, 
 }
 let fixation2 = {
     type: jsPsychHtmlKeyboardResponse,
-    stimulus:  () => {return `<div style='font-size: ${fixation_size}'> + </div>`},
+    stimulus:  () => { return `<div style='font-size: ${fixation_size}'> + </div>` },
     choices: "NO_KEYS",
     trial_duration: fixation2_delay, 
 }
 // Feedback
 let wrong_response = {
     type: jsPsychHtmlKeyboardResponse,
-    stimulus:  () => {return `<div style="font-size: ${general_font_size};"> Wrong response </div>`},
+    stimulus:  () => { return `<div style="font-size: ${general_font_size};"> Wrong response </div>` },
     choices: "NO_KEYS",
     trial_duration: wrong_response_delay,
+    data: { wrong_response: true }
 }
 let too_slow = {
     type: jsPsychHtmlKeyboardResponse,
-    stimulus: () => {return `<div style="font-size: ${general_font_size};"> Too slow </div>`},
+    stimulus: () => { return `<div style="font-size: ${general_font_size};"> Too slow </div>` },
     choices: "NO_KEYS",
     trial_duration: too_slow_delay, 
+    data: { too_slow: true }
 }
 // change background
 const set_background_colour_default = {
@@ -51,7 +53,7 @@ const jsPsych = initJsPsych({
 
 // Timeline start
 const timeline = [];
-timeline.push(set_background_colour_default)
+timeline.push(set_background_colour_default) // To ensure the background colour is correct.
 
 // timeline.push(set_background_colour_default) /7
 
@@ -80,29 +82,29 @@ const concent = {
 
 // Unique ID
 let ID = jsPsych.randomization.randomID(8);
-if(exp_debugging=="Y"){console.log("ID = " +ID)}
+if(exp_debugging=="Y"){ console.log("ID = " +ID) }
 
 ///////////////////////////////////////////////////////
 ////////////            TASK               ////////////
 // Shuffle stimuli list
 let rnd_stimuli = jsPsych.randomization.shuffle(stimuli);  // Shuffle stimuli list
-if(exp_debugging=="Y"){console.log(rnd_stimuli)}
+if(exp_debugging=="Y") { console.log(rnd_stimuli) }
 
 // Generate diagnostic length ranges
 let diagnostic_range = Array.from(Array(diagnostic_max_length-3), (x,i) => i + diagnostic_min_length) 
-if(exp_debugging=="Y"){console.log("The range of diagnostic lengths: ", diagnostic_range)}
+if(exp_debugging=="Y"){ console.log("The range of diagnostic lengths: ", diagnostic_range) }
 
 // Generate probability distribution of the diagnostic run (if relevant)
 if(math.toLowerCase()=="none"){
     final_probability_list = Array(diagnostic_max_length-(diagnostic_min_length-1)).fill(1)
 } else {
     let halfway = (diagnostic_min_length+diagnostic_max_length)/2 //Diag halfway value
-    if(exp_debugging=="Y"){console.log(halfway)}
+    if(exp_debugging=="Y"){ console.log(halfway) }
     
     let probability_list = [];
     for(let i = 0; i < spare; i++){
         probability_list.push(1)
-        if(exp_debugging=="Y"){console.log(probability_list)}
+        if(exp_debugging=="Y"){ console.log(probability_list) }
     }
     
     for(let i = 1; i < Math.floor(halfway - diagnostic_min_length - spare) + 1; i++){
@@ -136,7 +138,7 @@ if(math.toLowerCase()=="none"){
         // If odd add one in the middle
     }
 }
-if(exp_debugging=="Y"){console.log("Final probabilities are: ", final_probability_list)}
+if(exp_debugging=="Y"){ console.log("Final probabilities are: ", final_probability_list) }
 
 // Randomize diagnostic length across the experiment & distribute according to probability distribution
 let rnd_diagnostic_length = [];
@@ -144,9 +146,10 @@ for(let i = 0; i < number_of_inducers; i++){
     rnd_diagnostic_length.push(jsPsych.randomization.sampleWithReplacement(diagnostic_range, 1,  final_probability_list)[0]);
     // We randomize the length from "min" to "max" with the probabilities in "final_probability_list"
 }
-if(exp_debugging=="Y"){console.log("With these parameters we end up with an average length of: ",  (diagnostic_min_length+diagnostic_max_length)/2*number_of_inducers)}
-if(exp_debugging=="Y"){console.log("Diag lengths: ", rnd_diagnostic_length)}
-if(exp_debugging=="Y"){console.log("Experiment length: ", rnd_diagnostic_length.reduce((val, a) => val + a))} // sum the list
+if(exp_debugging=="Y"){ console.log("With these parameters we end up with an average length of: ",  
+(diagnostic_min_length+diagnostic_max_length)/2*number_of_inducers) }
+if(exp_debugging=="Y"){ console.log("Diag lengths: ", rnd_diagnostic_length) }
+if(exp_debugging=="Y"){ console.log("Experiment length: ", rnd_diagnostic_length.reduce((val, a) => val + a)) } // sum the list
 
 
 
@@ -269,10 +272,10 @@ for(let i = 0; i < number_of_inducers; i++){ // less than, since we start at 0
                 let data = jsPsych.data.get().last(1).values()[0];
                 if(data.response === null)  { 
                     //console.log(jsPsych.data.getLastTrialData())
-                    console.log("TOO SLOW TRUE")
+                    if(exp_debugging=="Y"){ console.log("TOO SLOW") }
                     console.log(data)
                 return true } 
-                else                        { return false }
+                else { return false }
             }
         }
         timeline.push(too_slow_trial)
@@ -283,8 +286,9 @@ for(let i = 0; i < number_of_inducers; i++){ // less than, since we start at 0
             conditional_function: () => {
                 let data = jsPsych.data.get().last(1).values()[0];
                 if( data.correct == false)  { 
+                    if(exp_debugging=="Y"){ console.log("WRONG RESPONSE") }
                  return true } 
-                else                        { return false }
+                else { return false }
             }
         }
         timeline.push(wrong_response_trial)
@@ -296,7 +300,7 @@ for(let i = 0; i < number_of_inducers; i++){ // less than, since we start at 0
     let rnd_inducer_stimulus = jsPsych.randomization.sampleWithReplacement(run_stimuli, 1, run_stimulus_bias)[0]
     let inducer_task = {
         type: jsPsychHtmlKeyboardResponse,
-        stimulus: () => {return `<p style="font-size: ${general_font_size};">${rnd_inducer_stimulus}`},
+        stimulus: () => { return `<p style="font-size: ${general_font_size};">${rnd_inducer_stimulus}` },
         choices: allowed_responses,
         trial_duration: trial_duration,
         data: {
@@ -304,7 +308,7 @@ for(let i = 0; i < number_of_inducers; i++){ // less than, since we start at 0
             inducer_run: i,                     // Inducer run 
             inducer_trial: true,                // Inducer trial
             correct_response_side: () => {      // Get response side, according to run_stimuli
-                if(rnd_inducer_stimulus == run_stimuli[0]){return rnd_inducer_responseSides[0]}
+                if(rnd_inducer_stimulus == run_stimuli[0]){ return rnd_inducer_responseSides[0] }
                 else { return rnd_diagnostic_responseSides[1]} },
         },
         on_finish: (data) => {
@@ -319,31 +323,39 @@ for(let i = 0; i < number_of_inducers; i++){ // less than, since we start at 0
             } else { data.correct = false }
         }
     }
-    // // If participants responded to slow, give feedback
-    // let too_slow_trial = {
-    //     timeline: [set_background_colour_wrong_response, too_slow, set_background_colour_default],
-    //     conditional_function: () => {
-    //         let data = jsPsych.data.get().last(1).values()[0];
-    //         if(data.response === null)  { return true } 
-    //         else                        { return false }
-    //     }
-    // }
-    // timeline.push(too_slow_trial)
-    
-    // // If participants responded incorrectly, give feedback
-    // let wrong_response_trial = {
-    //     timeline: [set_background_colour_wrong_response, wrong_response , set_background_colour_default],
-    //     conditional_function: () => {
-    //         let data = jsPsych.data.get().last(1).values()[0];
-    //         if( data.correct == false)  { console.log("SEND RED")
-    //             return true } 
-    //         else                        { return false }
-    //     }
-    // }
-    // timeline.push(wrong_response_trial)
-    
     timeline.push(inducer_task)
-    timeline.push(fixation2) // longer fixation
+
+    // If participants responded to slow, give feedback
+    let too_slow_trial = {
+        timeline: [set_background_colour_wrong_response, too_slow, set_background_colour_default],
+        conditional_function: () => {
+            let data = jsPsych.data.get().last(1).values()[0];
+            if(data.response === null)  { 
+                if(exp_debugging="Y"){ console.log("TOO SLOW") } 
+                return true } 
+            else { return false }
+        }
+    }
+    timeline.push(too_slow_trial)
+    // If participants responded incorrectly, give feedback
+    let wrong_response_trial = {
+        timeline: [set_background_colour_wrong_response, wrong_response , set_background_colour_default],
+        conditional_function: () => {
+            let data = jsPsych.data.get().last(1).values()[0];
+            if( data.correct == false)  { 
+                if(exp_debugging=="Y"){ 
+                    if(exp_debugging=="Y"){ console.log("WRONG RESPONSE") } 
+                return true } 
+                else { return false }
+            }
+        }
+    }
+    timeline.push(wrong_response_trial)
+    
+    if(i!=number_of_inducers){
+        console.log("INDUCERS PUSH")
+        timeline.push(fixation2) // longer fixation
+    }
 }
 
 
