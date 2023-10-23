@@ -3,8 +3,8 @@ const default_background_colour = "#cccccc" // Light grey
 const wrong_response_colour = "#d22d2d"     // Blood red-ish 
 
 // Delay 
-const fixation_delay = 2 // 750      // Main fixation delay
-const fixation2_delay = 1500    // second fixation delay (after each inducer)
+const short_fixation = 2 // 750      // Main fixation delay
+const long_fixation = 1500    // second fixation delay (after each inducer)
 const wrong_response_delay = 2 // 300    // How long is wrong response displayed?
 const too_slow_delay = 300          // How long is too slow response displayed
 const instruction_delay = 10000     // How long is each s-r mapping displayed
@@ -21,7 +21,7 @@ const responseSides = ["LEFT","RIGHT"];     // What participants will RESPOND to
     // these two parameters must correspond 
 
 ////    Inducer parameters     ////
-const inducer_colours = []      // Inducer colour randomize between participants (if more than 1)
+const inducer_colours = ["red","blue","green"]      // Inducer colour randomize between participants (if more than 1)
 
 ////    Diagnostic parameters   ////
 let number_of_inducers = 1//24;     // Number of inducers 

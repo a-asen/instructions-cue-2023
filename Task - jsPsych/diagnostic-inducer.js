@@ -1,5 +1,6 @@
 const exp_debugging="Y" // 
 
+
 function saveData(name, data){
     var xhr = new XMLHttpRequest();
     xhr.open('POST', 'write_data.php'); // 'write_data.php' is the path to the php file described above.
@@ -19,44 +20,44 @@ if(exp_debugging == "Y") { console.log(start_dateTime) }
 
 
 //// Trials ////
-// Fixation
-let fixation = {
+// short_fixation
+const short_fixation = {
     type: jsPsychHtmlKeyboardResponse,
     stimulus: () => { return `<div style='font-size: ${fixation_size}'> + </div>` },
     choices: "NO_KEYS",
     trial_duration: fixation_delay, 
+    data: {stimulus: "+", trial_info: "Fixation - short"}
 } 
-let fixation2 = {
+const long_fixation = {
     type: jsPsychHtmlKeyboardResponse,
     stimulus:  () => { return `<div style='font-size: ${fixation_size}'> + </div>` },
     choices: "NO_KEYS",
     trial_duration: fixation2_delay, 
+    data: {stimulus: "+", trial_info: "Fixation - long"}
 }
 // Feedback
-let wrong_response = {
+const wrong_response = {
     type: jsPsychHtmlKeyboardResponse,
     stimulus:  () => { return `<div style="font-size: ${general_font_size};"> Wrong response </div>` },
     choices: "NO_KEYS",
     trial_duration: wrong_response_delay,
-    data: { wrong_response: true }
+    data: { trial_info: "Wrong response"}
 }
-let too_slow = {
+const too_slow = {
     type: jsPsychHtmlKeyboardResponse,
     stimulus: () => { return `<div style="font-size: ${general_font_size};"> Too slow </div>` },
     choices: "NO_KEYS",
     trial_duration: too_slow_delay, 
-    data: { too_slow: true }
+    data: { trial_info: "Too slow"}
 }
 // change background
 const set_background_colour_default = {
     type: jsPsychCallFunction,
     func: () => { changeBackground(default_background_colour) }
 } 
-
-
 const set_background_colour_wrong_response = {
     type: jsPsychCallFunction,
-    func: () => { changeBackground(wrong_response_colour) }
+    func: () => { changeBackground(wrong_response_colour) },
 }
   // https://github.com/jspsych/jsPsych/discussions/936
   // https://github.com/psychbruce/jspsych/blob/master/exp_demo/experiment/experiment.js
@@ -66,13 +67,12 @@ const jsPsych = initJsPsych({
     // experiment_width : 1280, 
         // w/e add later if necessary
     on_finish: function() {
-    jsPsych.data.displayData();
-}});
+        jsPsych.data.displayData() }
+});
+
 // Timeline start
 const timeline = [];
 timeline.push(set_background_colour_default) // To ensure the background colour is correct.
-
-// timeline.push(set_background_colour_default) /7
 
 // About the experiment 
 const about_the_experiment = {
@@ -87,6 +87,8 @@ const concent = {
     type: jsPsychInstructions,
     pages: [
     ],
+
+    data: {stimulus: "Instructions...."}
 }
 
 // Instructions  // initialize fullscreen
@@ -191,6 +193,11 @@ let diagnostic_task_instruction = {
     }, 
     choices: [" "], 
     trial_duration: instruction_delay,
+    data: {
+        stimulus: `If italic press ${rnd_diagnostic_responseSides[0]} || If upright press ${rnd_diagnostic_responseSides[1]}`,
+        trial_info: "Diagnostic instructions",
+    },
+    on_finish: () => {console.log(jsPsych.data.getLastTrialData())}
     //post_trial_gap: 1500,
 }
 timeline.push(diagnostic_task_instruction)
@@ -212,12 +219,15 @@ for(let i = 0; i < number_of_inducers; i++){ // less than, since we start at 0
                     `<p style="font-size: ${general_font_size};"> If ${run_stimuli[1]} press ${rnd_inducer_responseSides[1]}`; 
         }, 
         choices: " ", 
-        data: run_stimuli[0] + rnd_inducer_responseSides[0], 
-                run_stimuli[1] + rnd_inducer_responseSides[1],
+        data: {
+            inducer_run: i,                 // Inducer run number
+            stimulus: `If ${run_stimuli[0]} press ${rnd_inducer_responseSides[0]} || If ${run_stimuli[1]} press ${rnd_inducer_responseSides[1]}`,
+            trial_info: "Inducer instructions"
+        }, 
         trial_duration: instruction_delay, 
     }
     timeline.push(inducer_instruction)
-    timeline.push(fixation)
+    timeline.push(short_fixation)
 
 
     // Then we generate the diagnostic trials 
@@ -251,16 +261,16 @@ for(let i = 0; i < number_of_inducers; i++){ // less than, since we start at 0
                 // Set the "correct_response_key"
                 if(data.correct_response_side == responseSides[0]){
                     data.correct_response_key = allowed_responses[0]
-                } else { data.correct_response_key = allowed_responses[1]}
+                } else { 
+                    data.correct_response_key = allowed_responses[1]}
 
                 // Only if there is a response do we check whether it is correct. 
                 if(data.response == null){
                     data.correct = null;
                 } else {
                     // If response equals correct_response_key
-                    if(data.correct_response_key == data.response){
-                        data.correct = true
-                    } else {data.correct = false}
+                    if(data.correct_response_key == data.response)  { data.correct = true }
+                    else                                            { data.correct = false }
                 }
 
                 // could add
@@ -283,10 +293,8 @@ for(let i = 0; i < number_of_inducers; i++){ // less than, since we start at 0
             timeline: [set_background_colour_wrong_response, too_slow, set_background_colour_default],
             conditional_function: () => {
                 let data = jsPsych.data.get().last(1).values()[0];
-                if(data.response === null)  { 
-                    if(exp_debugging=="Y"){ return true } 
-                    else { return false }
-                }
+                if(data.response === null)  { return true } 
+                else                        { return false }
             }
         }
         timeline.push(too_slow_trial)
@@ -295,14 +303,14 @@ for(let i = 0; i < number_of_inducers; i++){ // less than, since we start at 0
         let wrong_response_trial = {
             timeline: [set_background_colour_wrong_response, wrong_response , set_background_colour_default],
             conditional_function: () => {
-                let data = jsPsych.data.get().last(1).values()[0];
+                let data = jsPsych.data.get().last(1).values()[0]
                 if( data.correct == false)  { return true } 
-                else { return false }
+                else                        { return false }
             }
         }
         timeline.push(wrong_response_trial)
 
-        timeline.push(fixation)
+        timeline.push(short_fixation)
     }
 
     /// INDUCERN TASK HERE
@@ -311,7 +319,7 @@ for(let i = 0; i < number_of_inducers; i++){ // less than, since we start at 0
 
     let inducer_task = {
         type: jsPsychHtmlKeyboardResponse,
-        stimulus: () => { return `<p style="font-size: ${general_font_size};">${rnd_inducer_stimulus}` },
+        stimulus: () => { return `<p style="font-size: ${general_font_size}; color:${rnd_inducer_colour}">${rnd_inducer_stimulus}` },
         choices: allowed_responses,
         trial_duration: trial_duration,
         data: {
@@ -319,19 +327,21 @@ for(let i = 0; i < number_of_inducers; i++){ // less than, since we start at 0
             inducer_run: i,                     // Inducer run 
             inducer_trial: true,                // Inducer trial
             correct_response_side: () => {      // Get response side, according to run_stimuli
-                if(rnd_inducer_stimulus == run_stimuli[0]){ return rnd_inducer_responseSides[0] }
-                else { return rnd_diagnostic_responseSides[1]} },
+                if(rnd_inducer_stimulus == run_stimuli[0]){ 
+                    return rnd_inducer_responseSides[0] 
+                } else { 
+                    return rnd_diagnostic_responseSides[1]} },
         },
         on_finish: (data) => {
             // Find correct response key 
             if(data.correct_response_side == responseSides[0]){
-                data.correct_response_key = allowed_responses[0] } 
-            else { data.correct_response_key = allowed_responses[1] }
+                data.correct_response_key = allowed_responses[0] 
+            } else { 
+                data.correct_response_key = allowed_responses[1] }
 
             // Test whether the response is correct
-            if(data.response == data.correct_response_key){
-                data.correct = true;
-            } else { data.correct = false }
+            if(data.response == data.correct_response_key)  { data.correct = true }
+            else                                            { data.correct = false }
         }
     }
     timeline.push(inducer_task)
@@ -341,10 +351,8 @@ for(let i = 0; i < number_of_inducers; i++){ // less than, since we start at 0
         timeline: [set_background_colour_wrong_response, too_slow, set_background_colour_default],
         conditional_function: () => {
             let data = jsPsych.data.get().last(1).values()[0];
-            if(data.response === null)  { 
-                if(exp_debugging == "Y"){ console.log("TOO SLOW") } 
-                return true } 
-            else { return false }
+            if(data.response === null)  { return true } 
+            else                        { return false }
         }
     }
     timeline.push(too_slow_trial)
@@ -360,7 +368,7 @@ for(let i = 0; i < number_of_inducers; i++){ // less than, since we start at 0
     timeline.push(wrong_response_trial)
         
     let inducer_fixation = {
-        timeline: [fixation2],
+        timeline: [long_fixation],
         conditional_function: () => {
             if(i < number_of_inducers)  { return true } 
             else                        { return false }
@@ -369,6 +377,9 @@ for(let i = 0; i < number_of_inducers; i++){ // less than, since we start at 0
     timeline.push(inducer_fixation)
 }
 
+
+// Way too much to change to get the background colour gray
+// So just set it to white
 const white_bk = {
     type: jsPsychCallFunction,
     func: () => { changeBackground("white") }
@@ -400,27 +411,22 @@ const demographics = {
                 required: true,
             }
         ]],
-    data: { stimulus: "demographics" }, 
+    data: { stimulus: "demographics"}, 
     on_finish: () => {
-                // pick out responses from previous trial
-        console.log(jsPsych.data.getLastTrialData().values())
         data = jsPsych.data.getLastTrialData().values()[0]
-
         console.log(data)
-
-        gender = jsPsych.data.getLastTrialData().values()[0].response.gender
-        birthYear = jsPsych.data.getLastTrialData().values()[0].response.yearBorn
         
-        // Enda date/time
-        var end_dateTime = new Date().today() + "_" + new Date().timeNow();
-        
-        jsPsych.data.get().addToAll({ gender:    gender });
-        jsPsych.data.get().addToAll({ birthYear: birthYear });
-        jsPsych.data.get().addToAll({ id: ID });
+        jsPsych.data.get().addToAll({ gender:       data.response.gender });
+        jsPsych.data.get().addToAll({ birthYear:    data.response.birthYear });
+        jsPsych.data.get().addToAll({ id:           ID });
 
         // Save the data
         jsPsych.data.get().localSave('csv','mydata.csv')
+        console.log(jsPsych.data.get().localSave('csv','mydata.csv'))
+
+
         saveData("data_" + start_dateTime + "_" + ID, jsPsych.data.get().csv());
+
     }
 }
 timeline.push(demographics)
