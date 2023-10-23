@@ -1,24 +1,22 @@
+const exp_debugging="Y" // 
 
 
-// const exp_debugging="Y" // 
-
-
-// function saveData(name, data){
-//     var xhr = new XMLHttpRequest();
-//     xhr.open('POST', 'write_data.php'); // 'write_data.php' is the path to the php file described above.
-//     xhr.setRequestHeader('Content-Type', 'application/json');
-//     xhr.send(JSON.stringify({filename: name, filedata: data}));
-//   }
+function saveData(name, data){
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', 'write_data.php'); // 'write_data.php' is the path to the php file described above.
+    xhr.setRequestHeader('Content-Type', 'application/json');
+    xhr.send(JSON.stringify({filename: name, filedata: data}));
+  }
   
 
-// Date.prototype.today = function () { 
-//     return this.getFullYear() + "-" + (((this.getMonth()+1) < 10)?"0":"") + (this.getMonth()+1) +"-"+ ((this.getDate() < 10)?"0":"") + this.getDate();
-//   }
-//   Date.prototype.timeNow = function () {
-//      return ((this.getHours() < 10)?"0":"") + this.getHours() +"-"+ ((this.getMinutes() < 10)?"0":"") + this.getMinutes() +"-"+ ((this.getSeconds() < 10)?"0":"") + this.getSeconds();
-//   }
-//   var dateTime = new Date().today() + "_" + new Date().timeNow();
-// console.log(Date())
+Date.prototype.today = function () { 
+    return this.getFullYear() + "-" + (((this.getMonth()+1) < 10)?"0":"") + (this.getMonth()+1) +"-"+ ((this.getDate() < 10)?"0":"") + this.getDate();
+  }
+  Date.prototype.timeNow = function () {
+     return ((this.getHours() < 10)?"0":"") + this.getHours() +"-"+ ((this.getMinutes() < 10)?"0":"") + this.getMinutes() +"-"+ ((this.getSeconds() < 10)?"0":"") + this.getSeconds();
+  }
+  var dateTime = new Date().today() + "_" + new Date().timeNow();
+console.log(Date())
   
 
 //// Trials ////
@@ -386,43 +384,43 @@ for(let i = 0; i < number_of_inducers; i++){ // less than, since we start at 0
 }
 
 
-let demographics = {
-    type: jsPsychSurvey,
-    button_label_finish: "Next",
-    required_question_label: "test",
-    required_error: "Please check whether you responded to all the questions.",
-    pages: [
-        [
-            {
-                type: 'html',
-                prompt: 'You have now completed the central part of the experiment.<br> To complete the study, please answer the following questions:',
-            },
-            {
-                type: 'multi-choice',
-                prompt: "Gender", 
-                name: 'gender', 
-                options: ['Female', 'Male', 'Other', 'I would rather not tell.'], 
-                required: true
-            }, 
-            {
-                type: 'text',
-                prompt: "What year were you born? (enter answer into text box below)", 
-                name: 'yearBorn', 
-                textbox_columns: 5,
-                required: true,
-            }
-        ]
-    ],
-    data: { stimulus: "demographics" }, 
-    on_finish: () => {
-        saveData("data_" + dateTime + "_" + unique, jsPsych.data.get().csv());
-        jsPsych.data.get().addToAll({ gender:    gender });
-        jsPsych.data.get().addToAll({ birthYear: birthYear });
-        jsPsych.data.get().addToAll({ id:        ID });
-    }
-}
+// let demographics = {
+//     type: jsPsychSurvey,
+//     button_label_finish: "Next",
+//     required_question_label: "test",
+//     required_error: "Please check whether you responded to all the questions.",
+//     pages: [
+//         [
+//             {
+//                 type: 'html',
+//                 prompt: 'You have now completed the central part of the experiment.<br> To complete the study, please answer the following questions:',
+//             },
+//             {
+//                 type: 'multi-choice',
+//                 prompt: "Gender", 
+//                 name: 'gender', 
+//                 options: ['Female', 'Male', 'Other', 'I would rather not tell.'], 
+//                 required: true
+//             }, 
+//             {
+//                 type: 'text',
+//                 prompt: "What year were you born? (enter answer into text box below)", 
+//                 name: 'yearBorn', 
+//                 textbox_columns: 5,
+//                 required: true,
+//             }
+//         ]
+//     ],
+//     data: { stimulus: "demographics" }, 
+//     on_finish: () => {
+//         saveData("data_" + dateTime + "_" + unique, jsPsych.data.get().csv());
+//         jsPsych.data.get().addToAll({ gender:    gender });
+//         jsPsych.data.get().addToAll({ birthYear: birthYear });
+//         jsPsych.data.get().addToAll({ id:        ID });
+//     }
+// }
 
-var comments = {}
+// var comments = {}
 
 // exit fullscreen mode
     // before finish exit FS
