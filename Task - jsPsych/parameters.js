@@ -11,9 +11,9 @@ const instruction_delay = 10000
 const trial_duration = 2000
 
 // Font size
-const instruction_font_size = "36px"
-const general_font_size = "42px"
-const fixation_size = "48px"
+const instruction_font_size = "36px"    // about the experiment / Consent / explanation
+const general_font_size = "42px"        // Diagnostic/inducer/stimulus size
+const fixation_size = "48px"            // Fixation 
 
 ////    Responses    ////
 const allowed_responses = ["f","j"];  // Allowed responses
