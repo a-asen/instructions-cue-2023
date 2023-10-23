@@ -1,13 +1,22 @@
-const exp_debugging="Y" // 
+////////////////////////////////////////////////////////
+// CHANGE THESE BEFORE EXPERIMENT!
 
+const debug = true              // Show some console information
+const skip_instructions = true  // Skip intro? (to test trials)
+const save_local_data = true    // Save a local file (test analysis)
 
+////////////////////////////////////////////////////////
+
+// Connection to server?
 function saveData(name, data){
     var xhr = new XMLHttpRequest();
     xhr.open('POST', 'write_data.php'); // 'write_data.php' is the path to the php file described above.
     xhr.setRequestHeader('Content-Type', 'application/json');
     xhr.send(JSON.stringify({filename: name, filedata: data}));
 }
-  
+
+
+// Get data function
 Date.prototype.today = function () { 
     return this.getFullYear() + "-" + (((this.getMonth()+1) < 10)?"0":"") + (this.getMonth()+1) +"-"+ ((this.getDate() < 10)?"0":"") + this.getDate();
 }
@@ -15,25 +24,24 @@ Date.prototype.timeNow = function () {
     return ((this.getHours() < 10)?"0":"") + this.getHours() +"-"+ ((this.getMinutes() < 10)?"0":"") + this.getMinutes() +"-"+ ((this.getSeconds() < 10)?"0":"") + this.getSeconds();
 }
 var start_dateTime = new Date().today() + "_" + new Date().timeNow();
-if(exp_debugging == "Y") { console.log(start_dateTime) }
+if(debug == true) { console.log(start_dateTime) }
 
 
-
-//// Trials ////
-// short_fixation
-const short_fixation = {
+////    Trials      ////
+// Fixations
+let short_fixation = {
     type: jsPsychHtmlKeyboardResponse,
     stimulus: () => { return `<div style='font-size: ${fixation_size}'> + </div>` },
     choices: "NO_KEYS",
-    trial_duration: fixation_delay, 
-    data: {stimulus: "+", trial_info: "Fixation - short"}
+    trial_duration: short_fixation_delay, 
+    data: { stimulus: "+", trial_info: "Fixation - short" },
 } 
 const long_fixation = {
     type: jsPsychHtmlKeyboardResponse,
     stimulus:  () => { return `<div style='font-size: ${fixation_size}'> + </div>` },
     choices: "NO_KEYS",
-    trial_duration: fixation2_delay, 
-    data: {stimulus: "+", trial_info: "Fixation - long"}
+    trial_duration: long_fixation_delay, 
+    data: { stimulus: "+", trial_info: "Fixation - long" },
 }
 // Feedback
 const wrong_response = {
@@ -41,14 +49,14 @@ const wrong_response = {
     stimulus:  () => { return `<div style="font-size: ${general_font_size};"> Wrong response </div>` },
     choices: "NO_KEYS",
     trial_duration: wrong_response_delay,
-    data: { trial_info: "Wrong response"}
+    data: { stimulus: "Wrong response", trial_info: "Feedback" }
 }
 const too_slow = {
     type: jsPsychHtmlKeyboardResponse,
     stimulus: () => { return `<div style="font-size: ${general_font_size};"> Too slow </div>` },
     choices: "NO_KEYS",
     trial_duration: too_slow_delay, 
-    data: { trial_info: "Too slow"}
+    data: { stimulus: "Too slow", trial_info: "Feedback" }
 }
 // change background
 const set_background_colour_default = {
@@ -63,67 +71,79 @@ const set_background_colour_wrong_response = {
   // https://github.com/psychbruce/jspsych/blob/master/exp_demo/experiment/experiment.js
 
 
+//
+//
+//  Initialize 
+//
+//
+
 const jsPsych = initJsPsych({
     // experiment_width : 1280, 
         // w/e add later if necessary
     on_finish: function() {
         jsPsych.data.displayData() }
 });
-
 // Timeline start
 const timeline = [];
+
 timeline.push(set_background_colour_default) // To ensure the background colour is correct.
 
 // About the experiment 
 const about_the_experiment = {
     type: jsPsychInstructions,
     pages: [
-
+        `WHAT ABOUT THIS EXPERIMETN; HUH?!` 
     ],
+    data: { stimulus: "About the experiment", trial_info: "About the experiment" }
 }
+if(skip_instructions==true){} else { timeline.push(about_the_experiment) }
 
 // Concent !!!
 const concent = {
     type: jsPsychInstructions,
     pages: [
+        `BY CLICKING NEXT YOU CONSENT TO THE EXPERIMENT -- bla bla
+        
+        Cancel at any time without any repercussions`
     ],
-
+    
     data: {stimulus: "Instructions...."}
 }
+if(skip_instructions==true){} else { timeline.push(concent) }
 
-// Instructions  // initialize fullscreen
-// timeline.push({
-//     type: jsPsychFullscreen,
-//     fullscreen_mode: true
-// });
-    // For this experiment we will keep you in fullscreen.
-
+// initialize fullscreen
+if(skip_instructions==true){} else {
+    timeline.push({
+        type: jsPsychFullscreen,
+        fullscreen_mode: true
+    });
+}
 
 // Unique ID
 let ID = jsPsych.randomization.randomID(8);
-if(exp_debugging=="Y"){ console.log("ID = " + ID) }
+if(debug==true){ console.log("ID = " + ID) }
 
 ///////////////////////////////////////////////////////
 ////////////            TASK               ////////////
 // Shuffle stimuli list
 let rnd_stimuli = jsPsych.randomization.shuffle(stimuli);  // Shuffle stimuli list
-if(exp_debugging=="Y") { console.log(rnd_stimuli) }
+if(debug==true) { console.log(rnd_stimuli) }
 
 // Generate diagnostic length ranges
 let diagnostic_range = Array.from(Array(diagnostic_max_length-3), (x,i) => i + diagnostic_min_length) 
-if(exp_debugging=="Y"){ console.log("The range of diagnostic lengths: ", diagnostic_range) }
+if(debug==true){ console.log("The range of diagnostic lengths: ", diagnostic_range) }
 
 // Generate probability distribution of the diagnostic run (if relevant)
 if(math.toLowerCase() == "none"){
     final_probability_list = Array(diagnostic_max_length-(diagnostic_min_length-1)).fill(1)
 } else {
     let halfway = (diagnostic_min_length+diagnostic_max_length)/2 //Diag halfway value
-    if(exp_debugging=="Y"){ console.log("Halway: ", halfway) }
+    if(debug==true){ console.log("Halway: ", halfway) }
     
     let probability_list = [];
     for(let i = 0; i < spare; i++){
         probability_list.push(1)
-        if(exp_debugging=="Y"){ console.log("Probability list: ", probability_list) }
+        if(debug==true){ console.log("Probability list: ", probability_list) }
     }
     
     for(let i = 1; i < Math.floor(halfway - diagnostic_min_length - spare) + 1; i++){
@@ -155,7 +175,7 @@ if(math.toLowerCase() == "none"){
         // If odd add one in the middle
     }
 }
-if(exp_debugging=="Y"){ console.log("Final probabilities are: ", final_probability_list) }
+if(debug==true){ console.log("Final probabilities are: ", final_probability_list) }
 
 // Randomize diagnostic length across the experiment & distribute according to probability distribution
 let rnd_diagnostic_length = [];
@@ -163,11 +183,10 @@ for(let i = 0; i < number_of_inducers; i++){
     rnd_diagnostic_length.push(jsPsych.randomization.sampleWithReplacement(diagnostic_range, 1,  final_probability_list)[0]);
     // We randomize the length from "min" to "max" with the probabilities in "final_probability_list"
 }
-if(exp_debugging=="Y"){ console.log("With these parameters we end up with an average length of: ",  
+if(debug==true){ console.log("With these parameters we end up with an average length of: ",  
 (diagnostic_min_length+diagnostic_max_length)/2*number_of_inducers) }
-if(exp_debugging=="Y"){ console.log("Diag lengths: ", rnd_diagnostic_length) }
-if(exp_debugging=="Y"){ console.log("Experiment length: ", rnd_diagnostic_length.reduce((val, a) => val + a)) } // sum the list
-
+if(debug==true){ console.log("Diag lengths: ", rnd_diagnostic_length) }
+if(debug==true){ console.log("Experiment length: ", rnd_diagnostic_length.reduce((val, a) => val + a)) } // sum the list
 
 
 ////////        Experiment run creation         ////////
@@ -191,7 +210,8 @@ let diagnostic_task_instruction = {
         `<p style="font-size: ${general_font_size};"> If a target appeas upright press ${rnd_diagnostic_responseSides[1]}`; 
         return a;
     }, 
-    choices: [" "], 
+    prompt: "Press any key to continue",
+    choices: "ALL_KEYS", 
     trial_duration: instruction_delay,
     data: {
         stimulus: `If italic press ${rnd_diagnostic_responseSides[0]} || If upright press ${rnd_diagnostic_responseSides[1]}`,
@@ -218,7 +238,8 @@ for(let i = 0; i < number_of_inducers; i++){ // less than, since we start at 0
             return  `<p style="font-size: ${general_font_size};"> If ${run_stimuli[0]} press ${rnd_inducer_responseSides[0]}`+
                     `<p style="font-size: ${general_font_size};"> If ${run_stimuli[1]} press ${rnd_inducer_responseSides[1]}`; 
         }, 
-        choices: " ", 
+        prompt: "Press any key to continue",
+        choices: "ALL_KEYS", 
         data: {
             inducer_run: i,                 // Inducer run number
             stimulus: `If ${run_stimuli[0]} press ${rnd_inducer_responseSides[0]} || If ${run_stimuli[1]} press ${rnd_inducer_responseSides[1]}`,
@@ -253,6 +274,7 @@ for(let i = 0; i < number_of_inducers; i++){ // less than, since we start at 0
                 diagnostic_run: ii,             // Diagnostic run number
                 inducer_trial: false,           // Not an inducer trial
                 italic: run_rnd_italic,         // Italic trial?
+                trial_info: "Diagnostic trial", // General trial info
                 correct_response_side: () => {  // The correct response side (if is italic, then resp side 0)
                     if (run_rnd_italic == true) { return rnd_diagnostic_responseSides[0] } 
                     else                        { return rnd_diagnostic_responseSides[1] } },
@@ -326,6 +348,7 @@ for(let i = 0; i < number_of_inducers; i++){ // less than, since we start at 0
             stimulus: rnd_inducer_stimulus,     // stimulus
             inducer_run: i,                     // Inducer run 
             inducer_trial: true,                // Inducer trial
+            trial_info: "Inducer trial",        // General trial info
             correct_response_side: () => {      // Get response side, according to run_stimuli
                 if(rnd_inducer_stimulus == run_stimuli[0]){ 
                     return rnd_inducer_responseSides[0] 
@@ -411,22 +434,19 @@ const demographics = {
                 required: true,
             }
         ]],
-    data: { stimulus: "demographics"}, 
+    data: { stimulus: "Demographics", trial_info: "Demographics"}, 
     on_finish: () => {
         data = jsPsych.data.getLastTrialData().values()[0]
-        console.log(data)
         
         jsPsych.data.get().addToAll({ gender:       data.response.gender });
         jsPsych.data.get().addToAll({ birthYear:    data.response.birthYear });
         jsPsych.data.get().addToAll({ id:           ID });
 
         // Save the data
-        jsPsych.data.get().localSave('csv','mydata.csv')
-        console.log(jsPsych.data.get().localSave('csv','mydata.csv'))
+        if(save_local_data==true){ jsPsych.data.get().localSave('csv','mydata.csv') }
 
-
+        // Return data to server
         saveData("data_" + start_dateTime + "_" + ID, jsPsych.data.get().csv());
-
     }
 }
 timeline.push(demographics)
