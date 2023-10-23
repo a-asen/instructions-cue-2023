@@ -199,6 +199,7 @@ let diagnostic_task_instruction_description = {
     ]
 }
 
+
 let rnd_diagnostic_responseSides = jsPsych.randomization.shuffle(responseSides);    // randomize response side 
         // Could/would probably be a good idea to randomize italic/upright appearance as well, but w/e
 // Only displayed once, instruction remains the same throughout the experiment
@@ -221,6 +222,17 @@ let diagnostic_task_instruction = {
     //post_trial_gap: 1500,
 }
 timeline.push(diagnostic_task_instruction)
+
+
+
+// inducer
+
+
+// inducer explanation? should it say on each trial?! 
+
+
+
+
 
 
 // Here we create the experiment

@@ -24,7 +24,7 @@ const responseSides = ["LEFT","RIGHT"];     // What participants will RESPOND to
     // these two parameters must correspond 
 
 ////    Inducer parameters     ////
-const inducer_colours = ["red","blue","green"]      // Inducer colour randomize between participants (if more than 1)
+const inducer_colours = ["blue","green", "yellow"]      // Inducer colour randomize between participants (if more than 1)
 
 ////    Diagnostic parameters   ////
 let number_of_inducers = 1//24;     // Number of inducers 
