@@ -1,23 +1,22 @@
 const exp_debugging="Y" // 
 
-
 function saveData(name, data){
     var xhr = new XMLHttpRequest();
     xhr.open('POST', 'write_data.php'); // 'write_data.php' is the path to the php file described above.
     xhr.setRequestHeader('Content-Type', 'application/json');
     xhr.send(JSON.stringify({filename: name, filedata: data}));
-  }
+}
   
-
 Date.prototype.today = function () { 
     return this.getFullYear() + "-" + (((this.getMonth()+1) < 10)?"0":"") + (this.getMonth()+1) +"-"+ ((this.getDate() < 10)?"0":"") + this.getDate();
-  }
-  Date.prototype.timeNow = function () {
-     return ((this.getHours() < 10)?"0":"") + this.getHours() +"-"+ ((this.getMinutes() < 10)?"0":"") + this.getMinutes() +"-"+ ((this.getSeconds() < 10)?"0":"") + this.getSeconds();
-  }
-  var dateTime = new Date().today() + "_" + new Date().timeNow();
-console.log(Date())
-  
+}
+Date.prototype.timeNow = function () {
+    return ((this.getHours() < 10)?"0":"") + this.getHours() +"-"+ ((this.getMinutes() < 10)?"0":"") + this.getMinutes() +"-"+ ((this.getSeconds() < 10)?"0":"") + this.getSeconds();
+}
+var start_dateTime = new Date().today() + "_" + new Date().timeNow();
+if(exp_debugging == "Y") { console.log(start_dateTime) }
+
+
 
 //// Trials ////
 // Fixation
@@ -26,7 +25,7 @@ let fixation = {
     stimulus: () => { return `<div style='font-size: ${fixation_size}'> + </div>` },
     choices: "NO_KEYS",
     trial_duration: fixation_delay, 
-}
+} 
 let fixation2 = {
     type: jsPsychHtmlKeyboardResponse,
     stimulus:  () => { return `<div style='font-size: ${fixation_size}'> + </div>` },
@@ -53,10 +52,12 @@ const set_background_colour_default = {
     type: jsPsychCallFunction,
     func: () => { changeBackground(default_background_colour) }
 } 
+
+
 const set_background_colour_wrong_response = {
     type: jsPsychCallFunction,
     func: () => { changeBackground(wrong_response_colour) }
-} 
+}
   // https://github.com/jspsych/jsPsych/discussions/936
   // https://github.com/psychbruce/jspsych/blob/master/exp_demo/experiment/experiment.js
 
@@ -67,7 +68,6 @@ const jsPsych = initJsPsych({
     on_finish: function() {
     jsPsych.data.displayData();
 }});
-
 // Timeline start
 const timeline = [];
 timeline.push(set_background_colour_default) // To ensure the background colour is correct.
@@ -99,7 +99,7 @@ const concent = {
 
 // Unique ID
 let ID = jsPsych.randomization.randomID(8);
-if(exp_debugging=="Y"){ console.log("ID = " +ID) }
+if(exp_debugging=="Y"){ console.log("ID = " + ID) }
 
 ///////////////////////////////////////////////////////
 ////////////            TASK               ////////////
@@ -112,16 +112,16 @@ let diagnostic_range = Array.from(Array(diagnostic_max_length-3), (x,i) => i + d
 if(exp_debugging=="Y"){ console.log("The range of diagnostic lengths: ", diagnostic_range) }
 
 // Generate probability distribution of the diagnostic run (if relevant)
-if(math.toLowerCase()=="none"){
+if(math.toLowerCase() == "none"){
     final_probability_list = Array(diagnostic_max_length-(diagnostic_min_length-1)).fill(1)
 } else {
     let halfway = (diagnostic_min_length+diagnostic_max_length)/2 //Diag halfway value
-    if(exp_debugging=="Y"){ console.log(halfway) }
+    if(exp_debugging=="Y"){ console.log("Halway: ", halfway) }
     
     let probability_list = [];
     for(let i = 0; i < spare; i++){
         probability_list.push(1)
-        if(exp_debugging=="Y"){ console.log(probability_list) }
+        if(exp_debugging=="Y"){ console.log("Probability list: ", probability_list) }
     }
     
     for(let i = 1; i < Math.floor(halfway - diagnostic_min_length - spare) + 1; i++){
@@ -138,13 +138,11 @@ if(math.toLowerCase()=="none"){
                 break;
             case "log10":
                 probability_list.push(Number((1-(Math.log10(1+i) * decent)).toFixed(2)))
-                console.log(Math.log10(i))
                 break;
             case "linear":
                 probability_list.push(Number((1-(i * decent)).toFixed(2)))
                 break;
         }
-        console.log(probability_list)
     }
     if(diagnostic_range.length % 2 == 0){
         probability_list.unshift(1) 
@@ -189,7 +187,6 @@ let diagnostic_task_instruction = {
         let a = 
         `<p style="font-size: ${general_font_size};"> If a target appears <i> italic </i> press ${rnd_diagnostic_responseSides[0]}`+
         `<p style="font-size: ${general_font_size};"> If a target appeas upright press ${rnd_diagnostic_responseSides[1]}`; 
-        if(exp_debugging=="Y"){console.log(a)}
         return a;
     }, 
     choices: [" "], 
@@ -215,6 +212,8 @@ for(let i = 0; i < number_of_inducers; i++){ // less than, since we start at 0
                     `<p style="font-size: ${general_font_size};"> If ${run_stimuli[1]} press ${rnd_inducer_responseSides[1]}`; 
         }, 
         choices: " ", 
+        data: run_stimuli[0] + rnd_inducer_responseSides[0], 
+                run_stimuli[1] + rnd_inducer_responseSides[1],
         trial_duration: instruction_delay, 
     }
     timeline.push(inducer_instruction)
@@ -249,9 +248,6 @@ for(let i = 0; i < number_of_inducers; i++){ // less than, since we start at 0
                     else                        { return rnd_diagnostic_responseSides[1] } },
             },
             on_finish: (data) => {
-                
-                //if(exp_debugging=="Y"){console.log(jsPsych.data.getLastTrialData())}
-
                 // Set the "correct_response_key"
                 if(data.correct_response_side == responseSides[0]){
                     data.correct_response_key = allowed_responses[0]
@@ -288,11 +284,9 @@ for(let i = 0; i < number_of_inducers; i++){ // less than, since we start at 0
             conditional_function: () => {
                 let data = jsPsych.data.get().last(1).values()[0];
                 if(data.response === null)  { 
-                    //console.log(jsPsych.data.getLastTrialData())
-                    if(exp_debugging=="Y"){ console.log("TOO SLOW") }
-                    console.log(data)
-                return true } 
-                else { return false }
+                    if(exp_debugging=="Y"){ return true } 
+                    else { return false }
+                }
             }
         }
         timeline.push(too_slow_trial)
@@ -302,9 +296,7 @@ for(let i = 0; i < number_of_inducers; i++){ // less than, since we start at 0
             timeline: [set_background_colour_wrong_response, wrong_response , set_background_colour_default],
             conditional_function: () => {
                 let data = jsPsych.data.get().last(1).values()[0];
-                if( data.correct == false)  { 
-                    if(exp_debugging=="Y"){ console.log("WRONG RESPONSE") }
-                 return true } 
+                if( data.correct == false)  { return true } 
                 else { return false }
             }
         }
@@ -361,65 +353,77 @@ for(let i = 0; i < number_of_inducers; i++){ // less than, since we start at 0
         timeline: [set_background_colour_wrong_response, wrong_response , set_background_colour_default],
         conditional_function: () => {
             let data = jsPsych.data.get().last(1).values()[0];
-            if( data.correct == false)  { 
-                if(exp_debugging == "Y"){ 
-                    if(exp_debugging == "Y"){ console.log("WRONG RESPONSE") } 
-                    return true } 
-                    else { return false }
-                }
-            }
+            if( data.correct == false)  { return true } 
+            else                        { return false }
         }
-        timeline.push(wrong_response_trial)
+    }
+    timeline.push(wrong_response_trial)
         
-        let inducer_fixation = {
-            timeline: [fixation2],
-            conditional_function: () => {
-                let data = jsPsych.data.get().last(1).values()[0];
-                console.log("INDUCERS PUSH")
-                if(i != number_of_inducers)
-                {return true } else {return false}
+    let inducer_fixation = {
+        timeline: [fixation2],
+        conditional_function: () => {
+            if(i < number_of_inducers)  { return true } 
+            else                        { return false }
         }
     }
     timeline.push(inducer_fixation)
 }
 
+const white_bk = {
+    type: jsPsychCallFunction,
+    func: () => { changeBackground("white") }
+} 
+timeline.push(white_bk)
+const demographics = {
+    type: jsPsychSurvey,
+    button_label_finish: "Next",
+    required_question_label: "*",
+    required_error: "Please check whether you responded to all the questions.",
+    pages: [[
+            {
+                type: 'html',
+                prompt: `You have now completed the central part of the experiment.<br>` +
+                `To complete the study, please answer the following questions:`,
+            },
+            {
+                type: 'multi-choice',
+                prompt: "Gender", 
+                name: 'gender', 
+                options: ['Female', 'Male', 'Other', 'I would rather not tell.'], 
+                required: true
+            }, 
+            {
+                type: 'text',
+                prompt: "What year were you born? (enter answer into text box below)", 
+                name: 'yearBorn', 
+                textbox_columns: 5,
+                required: true,
+            }
+        ]],
+    data: { stimulus: "demographics" }, 
+    on_finish: () => {
+                // pick out responses from previous trial
+        console.log(jsPsych.data.getLastTrialData().values())
+        data = jsPsych.data.getLastTrialData().values()[0]
 
-// let demographics = {
-//     type: jsPsychSurvey,
-//     button_label_finish: "Next",
-//     required_question_label: "test",
-//     required_error: "Please check whether you responded to all the questions.",
-//     pages: [
-//         [
-//             {
-//                 type: 'html',
-//                 prompt: 'You have now completed the central part of the experiment.<br> To complete the study, please answer the following questions:',
-//             },
-//             {
-//                 type: 'multi-choice',
-//                 prompt: "Gender", 
-//                 name: 'gender', 
-//                 options: ['Female', 'Male', 'Other', 'I would rather not tell.'], 
-//                 required: true
-//             }, 
-//             {
-//                 type: 'text',
-//                 prompt: "What year were you born? (enter answer into text box below)", 
-//                 name: 'yearBorn', 
-//                 textbox_columns: 5,
-//                 required: true,
-//             }
-//         ]
-//     ],
-//     data: { stimulus: "demographics" }, 
-//     on_finish: () => {
-//         saveData("data_" + dateTime + "_" + unique, jsPsych.data.get().csv());
-//         jsPsych.data.get().addToAll({ gender:    gender });
-//         jsPsych.data.get().addToAll({ birthYear: birthYear });
-//         jsPsych.data.get().addToAll({ id:        ID });
-//     }
-// }
+        console.log(data)
 
+        gender = jsPsych.data.getLastTrialData().values()[0].response.gender
+        birthYear = jsPsych.data.getLastTrialData().values()[0].response.yearBorn
+        
+        // Enda date/time
+        var end_dateTime = new Date().today() + "_" + new Date().timeNow();
+        
+        jsPsych.data.get().addToAll({ gender:    gender });
+        jsPsych.data.get().addToAll({ birthYear: birthYear });
+        jsPsych.data.get().addToAll({ id: ID });
+
+        // Save the data
+        jsPsych.data.get().localSave('csv','mydata.csv')
+        saveData("data_" + start_dateTime + "_" + ID, jsPsych.data.get().csv());
+    }
+}
+timeline.push(demographics)
 // var comments = {}
 
 // exit fullscreen mode
