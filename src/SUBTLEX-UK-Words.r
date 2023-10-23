@@ -54,7 +54,7 @@ for(x in 1:128){
     # Get the levenshtein distances for each word pair
     print(dist)
   }
-  if(sum(dist<=2)>1){
+  if(sum(dist<3)>=1){
   # Threshold for similarity is 2 (e.g., two letters at the same location)
     print(paste("Skipping word:",new_word))
     next
@@ -66,3 +66,5 @@ for(x in 1:128){
 }
 save(word_list, file = "data/word_list.rdata")
 
+word_list
+levenshtein_distance(word_list[1],word_list[2])
