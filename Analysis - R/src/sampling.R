@@ -1,14 +1,16 @@
 
 # Sampling script
-n <- as.numeric()
 
-diagnostic_length <- function(min, max, probability){
-
-  sample()
-  four(x in 1:10000){
-      c(n, sum(sample(4:16,24, T))) -> n
+diagnostic_length <- \(min, max, reps=1000, experiment_length=24, probability = NULL){
+  n <- as.numeric()
+  for(x in 1:reps){
+    c(n, sum(sample(4:16,experiment_length, T, prob = probability))) -> n
   }
+  hist(n)
+}
+
+gen_probability <- \(){
 
 }
-hist(n)
 
+diagnostic_length(4,16, probability = [])
