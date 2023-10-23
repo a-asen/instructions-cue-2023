@@ -3,12 +3,12 @@ const default_background_colour = "#cccccc" // Light grey
 const wrong_response_colour = "#d22d2d"     // Blood red-ish 
 
 // Delay 
-const fixation_delay = 750
-const fixation2_delay = 1500
-const wrong_response_delay = 300
-const too_slow_delay = 300
-const instruction_delay = 10000
-const trial_duration = 2000
+const fixation_delay = 2 // 750      // Main fixation delay
+const fixation2_delay = 1500    // second fixation delay (after each inducer)
+const wrong_response_delay = 2 // 300    // How long is wrong response displayed?
+const too_slow_delay = 300          // How long is too slow response displayed
+const instruction_delay = 10000     // How long is each s-r mapping displayed
+const trial_duration = 2000     // How long is a trial?
 
 // Font size
 const instruction_font_size = "36px"    // about the experiment / Consent / explanation
@@ -16,19 +16,18 @@ const general_font_size = "42px"        // Diagnostic/inducer/stimulus size
 const fixation_size = "48px"            // Fixation 
 
 ////    Responses    ////
-const allowed_responses = ["f","j"];  // Allowed responses
-const responseSides = ["LEFT","RIGHT"]; // What participants will RESPOND to (e.g., If X appears press responseSides[0])
+const allowed_responses = ["f","j"];        // Allowed responses
+const responseSides = ["LEFT","RIGHT"];     // What participants will RESPOND to (e.g., If X appears press responseSides[0])
     // these two parameters must correspond 
 
 ////    Inducer parameters     ////
-const inducer_colours = []                  // Inducer colour randomize between participants (if more than 1)
+const inducer_colours = []      // Inducer colour randomize between participants (if more than 1)
 
 ////    Diagnostic parameters   ////
-let number_of_inducers = 2//24;   // Number of inducers 
-let diagnostic_min_length = 4;     // Min run length
-let diagnostic_max_length = 7;//16    // Max run length
-let run_stimulus_bias = [1,1];  // ??
-let run_italic_bias = [1,1];    // Left value correspond to ITALIC probability, right correspond to UPRIGHT probability
+let number_of_inducers = 1//24;     // Number of inducers 
+let diagnostic_min_length = 4;      // Min run length
+let diagnostic_max_length = 7;//16  // Max run length
+let run_italic_bias = [1,1];        // Left value correspond to ITALIC probability, right correspond to UPRIGHT probability
 
 // Diagnostic probability calcuation
 /* Here we change the probability of a trials of a certain distances from the center will occur. 
@@ -40,7 +39,7 @@ let math = "log"   // Set to "none" if no probability calcuation should take pla
     // choices: "none", "log10", "log", "log1p", "log2", "linear" // By steepness respectively
 let decent = .1     // Decent per 1 distance from the mean(s)
 let spare = 1       // spare - unaffected decent from the mean (e.g., 1 distance from mean is the same as the mean (i.e., 1))
-
+    // linear, .1, 1 = [0.8, 0.9, 1, 1, 1, .9, .8]
 
 
 
