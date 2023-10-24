@@ -126,7 +126,7 @@ const check_browser = {
 timeline.push(check_browser)
 
 // About the experiment 
-const about_the_experiment_and_concent = {
+const about_the_experiment_and_consent = {
     type: jsPsychInstructions,
     pages: () => {
         return [
@@ -134,21 +134,24 @@ const about_the_experiment_and_concent = {
         
         <h3>Welcome to this cognitive psychology study!</h3>
         <p>We are investigating effects of humans ability to rapidly adapt to instructions. \n
-        In this study, you will be doing two seperate tasks \n 
-        The study has two parts: completing two short questionnaires and answering some follow-up questions that relate to one of the questionnaires.</p>  
+        In this study, you will be doing two seperate tasks sequentially. \n
+        The first task will be the same throughout the experiment, while the other task will change over the course of the task. \n
+        Your goal is to respond as fast and accurately as possible to both of the tasks. \n 
         
-        <p>The study is conducted by Steffen Rygg Aasen and Torsten Martiny-Huenger at UiT – The Arctic University of Norway. \n
-        If you have questions about the study, you can contact Torsten Martiny-Huenger (torsten.martiny-huenger@uit.no). </p>
+        <p>The study is conducted by Steffen Rygg Aasen (Master student) and Torsten Martiny-Huenger (Supervisor) at UiT – The Arctic University of Norway. \n
+        If you have questions about the study, you may contact Torsten Martiny-Huenger at (torsten.martiny-huenger@uit.no). </p>
         </div>`, 
-        `<p>Participation in the study is voluntary. \n
-        All answers are collected and stored anonymously and cannot be traced back to an individual participant. \n
+        `<h3> Consent </h3>
+        <p>Participation in the study is voluntary. \n
+        All answers are collected and stored anonymously and cannot be traced back to your person. \n
         The anonymous storage means we cannot provide participants with their responses upon request. \n
-        You can quit the study without giving a reason by closing the browser tab. No data will be stored in that case.</p>`
+        You can quit the study without giving a reason by closing the browser tab. No data will be stored in that case.
+        </p>`
     ]},
     show_clickable_nav: ["Next"],
-    data: { stimulus: "The experiment and concent", trial_info: "The experiment and concent" }
+    data: { stimulus: "The experiment and consent", trial_info: "The experiment and consent" }
 }
-if(skip_instructions==true){} else { timeline.push(about_the_experiment_and_concent) }
+if(skip_instructions==true){} else { timeline.push(about_the_experiment_and_consent) }
 
 // initialize fullscreen
 if(skip_instructions==true){} else {
@@ -158,26 +161,27 @@ if(skip_instructions==true){} else {
     });
 }
 
-const check_fullscreen = {
-    type: jsPsychBrowserCheck,
-    inclusion_function: (data) => {
-        height_width_fullscreen = "H:" + data.height + "-W:" + data.width  // var
+// have to use "resize check" thingy
+// const check_fullscreen = {
+//     type: jsPsychBrowserCheck,
+//     inclusion_function: (data) => {
+//         height_width_fullscreen = "H:" + data.height + "-W:" + data.width  // var
         
-        if(debug){ console.log("Height and width of fullscreen: ", height_width_fullscreen) }
-        if(screen.height - window.innerHeight <= 10 && screen.height - window.innerHeight >= -10){
-            // We accept a couple of pixel in difference, since there is apparently some small differences between these (or there can be) 
-            if(debug){ 
-                console.log("Fullscreen detected") 
-                console.log("Screen and window difference: ", screen.height - window.innerHeight) 
-            }
-            return true
-        }
-    },
-    exclusion_message: (data) => {
-        return `We have detected that you are not in fullscreen,`
-    }
-}
-timeline.push(check_fullscreen)
+//         if(debug){ console.log("Height and width of fullscreen: ", height_width_fullscreen) }
+//         if(screen.height - window.innerHeight <= 10 && screen.height - window.innerHeight >= -10){
+//             // We accept a couple of pixel in difference, since there is apparently some small differences between these (or there can be) 
+//             if(debug){ 
+//                 console.log("Fullscreen detected") 
+//                 console.log("Screen and window difference: ", screen.height - window.innerHeight) 
+//             }
+//             return true
+//         }
+//     },
+//     exclusion_message: (data) => {
+//         return `We have detected that you are not in fullscreen,`
+//     }
+// }
+// timeline.push(check_fullscreen)
 
 // Unique ID
 let ID = jsPsych.randomization.randomID(8);
