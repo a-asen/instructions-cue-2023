@@ -14,7 +14,7 @@ const wrong_response_delay = 2 // 300    // How long is wrong response displayed
 const too_slow_delay = 300          // How long is too slow response displayed
 
 ////    Font size   ////
-const instruction_font_size = "36px"    // about the experiment / Consent / explanation
+const instruction_font_size = "24px"    // about the experiment / Consent / explanation
 const general_font_size = "42px"        // Diagnostic/inducer/stimulus size
 const fixation_size = "48px"            // Fixation 
 
