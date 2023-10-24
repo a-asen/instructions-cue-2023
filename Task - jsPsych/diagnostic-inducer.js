@@ -2,7 +2,7 @@
 // CHANGE THESE BEFORE EXPERIMENT!
 
 const debug = true              // Show some console information
-const skip_instructions = true  // Skip intro? (to test trials)
+const skip_instructions = false  // Skip intro? (to test trials)
 const save_local_data = true    // Save a local file (test analysis)
 
 ////////////////////////////////////////////////////////
@@ -24,7 +24,7 @@ Date.prototype.timeNow = function () {
     return ((this.getHours() < 10)?"0":"") + this.getHours() +"-"+ ((this.getMinutes() < 10)?"0":"") + this.getMinutes() +"-"+ ((this.getSeconds() < 10)?"0":"") + this.getSeconds();
 }
 var start_dateTime = new Date().today() + "_" + new Date().timeNow();
-if(debug == true) { console.log(start_dateTime) }
+if(debug) { console.log(start_dateTime) }
 
 
 ////    Trials      ////
@@ -83,33 +83,72 @@ const jsPsych = initJsPsych({
     on_finish: function() {
         jsPsych.data.displayData() }
 });
-// Timeline start
-const timeline = [];
-
+const timeline = []; // Timeline
 timeline.push(set_background_colour_default) // To ensure the background colour is correct.
 
-// About the experiment 
-const about_the_experiment = {
-    type: jsPsychInstructions,
-    pages: [
-        `WHAT ABOUT THIS EXPERIMETN; HUH?!` 
-    ],
-    data: { stimulus: "About the experiment", trial_info: "About the experiment" }
-}
-if(skip_instructions==true){} else { timeline.push(about_the_experiment) }
 
-// Concent !!!
-const concent = {
-    type: jsPsychInstructions,
-    pages: [
-        `BY CLICKING NEXT YOU CONSENT TO THE EXPERIMENT -- bla bla
+// Technical variables
+var refresh_rate;
+var height_width_pre;
+var height_width_fullscreen; 
+var os_browser; 
+
+
+const check_browser = {
+    type: jsPsychBrowserCheck,
+    inclusion_function: (data) => {
+        // general info about browser
+        refresh_rate = data.vsync_rate
+        os_browser = data.os + "_" + data.browser + "_" + data.browser_version
+        height_width_pre = "H:" + data.height + "-W:" + data.width
         
-        Cancel at any time without any repercussions`
-    ],
-    
-    data: {stimulus: "Instructions...."}
+        if(debug){
+            console.log(screen.height) // total height
+            console.log(window.innerHeight) // showecased experiment height
+            
+            console.log(refresh_rate)
+            console.log(os_browser)
+            console.log(height_width_pre)
+        }
+
+        // Conditional check
+        return data.fullscreen === true && data.mobile === false
+    },
+    exclusion_message: (data) => {
+        if(data.mobile){
+            return '<p>You must use a desktop/laptop computer to participate in this experiment.</p>';
+        } else if(data.fullscreen){
+            return `<p>We have detected that your browser cannot use fullscreen. \n
+            Try to use a different browser that supports fullscreen.`
+        }
+    }
 }
-if(skip_instructions==true){} else { timeline.push(concent) }
+timeline.push(check_browser)
+
+// About the experiment 
+const about_the_experiment_and_concent = {
+    type: jsPsychInstructions,
+    pages: () => {
+        return [
+       `<div style="font-size:${instruction_font_size}"> 
+        
+        <h3>Welcome to this cognitive psychology study!</h3>
+        <p>We are investigating effects of humans ability to rapidly adapt to instructions. \n
+        In this study, you will be doing two seperate tasks \n 
+        The study has two parts: completing two short questionnaires and answering some follow-up questions that relate to one of the questionnaires.</p>  
+        
+        <p>The study is conducted by Steffen Rygg Aasen and Torsten Martiny-Huenger at UiT – The Arctic University of Norway. \n
+        If you have questions about the study, you can contact Torsten Martiny-Huenger (torsten.martiny-huenger@uit.no). </p>
+        </div>`, 
+        `<p>Participation in the study is voluntary. \n
+        All answers are collected and stored anonymously and cannot be traced back to an individual participant. \n
+        The anonymous storage means we cannot provide participants with their responses upon request. \n
+        You can quit the study without giving a reason by closing the browser tab. No data will be stored in that case.</p>`
+    ]},
+    show_clickable_nav: ["Next"],
+    data: { stimulus: "The experiment and concent", trial_info: "The experiment and concent" }
+}
+if(skip_instructions==true){} else { timeline.push(about_the_experiment_and_concent) }
 
 // initialize fullscreen
 if(skip_instructions==true){} else {
@@ -119,31 +158,52 @@ if(skip_instructions==true){} else {
     });
 }
 
+const check_fullscreen = {
+    type: jsPsychBrowserCheck,
+    inclusion_function: (data) => {
+        height_width_fullscreen = "H:" + data.height + "-W:" + data.width  // var
+        
+        if(debug){ console.log("Height and width of fullscreen: ", height_width_fullscreen) }
+        if(screen.height - window.innerHeight <= 10 && screen.height - window.innerHeight >= -10){
+            // We accept a couple of pixel in difference, since there is apparently some small differences between these (or there can be) 
+            if(debug){ 
+                console.log("Fullscreen detected") 
+                console.log("Screen and window difference: ", screen.height - window.innerHeight) 
+            }
+            return true
+        }
+    },
+    exclusion_message: (data) => {
+        return `We have detected that you are not in fullscreen,`
+    }
+}
+timeline.push(check_fullscreen)
+
 // Unique ID
 let ID = jsPsych.randomization.randomID(8);
-if(debug==true){ console.log("ID = " + ID) }
+if(debug){ console.log("ID = " + ID) }
 
 ///////////////////////////////////////////////////////
 ////////////            TASK               ////////////
 // Shuffle stimuli list
 let rnd_stimuli = jsPsych.randomization.shuffle(stimuli);  // Shuffle stimuli list
-if(debug==true) { console.log(rnd_stimuli) }
+if(debug) { console.log(rnd_stimuli) }
 
 // Generate diagnostic length ranges
 let diagnostic_range = Array.from(Array(diagnostic_max_length-3), (x,i) => i + diagnostic_min_length) 
-if(debug==true){ console.log("The range of diagnostic lengths: ", diagnostic_range) }
+if(debug){ console.log("The range of diagnostic lengths: ", diagnostic_range) }
 
 // Generate probability distribution of the diagnostic run (if relevant)
 if(math.toLowerCase() == "none"){
     final_probability_list = Array(diagnostic_max_length-(diagnostic_min_length-1)).fill(1)
 } else {
     let halfway = (diagnostic_min_length+diagnostic_max_length)/2 //Diag halfway value
-    if(debug==true){ console.log("Halway: ", halfway) }
+    if(debug){ console.log("Halway: ", halfway) }
     
     let probability_list = [];
     for(let i = 0; i < spare; i++){
         probability_list.push(1)
-        if(debug==true){ console.log("Probability list: ", probability_list) }
+        if(debug){ console.log("Probability list: ", probability_list) }
     }
     
     for(let i = 1; i < Math.floor(halfway - diagnostic_min_length - spare) + 1; i++){
@@ -175,7 +235,7 @@ if(math.toLowerCase() == "none"){
         // If odd add one in the middle
     }
 }
-if(debug==true){ console.log("Final probabilities are: ", final_probability_list) }
+if(debug){ console.log("Final probabilities are: ", final_probability_list) }
 
 // Randomize diagnostic length across the experiment & distribute according to probability distribution
 let rnd_diagnostic_length = [];
@@ -183,10 +243,10 @@ for(let i = 0; i < number_of_inducers; i++){
     rnd_diagnostic_length.push(jsPsych.randomization.sampleWithReplacement(diagnostic_range, 1,  final_probability_list)[0]);
     // We randomize the length from "min" to "max" with the probabilities in "final_probability_list"
 }
-if(debug==true){ console.log("With these parameters we end up with an average length of: ",  
+if(debug){ console.log("With these parameters we end up with an average length of: ",  
 (diagnostic_min_length+diagnostic_max_length)/2*number_of_inducers) }
-if(debug==true){ console.log("Diag lengths: ", rnd_diagnostic_length) }
-if(debug==true){ console.log("Experiment length: ", rnd_diagnostic_length.reduce((val, a) => val + a)) } // sum the list
+if(debug){ console.log("Diag lengths: ", rnd_diagnostic_length) }
+if(debug){ console.log("Experiment length: ", rnd_diagnostic_length.reduce((val, a) => val + a)) } // sum the list
 
 
 ////////        Experiment run creation         ////////
