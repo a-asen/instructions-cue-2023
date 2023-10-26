@@ -46,17 +46,17 @@ const long_fixation = {
 // Feedback
 const wrong_response = {
     type: jsPsychHtmlKeyboardResponse,
-    stimulus:  () => { return `<div style="font-size: ${general_font_size};"> Wrong response </div>` },
+    stimulus:  () => { return `<div style="font-size: ${general_font_size};"> Wrong! </div>` },
     choices: "NO_KEYS",
     trial_duration: wrong_response_delay,
-    data: { stimulus: "Wrong response", trial_info: "Feedback" }
+    data: { stimulus: "Wrong", trial_info: "Feedback" }
 }
 const too_slow = {
     type: jsPsychHtmlKeyboardResponse,
-    stimulus: () => { return `<div style="font-size: ${general_font_size};"> Too slow </div>` },
+    stimulus: () => { return `<div style="font-size: ${general_font_size};"> Slow </div>` },
     choices: "NO_KEYS",
     trial_duration: too_slow_delay, 
-    data: { stimulus: "Too slow", trial_info: "Feedback" }
+    data: { stimulus: "Slow", trial_info: "Feedback" }
 }
 // change background
 const set_background_colour_default = {
@@ -91,7 +91,8 @@ timeline.push(set_background_colour_default) // To ensure the background colour 
 var refresh_rate;
 var height_width_pre;
 var height_width_fullscreen; 
-var os_browser; 
+var os_browser; // not necessary, to debug 
+    
 
 
 const check_browser = {
@@ -112,7 +113,7 @@ const check_browser = {
         }
 
         // Conditional check
-        return data.fullscreen === true && data.mobile === false
+        return data.fullscreen === true && data.mobile === false && data.browser.toLowerCase != "safari"
     },
     exclusion_message: (data) => {
         if(data.mobile){
@@ -120,6 +121,11 @@ const check_browser = {
         } else if(data.fullscreen){
             return `<p>We have detected that your browser cannot use fullscreen. \n
             Try to use a different browser that supports fullscreen.`
+        } else if(data.browser) {
+            return `<p>We haev detected that you use Safari which is not able to run the experiment properly. \n
+            Please run the experiment in a different browser.</p>`
+        } else {
+            return `We failed to parse your browser information... You may try to use a different browser`
         }
     }
 }
@@ -297,8 +303,6 @@ timeline.push(diagnostic_task_instruction)
 
 
 
-
-
 // Here we create the experiment
 for(let i = 0; i < number_of_inducers; i++){ // less than, since we start at 0
     // This first get the number of different inducers
@@ -325,6 +329,12 @@ for(let i = 0; i < number_of_inducers; i++){ // less than, since we start at 0
     }
     timeline.push(inducer_instruction)
     timeline.push(short_fixation)
+
+
+    if(repetition_experiment){
+        let rnd_repetition = number_of_inducers * percent_repetition
+
+    }
 
 
     // Then we generate the diagnostic trials 
