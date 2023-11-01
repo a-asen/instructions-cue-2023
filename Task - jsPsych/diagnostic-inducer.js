@@ -43,6 +43,7 @@ const long_fixation = {
     trial_duration: long_fixation_delay, 
     data: { stimulus: "+", trial_info: "Fixation - long" },
 }
+
 // Feedback
 const wrong_response = {
     type: jsPsychHtmlKeyboardResponse,
@@ -58,6 +59,7 @@ const too_slow = {
     trial_duration: too_slow_delay, 
     data: { stimulus: "Slow", trial_info: "Feedback" }
 }
+
 // change background
 const set_background_colour_default = {
     type: jsPsychCallFunction,
@@ -88,13 +90,14 @@ timeline.push(set_background_colour_default) // To ensure the background colour 
 
 
 // Technical variables
-var refresh_rate;
-var height_width_pre;
-var height_width_fullscreen; 
-var os_browser; // not necessary, to debug 
+var refresh_rate;               // Can be nice to gather
+var height_width_pre;           // 
+var height_width_fullscreen;    //
+var os_browser;     // not necessary, to debug ???
     
 
-
+// We want to ensure some features before task start? 
+    // Perhas we  trust prolifics inclusion/exclusion check ? 
 const check_browser = {
     type: jsPsychBrowserCheck,
     inclusion_function: (data) => {
@@ -157,10 +160,10 @@ const about_the_experiment_and_consent = {
     show_clickable_nav: ["Next"],
     data: { stimulus: "The experiment and consent", trial_info: "The experiment and consent" }
 }
-if(skip_instructions==true){} else { timeline.push(about_the_experiment_and_consent) }
+if(skip_instructions){} else { timeline.push(about_the_experiment_and_consent) }
 
 // initialize fullscreen
-if(skip_instructions==true){} else {
+if(skip_instructions){} else {
     timeline.push({
         type: jsPsychFullscreen,
         fullscreen_mode: true
@@ -168,6 +171,9 @@ if(skip_instructions==true){} else {
 }
 
 // have to use "resize check" thingy
+    // We could add a check after each block, ensuring that participants are in fullscreen ? 
+
+
 // const check_fullscreen = {
 //     type: jsPsychBrowserCheck,
 //     inclusion_function: (data) => {
@@ -331,10 +337,9 @@ for(let i = 0; i < number_of_inducers; i++){ // less than, since we start at 0
     timeline.push(short_fixation)
 
 
-    if(repetition_experiment){
-        let rnd_repetition = number_of_inducers * percent_repetition
-
-    }
+    // if(repetition_experiment){
+    //     let rnd_repetition = number_of_inducers * percent_repetition
+    // }
 
 
     // Then we generate the diagnostic trials 
@@ -396,6 +401,7 @@ for(let i = 0; i < number_of_inducers; i++){ // less than, since we start at 0
         }
         timeline.push(diagnostic_run)
 
+        ////     Feedback   ////
         // If participants responded to slow, give feedback
         let too_slow_trial = {
             timeline: [set_background_colour_wrong_response, too_slow, set_background_colour_default],
@@ -420,8 +426,9 @@ for(let i = 0; i < number_of_inducers; i++){ // less than, since we start at 0
 
         timeline.push(short_fixation)
     }
-
-    /// INDUCERN TASK HERE
+    ////////////////////////////////////
+    ////        INDUCER TASK        ////
+    ////////////////////////////////////
     let rnd_inducer_stimulus = jsPsych.randomization.sampleWithReplacement(run_stimuli, 1)[0]
     let rnd_inducer_colour = jsPsych.randomization.sampleWithReplacement(inducer_colours, 1)[0]
 
@@ -455,6 +462,7 @@ for(let i = 0; i < number_of_inducers; i++){ // less than, since we start at 0
     }
     timeline.push(inducer_task)
 
+    ////     Feedback   ////
     // If participants responded to slow, give feedback
     let too_slow_trial = {
         timeline: [set_background_colour_wrong_response, too_slow, set_background_colour_default],
@@ -465,6 +473,7 @@ for(let i = 0; i < number_of_inducers; i++){ // less than, since we start at 0
         }
     }
     timeline.push(too_slow_trial)
+
     // If participants responded incorrectly, give feedback
     let wrong_response_trial = {
         timeline: [set_background_colour_wrong_response, wrong_response , set_background_colour_default],
@@ -487,19 +496,23 @@ for(let i = 0; i < number_of_inducers; i++){ // less than, since we start at 0
 }
 
 
-// Way too much to change to get the background colour gray
-// So just set it to white
+// For the final question - demographics and feedback - it is too much effort (from my investigation)
+// to change the background colour of the trial. Hence just change it to white...
+
 const white_bk = {
     type: jsPsychCallFunction,
     func: () => { changeBackground("white") }
 } 
 timeline.push(white_bk)
+
+////        Demographics        ////
 const demographics = {
     type: jsPsychSurvey,
     button_label_finish: "Next",
     required_question_label: "*",
     required_error: "Please check whether you responded to all the questions.",
-    pages: [[
+    pages: [
+        [
             {
                 type: 'html',
                 prompt: `You have now completed the central part of the experiment.<br>` +
@@ -518,9 +531,65 @@ const demographics = {
                 name: 'yearBorn', 
                 textbox_columns: 5,
                 required: true,
+            },
+        ]
+    ],
+    data: { stimulus: "Demographics", trial_info: "Demographics" }, 
+}
+
+
+
+var comments = {
+    type: jsPsychSurveyHtmlForm,
+    preamble: '<p>If you have any comments you would like to tell us, please write them in the text box below.</p>',
+    html: '<p><input type="text" id="test-resp-box" name="response" size="10" /></p>',
+    autofocus: 'test-resp-box',
+    textbox_rows: 5,
+    textbox_columns: 40,
+    data: { stimulus: 'openFeedback' },
+}
+
+const experiment_feedback  = {
+    type: jsPsychSurvey,
+    button_label_finish: "Next",
+    required_question_label: "*",
+    required_error: "Please check whether you responded to all the questions.",
+    pages: 
+    [   
+        [
+            {
+                type:"html",
+                prompt: `People are motivated and distracted to different degrees for varying reasons. \n
+                There is nothing wrong with low motivation or being distracted, but we kindly ask that you answer honestly.` 
+            },
+            {
+                type: "likert",
+                prompt: "How distracted were you during the task?",
+            //     likert_scale_values: [
+            //         {value: 1, text: "Not at all distracted"},
+            //         {value}
+            // ],
+                likert_scale_max: 7,
+                likert_scale_min_label: "Not at all distracted",
+                likert_scale_max_label: "Distracted all the time",
+                required: true, 
+            },
+            {
+                type: "likert",
+                prompt: "How motivated were you to perform well on the task?",
+                likert_scale_max: 7,
+                likert_scale_min_label: "Not at all motivated",
+                likert_scale_max_label: "Very motivated",
+                required: true, 
+            },
+            {
+                type: "text", 
+                prompt: "Feedback on the task?",
+                name: "feedback",
+                textbox_columns: 50,
+                required: true,
             }
-        ]],
-    data: { stimulus: "Demographics", trial_info: "Demographics"}, 
+
     on_finish: () => {
         data = jsPsych.data.getLastTrialData().values()[0]
         
@@ -538,13 +607,13 @@ const demographics = {
 timeline.push(demographics)
 // var comments = {}
 
-// exit fullscreen mode
-    // before finish exit FS
+
+// Exit fullscreen and end experiment. 
 timeline.push({
     type: jsPsychFullscreen,
-    fullscreen_mode: false
+    message: "Thanks for participating in this study! <br>", 
+    button_label: "End experiment", 
+    fullscreen_mode: false,
 }); 
-
-var thanks = {}
 
 jsPsych.run(timeline)
