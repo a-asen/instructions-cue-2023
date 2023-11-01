@@ -1,2 +1,2 @@
 library(readxl)
-read_xlsx("data/sbutlex-uk/SUBTLEX-UK_all.xlsx") -> subt
+read_xlsx("data/subtlex-uk/SUBTLEX-UK_all.xlsx") -> subt
