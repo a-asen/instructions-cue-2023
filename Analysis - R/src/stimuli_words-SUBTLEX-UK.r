@@ -15,6 +15,7 @@ while(length(word_list) < 128){
   sample(rare_words,1) -> new_word # Sample a new word
   word_test(word_list, new_word) -> word_list
 }
+save(word_list, file = "data/word_list.rdata")
 
 
 # Parse all items         ======
@@ -35,13 +36,4 @@ save(parse_all_items, file="data/parse_all_items.rdata")
 
 
 
-
-for(x in 1:128){
-
-}
-
-
-save(word_list, file = "data/word_list.rdata")
-
-word_list
 
