@@ -72,12 +72,27 @@ const set_background_colour_wrong_response = {
   // https://github.com/jspsych/jsPsych/discussions/936
   // https://github.com/psychbruce/jspsych/blob/master/exp_demo/experiment/experiment.js
 
-
 //
 //
 //  Initialize 
 //
 //
+
+// Experiment vars
+var gender;
+var age; 
+var distraction;
+var distraction_feedback;
+var motivation;
+var motivation_feedback;
+
+// Technical variables
+var refresh_rate;               // Can be nice to gather
+var height_width_pre;           // 
+var height_width_fullscreen;    //
+var os_browser;     // not necessary, to debug ???
+
+let rnd_inducer_colour = jsPsych.randomization.sampleWithReplacement(inducer_colours, 1)[0]
 
 const jsPsych = initJsPsych({
     // experiment_width : 1280, 
@@ -88,13 +103,6 @@ const jsPsych = initJsPsych({
 const timeline = []; // Timeline
 timeline.push(set_background_colour_default) // To ensure the background colour is correct.
 
-
-// Technical variables
-var refresh_rate;               // Can be nice to gather
-var height_width_pre;           // 
-var height_width_fullscreen;    //
-var os_browser;     // not necessary, to debug ???
-    
 
 // We want to ensure some features before task start? 
     // Perhas we  trust prolifics inclusion/exclusion check ? 
@@ -117,6 +125,7 @@ const check_browser = {
 
         // Conditional check
         return data.fullscreen === true && data.mobile === false && data.browser.toLowerCase != "safari"
+            // safari does not support keyboard input in fullscreen
     },
     exclusion_message: (data) => {
         if(data.mobile){
@@ -142,37 +151,72 @@ const about_the_experiment_and_consent = {
        `<div style="font-size:${instruction_font_size}"> 
         
         <h3>Welcome to this cognitive psychology study!</h3>
-        <p>We are investigating effects of humans ability to rapidly adapt to instructions. \n
-        In this study, you will be doing two seperate tasks sequentially. \n
-        The first task will be the same throughout the experiment, while the other task will change over the course of the task. \n
-        Your goal is to respond as fast and accurately as possible to both of the tasks. \n 
+        We are investigating cognitive flexibility in humans.
+
+        The study is conducted by Steffen Aasen (Master student) and \n
+        Torsten Martiny-Huenger (Supervisor) at UiT – The Arctic University of Norway.
         
-        <p>The study is conducted by Steffen Rygg Aasen (Master student) and Torsten Martiny-Huenger (Supervisor) at UiT – The Arctic University of Norway. \n
         If you have questions about the study, you may contact Torsten Martiny-Huenger at (torsten.martiny-huenger@uit.no). </p>
+
+        </div>`,
+        
+        `<div style="font-size:${instruction_font_size}"> 
+
+        <h3>About the experiment</h3>                
+        In this study, you will have to remember two instructions at once \n
+
+
+
+
+        mbe asked to remember two instructions which are to be implemented in the experiment. \n
+        The first task that you will be presented with will <b>remain the same </b> throughout the experiment. \n
+        The second task will change in the experiment and will only be executed once. \n
+        Each new run will start with a new instruction.  \n
+        Your task is to respond as fast and accurately as possible to the current task. \n
+        Only one task will be executed during any one trial. This will be indicated by its colour.<br><br> \n 
+        To response to any trial, you are asked to click either ${responseSides[0]} using ${allowed_responses[0]}, or \n
+        ${responseSides[1]} using ${allowed_responses[1]}
         </div>`, 
-        `<h3> Consent </h3>
+
+        `<div style="font-size:${instruction_font_size}">
+        <h3> Consent </h3>
+        
         <p>Participation in the study is voluntary. \n
-        All answers are collected and stored anonymously and cannot be traced back to your person. \n
+        All responses are collected and stored anonymously and cannot be traced back to you. \n
         The anonymous storage means we cannot provide participants with their responses upon request. \n
         You can quit the study without giving a reason by closing the browser tab. No data will be stored in that case.
-        </p>`
+        </p>
+        </div>`,
+        
+
     ]},
     show_clickable_nav: ["Next"],
     data: { stimulus: "The experiment and consent", trial_info: "The experiment and consent" }
 }
 if(skip_instructions){} else { timeline.push(about_the_experiment_and_consent) }
 
-// initialize fullscreen
+
+
+
+
+
+////       Initialize fullscreen and START        ////
 if(skip_instructions){} else {
     timeline.push({
         type: jsPsychFullscreen,
+        message: `<div style="font-size:${instruction_font_size}">
+        This experiment requires fullscreen and will be initiated when clicking the button below
+        <br><br>
+        </div>`,
+        button_label: "Start the experiment",
         fullscreen_mode: true
     });
 }
 
+//
+//
 // have to use "resize check" thingy
     // We could add a check after each block, ensuring that participants are in fullscreen ? 
-
 
 // const check_fullscreen = {
 //     type: jsPsychBrowserCheck,
@@ -194,6 +238,9 @@ if(skip_instructions){} else {
 //     }
 // }
 // timeline.push(check_fullscreen)
+//
+//
+
 
 // Unique ID
 var ID = jsPsych.randomization.randomID(8);
@@ -269,11 +316,35 @@ if(debug){ console.log("Experiment length: ", rnd_diagnostic_length.reduce((val,
 ////    DIAGNOSTIC TASK    ////
 let diagnostic_task_instruction_description = {
     type: jsPsychHtmlKeyboardResponse,
-    pages: [
-        `In the next screen you will see the instructions you are to execute when the target appears in black color `,,
-        "You will have 20 seconds to remember the instructions. These instructions do not change over the experiment",
-    ]
+    pages: () => {
+        return [
+            `<div style="font-size:${instruction_font_size}">
+            Reminder: Respond to ${responseSides[0]} using ${allowed_responses[0]}, \n
+            and ${responseSides[1]} using ${allowed_responses[1]}\n
+            <br>
+            We ask that you use one finger from each hand to the related response. 
+            <br>
+            <br>
+            In the next screen you will see the instructions that <b> will not change </b> in the experiment. \n
+            These are to be responded to when the target appears in black colour. \n 
+            Thereafter, you will be presented with the other instructions. \n
+            These trials are only to be answered when the target appears in ${rnd_inducer_colour}  \n 
+            You will receive a maximum of 20 seconds reading each instruction (which is plenty of time) to remember the instructions.
+            <br>
+            <br>
+            The experiment proceed quickly without any breaks, \n
+            please ensure that you are in a calm environment where you are unlikely to be distracted/disrupted.      
+            The experiment will take approximately 30 minutes.
+            <br>
+            The experiment start immediately when pressing SPACE.
+            </div>
+            `
+        ],
+    },
+    choices: " ",
+    post_trial_gap: 1500,
 }
+timeline.push(diagnostic_task_instruction_description)
 
 
 let rnd_diagnostic_responseSides = jsPsych.randomization.shuffle(responseSides);    // randomize response side 
@@ -290,6 +361,7 @@ let diagnostic_task_instruction = {
     prompt: "Press any key to continue",
     choices: "ALL_KEYS", 
     trial_duration: instruction_delay,
+    
     data: {
         stimulus: `If italic press ${rnd_diagnostic_responseSides[0]} || If upright press ${rnd_diagnostic_responseSides[1]}`,
         trial_info: "Diagnostic instructions",
@@ -299,15 +371,10 @@ let diagnostic_task_instruction = {
 }
 timeline.push(diagnostic_task_instruction)
 
-
-
-// inducer
-
-
-// inducer explanation? should it say on each trial?! 
-
-
-
+let inducer_prompt={
+    type: jsPsychHtmlKeyboardResponse,
+    stimulus: `In the next screen you will see the other instructions.`
+}
 
 // Here we create the experiment
 for(let i = 0; i < number_of_inducers; i++){ // less than, since we start at 0
@@ -317,7 +384,7 @@ for(let i = 0; i < number_of_inducers; i++){ // less than, since we start at 0
     let run_diagnostic_length = rnd_diagnostic_length[i] // Get the curret diagnostic length
     let rnd_inducer_responseSides = jsPsych.randomization.shuffle(responseSides); // randomize where left/right appears
     
-    // Inducer instruction for this run
+    ////        Inducer instruction         ////
     let inducer_instruction = { 
         type: jsPsychHtmlKeyboardResponse,
         stimulus: () => {   
@@ -334,13 +401,13 @@ for(let i = 0; i < number_of_inducers; i++){ // less than, since we start at 0
         trial_duration: instruction_delay, 
     }
     timeline.push(inducer_instruction)
+
     timeline.push(short_fixation)
 
 
-    // if(repetition_experiment){
-    //     let rnd_repetition = number_of_inducers * percent_repetition
-    // }
-
+    /////////////////////////////////
+    ////    Diagnostic run      /////
+    /////////////////////////////////
 
     // Then we generate the diagnostic trials 
         // Should perhaps be a color? Or randomize a color? 
@@ -430,7 +497,6 @@ for(let i = 0; i < number_of_inducers; i++){ // less than, since we start at 0
     ////        INDUCER TASK        ////
     ////////////////////////////////////
     let rnd_inducer_stimulus = jsPsych.randomization.sampleWithReplacement(run_stimuli, 1)[0]
-    let rnd_inducer_colour = jsPsych.randomization.sampleWithReplacement(inducer_colours, 1)[0]
 
     let inducer_task = {
         type: jsPsychHtmlKeyboardResponse,
@@ -540,8 +606,8 @@ const demographics = {
     on_finish: () => {
         data = jsPsych.data.getLastTrialData().values()[0]
 
-        var gender = data.response.gender 
-        var age = data.response.age
+        gender = data.response.gender 
+        age = data.response.age
     }
 }
 timeline.push(demographics)
@@ -552,7 +618,8 @@ const experiment_feedback  = {
     required_question_label: "*",
     required_error: "Please check whether you responded to all the questions.",
     pages: 
-        [[
+    [
+        [
             {
                 type:"html",
                 prompt: `People are motivated and distracted to different degrees for varying reasons. \n
@@ -562,13 +629,9 @@ const experiment_feedback  = {
                 type: "likert",
                 prompt: "How distracted were you during the task?",
                 name: "distraction", 
-            //     likert_scale_values: [
-            //         {value: 1, text: "Not at all distracted"},
-            //         {value}
-            // ],
                 likert_scale_max: 7,
-                // likert_scale_min_label: "Not at all distracted",
-                // likert_scale_max_label: "Distracted all the time",
+                likert_scale_min_label: "Not at all distracted   ",
+                likert_scale_max_label: "   Ver| distracted",
                 required: true, 
             },
             {
@@ -583,8 +646,8 @@ const experiment_feedback  = {
                 prompt: "How motivated were you to perform well on the task?",
                 name: "motivation",
                 likert_scale_max: 7,
-                // likert_scale_min_label: "Not at all motivated",
-                // likert_scale_max_label: "Very motivated",
+                likert_scale_min_label: "Not at all motivated   ",
+                likert_scale_max_label: "   Very motivated",
                 required: true, 
             },
             {
@@ -594,50 +657,34 @@ const experiment_feedback  = {
                 textbox_columns: 50,
                 textbox_rows: 3,
             }
+        ],
+        [
+            {
+                type: "text",
+                prompt: "Do you have any other comments in relation to the experiment? Then you can describe them here.",
+                name: 'open_feedback',
+                textbox_columns: 100,
+                textbox_rows: 5,
+            } 
+        ]
     ],
-    [
-        {
-            type: "text",
-            prompt: "Do you have any other comments then you can describe them here?",
-            name: 'motivation_feedback',
-            textbox_columns: 100,
-            textbox_rows: 5,
-        } 
-    ]
-],
-    data: {stimulus: "Distraction_Motivation", trial_info: "Distraction_Motivation"},
+    data: {stimulus: "experiment_feedback", trial_info: "experiment_feedback"},
     on_finish: () => {
         data = jsPsych.data.getLastTrialData().values()[0]
         
-        var distraction = data.response.distraction
-        var distraction_feedback = data.response.distraction_feedback
-        var motivation = data.response.motivation
-        var motivation_feedback = data.response.motivation_feedback
-    }
-}
-timeline.push(experiment_feedback)
-
-var comments = {
-    type: jsPsychSurveyHtmlForm,
-    preamble: '<p>If you have any comments you would like to tell us, please write them in the text box below.</p>',
-    html: '<p><input type="text" id="test-resp-box" name="response" size="10" /></p>',
-    autofocus: 'test-resp-box',
-    textbox_rows: 5,
-    textbox_columns: 60,
-    
-    data: { stimulus: 'openFeedback' },    
-
-    on_finish: () => {
+        if(debug){console.log("Adding variables to data...")}
         data = jsPsych.data.getLastTrialData().values()[0]
-        console.log(data.response, "open survey resp")
+
+        ///////////// idk why we need this? // the only thing we need is ID, right=?
         jsPsych.data.get().addToAll({ id:                   ID });
         jsPsych.data.get().addToAll({ age:                  age });
         jsPsych.data.get().addToAll({ gender:               gender });
-        jsPsych.data.get().addToAll({ distraction:          distraction });
-        jsPsych.data.get().addToAll({ distraction_feedback: distraction_feedback });
-        jsPsych.data.get().addToAll({ motivation:           motivation });
-        jsPsych.data.get().addToAll({ motivation_feedback:  motivation_feedback });
-        jsPsych.data.get().addToAll({ open_feedback:        data.response });
+
+        jsPsych.data.get().addToAll({ distraction:          data.response.distraction });
+        jsPsych.data.get().addToAll({ distraction_feedback: data.response.distraction_feedback });
+        jsPsych.data.get().addToAll({ motivation:           data.response.motivation });
+        jsPsych.data.get().addToAll({ motivation_feedback:  data.response.motivation_feedback });
+        jsPsych.data.get().addToAll({ open_feedback:        data.open_feedback });
 
         // Save the data
         if(save_local_data){ jsPsych.data.get().localSave('csv','mydata.csv') }
@@ -646,13 +693,13 @@ var comments = {
         saveData("data_" + start_dateTime + "_" + ID, jsPsych.data.get().csv());
     }
 }
-timeline.push(comments)
+timeline.push(experiment_feedback)
 
 
 // Exit fullscreen and end experiment. 
 timeline.push({
     type: jsPsychFullscreen,
-    message: "Thanks for participating in this study! <br>", 
+    message: "Thank you for participating in this study! <br><br>", 
     button_label: "End experiment", 
     fullscreen_mode: false,
 }); 

@@ -21,10 +21,11 @@ const fixation_size = "48px"            // Fixation
 ////    Responses    ////
 const allowed_responses = ["f","j"];        // Allowed responses
 const responseSides = ["LEFT","RIGHT"];     // What participants will RESPOND to (e.g., If X appears press responseSides[0])
-    // these two parameters must correspond 
+    // these two parameters correspond in appearance 
+    // i.e., f (or whatever key) should correspond to the response side (left)
 
 ////    Inducer parameters     ////
-const inducer_colours = ["blue","green", "yellow"]      // Inducer colour randomize between participants (if more than 1)
+const inducer_colours = ["blue", "green", "yellow"]      // Inducer colour randomize between participants (if more than 1)
 
 ////    Diagnostic parameters   ////
 let number_of_inducers = 1//24;     // Number of inducers 
@@ -48,20 +49,18 @@ let spare = 1       // spare - unaffected decent from the mean (e.g., 1 distance
 
 /////       Other           /////
 // Stimuli list
-var stimuli = [
-    "hga", "hda", "uxb", "p38", "gwm", "kpw", "mnd", "uhw", "jps", "tyn",
-    "qlm", "vef", "pcm", "hiz", "jvl", "lhd", "xfr", "cem", "wfr", "vht",
-    "kor", "srl", "erf", "tjx", "clp", "huc", "npa", "krs", "avd", "uaw",
-    "fma", "hkj", "udc", "tys", "fpg", "bmu", "slu", "aec", "g50", "hpe",
-    "kyu", "hyo", "rga", "mch", "frr", "brg", "ffi", "oco", "ftc", "thd",
-    "adt", "ksh", "rsn", "txa", "pyt", "mfv", "eex", "ltt", "xar", "eaj",
-    "dyi", "lko", "byo", "j&w", "ipd", "emc", "tgz", "dyi", "hs1", "d30",
-    "lxc", "dlj", "acd", "dby", "p34", "wez", "d94", "unm", "adb", "mok",
-    "iht", "uce", "a43", "ehs", "oic", "ctv", "oll", "gek", "gco", "bia",
-    "idd", "hdv", "wrz", "tdt", "vsr", "npt", "yyz", "b96", "l8r", "usl",
-    "jgs", "nej", "ttf", "cew", "icl", "fkk", "kof", "pgo", "bkr", "oad",
-    "p5p", "c3s", "mgv", "g73", "cgb", "pcb", "gfa", "pku", "deu", "aor",
-    "va3", "vgl", "t&r", "zvi", "vmo", "fct"];
+stimuli = ["gwn", "eug", "sht", "cjm", "svs", "orp", "scy", "rve", "wjb", "drn", 
+    "emd", "nz1", "dlo", "hvp", "hmn", "auj", "cuo", "t&g", "jca", "ukt", "tne", "wue", 
+    "hhu", "m3p", "qut", "gbm", "byp", "mav", "sbk", "dnc", "mda", "clr", "uga", "ibb", 
+    "uau", "ozu", "lfd", "f.w", "mub", "kil", "yag", "hsm", "fef", "lbx", "kpt", "upv", 
+    "ifg", "foc", "mtd", "nh3", "wng", "t53", "wtc", "re8", "jme", "a82", "dym", "eif", 
+    "ctv", "tr6", "oco", "dmg", "crt", "vh1", "slp", "cea", "pwa", "eal", "f47", "ysh", 
+    "xss", "me1", "m45", "enw", "gft", "doy", "hrf", "oac", "wma", "lst", "yle", "s.r",
+    "hyo", "tey", "pib", "olt", "luu", "k19", "ff4", "efr", "k5u", "mhs", "pfl", "rch", 
+    "yrl", "nua", "afb", "ayy", "i50", "v&t", "m16", "dpf", "ubr", "syn", "lgs", "iec", 
+    "bsl", "vvm", "umf", "dba", "aip", "dts", "w&d", "avc", "dv6", "j&j", "sdc", "atr", 
+    "spm", "alh", "ows", "idd", "abv", "cml", "lpo", "r22", "z28", "eyt"]
+
 
 // Change background function
 function changeBackground(colour) {
