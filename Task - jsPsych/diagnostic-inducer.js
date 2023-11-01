@@ -196,7 +196,7 @@ if(skip_instructions){} else {
 // timeline.push(check_fullscreen)
 
 // Unique ID
-let ID = jsPsych.randomization.randomID(8);
+var ID = jsPsych.randomization.randomID(8);
 if(debug){ console.log("ID = " + ID) }
 
 ///////////////////////////////////////////////////////
@@ -505,6 +505,7 @@ const white_bk = {
 } 
 timeline.push(white_bk)
 
+
 ////        Demographics        ////
 const demographics = {
     type: jsPsychSurvey,
@@ -527,27 +528,23 @@ const demographics = {
             }, 
             {
                 type: 'text',
-                prompt: "What year were you born? (enter answer into text box below)", 
-                name: 'yearBorn', 
+                prompt: "What is you age? (enter answer into text box below)", 
+                name: 'age', 
+                input_type: "number",
                 textbox_columns: 5,
                 required: true,
             },
         ]
     ],
     data: { stimulus: "Demographics", trial_info: "Demographics" }, 
+    on_finish: () => {
+        data = jsPsych.data.getLastTrialData().values()[0]
+
+        var gender = data.response.gender 
+        var age = data.response.age
+    }
 }
-
-
-
-var comments = {
-    type: jsPsychSurveyHtmlForm,
-    preamble: '<p>If you have any comments you would like to tell us, please write them in the text box below.</p>',
-    html: '<p><input type="text" id="test-resp-box" name="response" size="10" /></p>',
-    autofocus: 'test-resp-box',
-    textbox_rows: 5,
-    textbox_columns: 40,
-    data: { stimulus: 'openFeedback' },
-}
+timeline.push(demographics)
 
 const experiment_feedback  = {
     type: jsPsychSurvey,
@@ -555,57 +552,101 @@ const experiment_feedback  = {
     required_question_label: "*",
     required_error: "Please check whether you responded to all the questions.",
     pages: 
-    [   
-        [
+        [[
             {
                 type:"html",
                 prompt: `People are motivated and distracted to different degrees for varying reasons. \n
-                There is nothing wrong with low motivation or being distracted, but we kindly ask that you answer honestly.` 
+                There is nothing wrong with a low motivation or being distracted and we kindly ask that you answer honestly.` 
             },
             {
                 type: "likert",
                 prompt: "How distracted were you during the task?",
+                name: "distraction", 
             //     likert_scale_values: [
             //         {value: 1, text: "Not at all distracted"},
             //         {value}
             // ],
                 likert_scale_max: 7,
-                likert_scale_min_label: "Not at all distracted",
-                likert_scale_max_label: "Distracted all the time",
+                // likert_scale_min_label: "Not at all distracted",
+                // likert_scale_max_label: "Distracted all the time",
                 required: true, 
+            },
+            {
+                type: "text",
+                prompt: "Is there anything you want to add in relation to the DISTRACTION question (above)?",
+                name: 'distraction_feedback', 
+                textbox_columns: 50,
+                textbox_rows: 3,
             },
             {
                 type: "likert",
                 prompt: "How motivated were you to perform well on the task?",
+                name: "motivation",
                 likert_scale_max: 7,
-                likert_scale_min_label: "Not at all motivated",
-                likert_scale_max_label: "Very motivated",
+                // likert_scale_min_label: "Not at all motivated",
+                // likert_scale_max_label: "Very motivated",
                 required: true, 
             },
             {
-                type: "text", 
-                prompt: "Feedback on the task?",
-                name: "feedback",
+                type: "text",
+                prompt: "Is there anything you want to add in relation to the MOTIVATION question (above)?",
+                name: 'motivation_feedback',
                 textbox_columns: 50,
-                required: true,
+                textbox_rows: 3,
             }
-
+    ],
+    [
+        {
+            type: "text",
+            prompt: "Do you have any other comments then you can describe them here?",
+            name: 'motivation_feedback',
+            textbox_columns: 100,
+            textbox_rows: 5,
+        } 
+    ]
+],
+    data: {stimulus: "Distraction_Motivation", trial_info: "Distraction_Motivation"},
     on_finish: () => {
         data = jsPsych.data.getLastTrialData().values()[0]
         
-        jsPsych.data.get().addToAll({ gender:       data.response.gender });
-        jsPsych.data.get().addToAll({ birthYear:    data.response.birthYear });
-        jsPsych.data.get().addToAll({ id:           ID });
+        var distraction = data.response.distraction
+        var distraction_feedback = data.response.distraction_feedback
+        var motivation = data.response.motivation
+        var motivation_feedback = data.response.motivation_feedback
+    }
+}
+timeline.push(experiment_feedback)
+
+var comments = {
+    type: jsPsychSurveyHtmlForm,
+    preamble: '<p>If you have any comments you would like to tell us, please write them in the text box below.</p>',
+    html: '<p><input type="text" id="test-resp-box" name="response" size="10" /></p>',
+    autofocus: 'test-resp-box',
+    textbox_rows: 5,
+    textbox_columns: 60,
+    
+    data: { stimulus: 'openFeedback' },    
+
+    on_finish: () => {
+        data = jsPsych.data.getLastTrialData().values()[0]
+        console.log(data.response, "open survey resp")
+        jsPsych.data.get().addToAll({ id:                   ID });
+        jsPsych.data.get().addToAll({ age:                  age });
+        jsPsych.data.get().addToAll({ gender:               gender });
+        jsPsych.data.get().addToAll({ distraction:          distraction });
+        jsPsych.data.get().addToAll({ distraction_feedback: distraction_feedback });
+        jsPsych.data.get().addToAll({ motivation:           motivation });
+        jsPsych.data.get().addToAll({ motivation_feedback:  motivation_feedback });
+        jsPsych.data.get().addToAll({ open_feedback:        data.response });
 
         // Save the data
-        if(save_local_data==true){ jsPsych.data.get().localSave('csv','mydata.csv') }
+        if(save_local_data){ jsPsych.data.get().localSave('csv','mydata.csv') }
 
         // Return data to server
         saveData("data_" + start_dateTime + "_" + ID, jsPsych.data.get().csv());
     }
 }
-timeline.push(demographics)
-// var comments = {}
+timeline.push(comments)
 
 
 // Exit fullscreen and end experiment. 
