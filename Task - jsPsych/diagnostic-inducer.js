@@ -5,16 +5,27 @@ const debug = true              // Show some console information
 const skip_instructions = false  // Skip intro? (to test trials)
 const save_local_data = true    // Save a local file (test analysis)
 
-////////////////////////////////////////////////////////
+////////////////////////////
+////                    ////
+////    Initialize      ////
+////                    ////
+////////////////////////////
+const jsPsych = initJsPsych({
+    // experiment_width : 1280, 
+        // w/e add later if necessary
+    on_finish: function() {
+        jsPsych.data.displayData() }
+});
+const timeline = []; // Timeline
 
-// Connection to server?
+
+// Connection to server? idk
 function saveData(name, data){
     var xhr = new XMLHttpRequest();
     xhr.open('POST', 'write_data.php'); // 'write_data.php' is the path to the php file described above.
     xhr.setRequestHeader('Content-Type', 'application/json');
     xhr.send(JSON.stringify({filename: name, filedata: data}));
 }
-
 
 // Get data function
 Date.prototype.today = function () { 
@@ -27,7 +38,8 @@ var start_dateTime = new Date().today() + "_" + new Date().timeNow();
 if(debug) { console.log(start_dateTime) }
 
 
-////    Trials      ////
+
+////        Trials          ////
 // Fixations
 let short_fixation = {
     type: jsPsychHtmlKeyboardResponse,
@@ -44,7 +56,7 @@ const long_fixation = {
     data: { stimulus: "+", trial_info: "Fixation - long" },
 }
 
-// Feedback
+// Feedback trial
 const wrong_response = {
     type: jsPsychHtmlKeyboardResponse,
     stimulus:  () => { return `<div style="font-size: ${general_font_size};"> Wrong! </div>` },
@@ -60,7 +72,7 @@ const too_slow = {
     data: { stimulus: "Slow", trial_info: "Feedback" }
 }
 
-// change background
+// Change background
 const set_background_colour_default = {
     type: jsPsychCallFunction,
     func: () => { changeBackground(default_background_colour) }
@@ -72,11 +84,28 @@ const set_background_colour_wrong_response = {
   // https://github.com/jspsych/jsPsych/discussions/936
   // https://github.com/psychbruce/jspsych/blob/master/exp_demo/experiment/experiment.js
 
-//
-//
-//  Initialize 
-//
-//
+// Feedback block
+    // Too slow
+let too_slow_trial = {
+    timeline: [set_background_colour_wrong_response, too_slow, set_background_colour_default],
+    conditional_function: () => {
+        let data = jsPsych.data.get().last(1).values()[0];
+        if(data.response === null)  { return true } 
+        else                        { return false }
+    }
+}
+    // Wrong response
+let wrong_response_trial = {
+    timeline: [set_background_colour_wrong_response, wrong_response , set_background_colour_default],
+    conditional_function: () => {
+        let data = jsPsych.data.get().last(1).values()[0]
+        if( data.correct == false)  { return true } 
+        else                        { return false }
+    }
+}
+
+timeline.push(set_background_colour_default) // To ensure the background colour is correct.
+
 
 // Experiment vars
 var gender;
@@ -88,21 +117,89 @@ var motivation_feedback;
 
 // Technical variables
 var refresh_rate;               // Can be nice to gather
-var height_width_pre;           // 
-var height_width_fullscreen;    //
+var height_width_pre;           // Height-width pre fullscreen
+var height_width_fullscreen;    // Height-width after fullscreen
 var os_browser;     // not necessary, to debug ???
 
+// Inducer colour
 let rnd_inducer_colour = jsPsych.randomization.sampleWithReplacement(inducer_colours, 1)[0]
 
-const jsPsych = initJsPsych({
-    // experiment_width : 1280, 
-        // w/e add later if necessary
-    on_finish: function() {
-        jsPsych.data.displayData() }
-});
-const timeline = []; // Timeline
-timeline.push(set_background_colour_default) // To ensure the background colour is correct.
+// Unique ID
+var ID = jsPsych.randomization.randomID(8);
+if(debug){ console.log("ID = " + ID) }
 
+// Shuffle stimuli list
+let rnd_stimuli = jsPsych.randomization.shuffle(stimuli);  // Shuffle stimuli list
+if(debug) { console.log(rnd_stimuli) }
+
+// Generate diagnostic length range
+let diagnostic_range = Array.from(Array(diagnostic_max_length-3), (x,i) => i + diagnostic_min_length) 
+if(debug){ console.log("The range of diagnostic lengths: ", diagnostic_range) }
+
+// Generate probability distribution of the diagnostic run (if relevant)
+if(math.toLowerCase() == "none"){
+    final_probability_list = Array(diagnostic_max_length-(diagnostic_min_length-1)).fill(1)
+} else {
+    let halfway = (diagnostic_min_length+diagnostic_max_length)/2 //Diag halfway value
+    if(debug){ console.log("Halway: ", halfway) }
+    
+    let probability_list = [];
+    for(let i = 0; i < spare; i++){
+        probability_list.push(1)
+        if(debug){ console.log("Probability list: ", probability_list) }
+    }
+    
+    for(let i = 1; i < Math.floor(halfway - diagnostic_min_length - spare) + 1; i++){
+        // Start at 1 (cause it is the first distance)
+        switch(math.toLowerCase()){
+            case "log":
+                probability_list.push(Number((1-(Math.log(1+i) * decent)).toFixed(2)))
+                break;
+            case "log2":
+                probability_list.push(Number((1-(Math.log2(1+i) * decent)).toFixed(2)))
+                break;
+            case "log1p":
+                probability_list.push(Number((1-(Math.log1p(1+i) * decent)).toFixed(2)))
+                break;
+            case "log10":
+                probability_list.push(Number((1-(Math.log10(1+i) * decent)).toFixed(2)))
+                break;
+            case "linear":
+                probability_list.push(Number((1-(i * decent)).toFixed(2)))
+                break;
+        }
+    }
+    if(diagnostic_range.length % 2 == 0){
+        probability_list.unshift(1) 
+        var final_probability_list = Object.assign([],probability_list).reverse().concat(probability_list); 
+        // If it is even, then add 1 at the start
+    } else {
+        var final_probability_list = Object.assign([],probability_list).reverse().concat(1, probability_list); 
+        // If odd add one in the middle
+    }
+}
+if(debug){ console.log("Final probabilities are: ", final_probability_list) }
+
+// Randomize diagnostic length across the experiment & distribute according to probability distribution
+let rnd_diagnostic_length = [];
+for(let i = 0; i < number_of_inducers; i++){
+    rnd_diagnostic_length.push(jsPsych.randomization.sampleWithReplacement(diagnostic_range, 1, final_probability_list)[0]);
+    // We randomize the length from "min" to "max" with the probabilities in "final_probability_list"
+}
+
+//// Or generate a maximum number of trials? 
+
+
+if(debug){ console.log("With these parameters we end up with an average length of: ",  
+                    (diagnostic_min_length+diagnostic_max_length)/2*number_of_inducers) }
+if(debug){ console.log("Diag lengths: ", rnd_diagnostic_length) }
+if(debug){ console.log("Experiment length: ", rnd_diagnostic_length.reduce((val, a) => val + a)) } // sum the list
+
+
+
+////////////////////////////
+////    Instructions    ////
+////////////////////////////
 
 // We want to ensure some features before task start? 
     // Perhas we  trust prolifics inclusion/exclusion check ? 
@@ -137,7 +234,7 @@ const check_browser = {
             return `<p>We haev detected that you use Safari which is not able to run the experiment properly. \n
             Please run the experiment in a different browser.</p>`
         } else {
-            return `We failed to parse your browser information... You may try to use a different browser`
+            return `We failed to parse your browser information... Try using a different browser.`
         }
     }
 }
@@ -195,20 +292,15 @@ const about_the_experiment_and_consent = {
 }
 if(skip_instructions){} else { timeline.push(about_the_experiment_and_consent) }
 
-
-
-
-
-
 ////       Initialize fullscreen and START        ////
 if(skip_instructions){} else {
     timeline.push({
         type: jsPsychFullscreen,
         message: `<div style="font-size:${instruction_font_size}">
-        This experiment requires fullscreen and will be initiated when clicking the button below
+        This experiment requires fullscreen and will be initiated when clicking the button below.
         <br><br>
         </div>`,
-        button_label: "Start the experiment",
+        button_label: "Enable fullscreen",
         fullscreen_mode: true
     });
 }
@@ -242,109 +334,42 @@ if(skip_instructions){} else {
 //
 
 
-// Unique ID
-var ID = jsPsych.randomization.randomID(8);
-if(debug){ console.log("ID = " + ID) }
-
 ///////////////////////////////////////////////////////
 ////////////            TASK               ////////////
-// Shuffle stimuli list
-let rnd_stimuli = jsPsych.randomization.shuffle(stimuli);  // Shuffle stimuli list
-if(debug) { console.log(rnd_stimuli) }
+///////////////////////////////////////////////////////
 
-// Generate diagnostic length ranges
-let diagnostic_range = Array.from(Array(diagnostic_max_length-3), (x,i) => i + diagnostic_min_length) 
-if(debug){ console.log("The range of diagnostic lengths: ", diagnostic_range) }
-
-// Generate probability distribution of the diagnostic run (if relevant)
-if(math.toLowerCase() == "none"){
-    final_probability_list = Array(diagnostic_max_length-(diagnostic_min_length-1)).fill(1)
-} else {
-    let halfway = (diagnostic_min_length+diagnostic_max_length)/2 //Diag halfway value
-    if(debug){ console.log("Halway: ", halfway) }
-    
-    let probability_list = [];
-    for(let i = 0; i < spare; i++){
-        probability_list.push(1)
-        if(debug){ console.log("Probability list: ", probability_list) }
-    }
-    
-    for(let i = 1; i < Math.floor(halfway - diagnostic_min_length - spare) + 1; i++){
-        // Start at 1 (cause it is the first distance)
-        switch(math.toLowerCase()){
-            case "log":
-                probability_list.push(Number((1-(Math.log(1+i) * decent)).toFixed(2)))
-                break;
-            case "log2":
-                probability_list.push(Number((1-(Math.log2(1+i) * decent)).toFixed(2)))
-                break;
-            case "log1p":
-                probability_list.push(Number((1-(Math.log1p(1+i) * decent)).toFixed(2)))
-                break;
-            case "log10":
-                probability_list.push(Number((1-(Math.log10(1+i) * decent)).toFixed(2)))
-                break;
-            case "linear":
-                probability_list.push(Number((1-(i * decent)).toFixed(2)))
-                break;
-        }
-    }
-    if(diagnostic_range.length % 2 == 0){
-        probability_list.unshift(1) 
-        var final_probability_list = Object.assign([],probability_list).reverse().concat(probability_list); 
-        // If it is even, then add 1 at the start
-    } else {
-        var final_probability_list = Object.assign([],probability_list).reverse().concat(1, probability_list); 
-        // If odd add one in the middle
-    }
-}
-if(debug){ console.log("Final probabilities are: ", final_probability_list) }
-
-// Randomize diagnostic length across the experiment & distribute according to probability distribution
-let rnd_diagnostic_length = [];
-for(let i = 0; i < number_of_inducers; i++){
-    rnd_diagnostic_length.push(jsPsych.randomization.sampleWithReplacement(diagnostic_range, 1,  final_probability_list)[0]);
-    // We randomize the length from "min" to "max" with the probabilities in "final_probability_list"
-}
-if(debug){ console.log("With these parameters we end up with an average length of: ",  
-(diagnostic_min_length+diagnostic_max_length)/2*number_of_inducers) }
-if(debug){ console.log("Diag lengths: ", rnd_diagnostic_length) }
-if(debug){ console.log("Experiment length: ", rnd_diagnostic_length.reduce((val, a) => val + a)) } // sum the list
-
-
-////////        Experiment run creation         ////////
 ////    DIAGNOSTIC TASK    ////
 let diagnostic_task_instruction_description = {
     type: jsPsychHtmlKeyboardResponse,
-    pages: () => {
-        return [
-            `<div style="font-size:${instruction_font_size}">
-            Reminder: Respond to ${responseSides[0]} using ${allowed_responses[0]}, \n
-            and ${responseSides[1]} using ${allowed_responses[1]}\n
-            <br>
-            We ask that you use one finger from each hand to the related response. 
-            <br>
-            <br>
-            In the next screen you will see the instructions that <b> will not change </b> in the experiment. \n
-            These are to be responded to when the target appears in black colour. \n 
-            Thereafter, you will be presented with the other instructions. \n
-            These trials are only to be answered when the target appears in ${rnd_inducer_colour}  \n 
-            You will receive a maximum of 20 seconds reading each instruction (which is plenty of time) to remember the instructions.
-            <br>
-            <br>
-            The experiment proceed quickly without any breaks, \n
-            please ensure that you are in a calm environment where you are unlikely to be distracted/disrupted.      
-            The experiment will take approximately 30 minutes.
-            <br>
-            The experiment start immediately when pressing SPACE.
-            </div>
-            `
-        ],
+    stimulus: () => {
+        let a = `<div style="font-size:${instruction_font_size}">
+        Reminder: Respond to ${responseSides[0]} using ${allowed_responses[0]}, \n
+        and ${responseSides[1]} using ${allowed_responses[1]}\n
+        <br>
+        We ask that you use one finger from each hand to the related response. 
+        <br>
+        <br>
+        In the next screen you will see the instructions that <b> will not change </b> in the experiment. \n
+        These are to be responded to when the target appears in black colour. \n 
+        Thereafter, you will be presented with the other instructions. \n
+        These trials are only to be answered when the target appears in <span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour}</span>.  \n 
+        You will receive a maximum of 20 seconds reading each instruction (which is plenty of time) to remember the instructions.
+        <br>
+        <br>
+        The experiment proceed quickly without any breaks, \n
+        please ensure that you are in a calm environment where you are unlikely to be distracted/disrupted.      
+        The experiment will take approximately 30 minutes.
+        <br>
+        The experiment start immediately when pressing SPACE.
+        </div>
+        `
+        return [a]
     },
     choices: " ",
     post_trial_gap: 1500,
 }
 timeline.push(diagnostic_task_instruction_description)
+
 
 
 let rnd_diagnostic_responseSides = jsPsych.randomization.shuffle(responseSides);    // randomize response side 
@@ -371,16 +396,19 @@ let diagnostic_task_instruction = {
 }
 timeline.push(diagnostic_task_instruction)
 
+// ?????
 let inducer_prompt={
     type: jsPsychHtmlKeyboardResponse,
     stimulus: `In the next screen you will see the other instructions.`
 }
+// ?????
 
-// Here we create the experiment
+// Here we create the experiment blocks
 for(let i = 0; i < number_of_inducers; i++){ // less than, since we start at 0
     // This first get the number of different inducers
     let run_stimuli = [rnd_stimuli[0], rnd_stimuli[1]] // Get new stimuli
     rnd_stimuli.splice(0,2) // Remove those stimuli from the list
+
     let run_diagnostic_length = rnd_diagnostic_length[i] // Get the curret diagnostic length
     let rnd_inducer_responseSides = jsPsych.randomization.shuffle(responseSides); // randomize where left/right appears
     
@@ -397,13 +425,13 @@ for(let i = 0; i < number_of_inducers; i++){ // less than, since we start at 0
             inducer_run: i,                 // Inducer run number
             stimulus: `If ${run_stimuli[0]} press ${rnd_inducer_responseSides[0]} || If ${run_stimuli[1]} press ${rnd_inducer_responseSides[1]}`,
             trial_info: "Inducer instructions"
-        }, 
+        },
         trial_duration: instruction_delay, 
     }
+
     timeline.push(inducer_instruction)
 
     timeline.push(short_fixation)
-
 
     /////////////////////////////////
     ////    Diagnostic run      /////
@@ -456,7 +484,7 @@ for(let i = 0; i < number_of_inducers; i++){ // less than, since we start at 0
                 // could add
                 // data.inducer_required_response = 
 
-                /// GONGUENCEY HERE
+                ////    GONGUENCEY HERE     ////
                 // if they are the same in one position, then they are congruent?
                 if(rnd_diagnostic_responseSides[0] == rnd_inducer_responseSides[0] & data.stimulus == run_stimuli[0]){
                         // If the diagnostic and inducer respond side overlapp, as well as the stimulus is equal to the run stimuli[0] THEN congruent 
@@ -470,25 +498,7 @@ for(let i = 0; i < number_of_inducers; i++){ // less than, since we start at 0
 
         ////     Feedback   ////
         // If participants responded to slow, give feedback
-        let too_slow_trial = {
-            timeline: [set_background_colour_wrong_response, too_slow, set_background_colour_default],
-            conditional_function: () => {
-                let data = jsPsych.data.get().last(1).values()[0];
-                if(data.response === null)  { return true } 
-                else                        { return false }
-            }
-        }
         timeline.push(too_slow_trial)
-        
-        // If participants responded incorrectly, give feedback
-        let wrong_response_trial = {
-            timeline: [set_background_colour_wrong_response, wrong_response , set_background_colour_default],
-            conditional_function: () => {
-                let data = jsPsych.data.get().last(1).values()[0]
-                if( data.correct == false)  { return true } 
-                else                        { return false }
-            }
-        }
         timeline.push(wrong_response_trial)
 
         timeline.push(short_fixation)
@@ -528,29 +538,13 @@ for(let i = 0; i < number_of_inducers; i++){ // less than, since we start at 0
     }
     timeline.push(inducer_task)
 
+
     ////     Feedback   ////
     // If participants responded to slow, give feedback
-    let too_slow_trial = {
-        timeline: [set_background_colour_wrong_response, too_slow, set_background_colour_default],
-        conditional_function: () => {
-            let data = jsPsych.data.get().last(1).values()[0];
-            if(data.response === null)  { return true } 
-            else                        { return false }
-        }
-    }
     timeline.push(too_slow_trial)
-
-    // If participants responded incorrectly, give feedback
-    let wrong_response_trial = {
-        timeline: [set_background_colour_wrong_response, wrong_response , set_background_colour_default],
-        conditional_function: () => {
-            let data = jsPsych.data.get().last(1).values()[0];
-            if( data.correct == false)  { return true } 
-            else                        { return false }
-        }
-    }
     timeline.push(wrong_response_trial)
         
+    // Fixation if new inducer run
     let inducer_fixation = {
         timeline: [long_fixation],
         conditional_function: () => {
@@ -631,7 +625,7 @@ const experiment_feedback  = {
                 name: "distraction", 
                 likert_scale_max: 7,
                 likert_scale_min_label: "Not at all distracted   ",
-                likert_scale_max_label: "   Ver| distracted",
+                likert_scale_max_label: "   Very distracted",
                 required: true, 
             },
             {
@@ -661,7 +655,7 @@ const experiment_feedback  = {
         [
             {
                 type: "text",
-                prompt: "Do you have any other comments in relation to the experiment? Then you can describe them here.",
+                prompt: "Do you have any other comments, thoughts, or remarks in relation to the experiment?",
                 name: 'open_feedback',
                 textbox_columns: 100,
                 textbox_rows: 5,

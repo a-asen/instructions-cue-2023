@@ -67,5 +67,3 @@ function changeBackground(colour) {
     document.body.style.background = colour;
 }
 
-
-
