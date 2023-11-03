@@ -17,8 +17,9 @@ max_diagnostic_length <- \(min, max, reps=1000, experiment_length=24, probabilit
     geom_vline(xintercept = mean(n), colour="red")
 }
 
-max_diagnostic_length(4,16, reps = 30, probability = gen_prob(4,16,.1,"log",1))
+
 
 # Generate probability distribution of the diagnostic run (if relevant)
-
+max_diagnostic_length(4,16, reps = 30, probability = gen_prob(4,16,.1,"log",1))
+  # Gen_prob generates the probability distribution
 
