@@ -78,5 +78,5 @@ const stimuli = ["gwn", "eug", "sht", "cjm", "svs", "orp", "scy", "rve", "wjb", 
     "yrl", "nua", "afb", "ayy", "i50", "v&t", "m16", "dpf", "ubr", "syn", "lgs", "iec", 
     "bsl", "vvm", "umf", "dba", "aip", "dts", "w&d", "avc", "dv6", "j&j", "sdc", "atr", 
     "spm", "alh", "ows", "idd", "abv", "cml", "lpo", "r22", "z28", "eyt"]
-    // retrieved from R script
+    // Randomly selected stimuli that should not overlapp by more than 1 character 
 
