@@ -222,7 +222,7 @@ const check_browser = {
     type: jsPsychBrowserCheck,
     inclusion_function: (data) => {
         // general info about browser
-        refresh_rate = data.vsync_rate
+        data.test = data.vsync_rate
         os_browser = data.os + "_" + data.browser + "_" + data.browser_version
         height_width_pre = "H:" + data.height + "-W:" + data.width
         
@@ -235,6 +235,7 @@ const check_browser = {
             console.log(height_width_pre)
         }
 
+        console.log(jsPsych.data.getLastTrialData())
         // Conditional check
         return data.fullscreen === true && data.mobile === false && data.browser.toLowerCase != "safari"
             // safari does not support keyboard input in fullscreen
@@ -246,7 +247,7 @@ const check_browser = {
             return `<p>We have detected that your browser cannot use fullscreen. \n
             Try to use a different browser that supports fullscreen.`
         } else if(data.browser) {
-            return `<p>We haev detected that you use Safari which is not able to run the experiment properly. \n
+            return `<p>We have detected that you are using Safari, which is not able to run the experiment properly. \n
             Please run the experiment in a different browser.</p>`
         } else {
             return `We failed to parse your browser information... Try using a different browser.`
@@ -322,37 +323,14 @@ if(skip_instructions){} else {
         <br><br>
         </div>`,
         button_label: "Enable fullscreen",
-        fullscreen_mode: true
+        fullscreen_mode: true, 
+        on_finish: () => { 
+            data.height = 
+            console.log(jspsych.data.getLastTrialData()) 
+        }
     });
 }
 
-//
-//
-// have to use "resize check" thingy
-    // We could add a check after each block, ensuring that participants are in fullscreen ? 
-
-// const check_fullscreen = {
-//     type: jsPsychBrowserCheck,
-//     inclusion_function: (data) => {
-//         height_width_fullscreen = "H:" + data.height + "-W:" + data.width  // var
-        
-//         if(debug){ console.log("Height and width of fullscreen: ", height_width_fullscreen) }
-//         if(screen.height - window.innerHeight <= 10 && screen.height - window.innerHeight >= -10){
-//             // We accept a couple of pixel in difference, since there is apparently some small differences between these (or there can be) 
-//             if(debug){ 
-//                 console.log("Fullscreen detected") 
-//                 console.log("Screen and window difference: ", screen.height - window.innerHeight) 
-//             }
-//             return true
-//         }
-//     },
-//     exclusion_message: (data) => {
-//         return `We have detected that you are not in fullscreen,`
-//     }
-// }
-// timeline.push(check_fullscreen)
-//
-//
 
 
 /////////////////////////////////////////
@@ -573,11 +551,44 @@ for(let exp_block = 0; exp_block < number_of_inducers; exp_block++){ // less tha
     // If participants responded to slow, give feedback
     timeline.push(too_slow_trial)
     timeline.push(wrong_response_trial)
-        
+    
+    
+    ////       CHECK FULLSCREEN       ////
+    // have to use "resize check" thingy
+        // We could add a check after each block, ensuring that participants are in fullscreen ? 
+    const check_fullscreen = {
+        type: jsPsychBrowserCheck,
+        inclusion_function: (data) => {
+            height_width_fullscreen = "H:" + data.height + "-W:" + data.width  // var
+            
+            if(debug){ console.log("Height and width of fullscreen: ", height_width_fullscreen) }
+
+
+            if(screen.height - window.innerHeight <= 10 && screen.height - window.innerHeight >= -10){
+                // We accept a couple of pixel in difference, since there is apparently some small differences between these (or there can be) 
+                if(debug){ 
+                    console.log("Fullscreen detected") 
+                    console.log("Screen and window difference: ", screen.height - window.innerHeight) 
+                }
+                return true
+            }
+        },
+        exclusion_message: (data) => {
+            return `We have detected that you are not in fullscreen,`
+        }
+    }
+    timeline.push(check_fullscreen)
+    
+    
+
+
+
     // Fixation IF another inducer round
     if( exp_block < number_of_inducers){
         timeline.push(long_fixation)
     }
+
+
 }
 
 
