@@ -1,25 +1,26 @@
-# Sampling script
-max_diagnostic_length <- \(min, max, reps=1000, experiment_length=24, probability = NULL){
-  n <- as.numeric()
+library(ProjectTemplate)
+load.project()
 
-   for(x in 1:reps){
-    c(n, sum(sample(min:max, experiment_length, T, prob = probability))) -> n
-  }
-  #hist(n)
-
-  if(!is.null(probability)){
-    cat("With the probability distribution: ", probability, fill = T)
-  }
-
-  ggplot(tibble(n), aes(n))+
-    geom_histogram(aes(y=after_stat(density)))+
-    geom_density(fill="black", alpha=.2)+
-    geom_vline(xintercept = mean(n), colour="red")
-}
-
-
+l <- list()
 
 # Generate probability distribution of the diagnostic run (if relevant)
-max_diagnostic_length(4,16, reps = 30, probability = gen_prob(4,16,.1,"log",1))
-  # Gen_prob generates the probability distribution
+max_diagnostic_length(4, 16, experiment_length = 24, reps = 5000) -> l$none
 
+max_diagnostic_length(4, 16, experiment_length = 24, reps = 5000,
+                      probability = T, decent = .2, math = "log10", spare = 1) -> l$log10
+
+max_diagnostic_length(4, 16, experiment_length = 24, reps = 5000,
+                      probability = T, decent = .2, math = "log", spare = 1) -> l$log
+
+max_diagnostic_length(4, 16, experiment_length = 24, reps = 5000,
+                      probability = T, decent = .2, math = "log1p", spare = 1) -> l$log1p
+
+max_diagnostic_length(4, 16, experiment_length = 24, reps = 5000,
+                      probability = T, decent = .2, math = "log2", spare = 1) -> l$log2
+
+max_diagnostic_length(4, 16, experiment_length = 24, reps = 5000,
+                      probability = T, decent = .2, math = "linear", spare = 1) -> l$linear
+
+
+library(patchwork)
+l$none + l$log10 + l$log + l$log1p + l$log2 + l$linear
