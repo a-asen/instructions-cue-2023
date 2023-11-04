@@ -264,10 +264,10 @@ const about_the_experiment_and_consent = {
         
         <h3>Welcome to this cognitive psychology study!</h3>
         We are investigating cognitive flexibility in humans.
-
+        <br>
         The study is conducted by Steffen Aasen (Master student) and \n
         Torsten Martiny-Huenger (Supervisor) at UiT – The Arctic University of Norway.
-        
+        <br>
         If you have questions about the study, you may contact Torsten Martiny-Huenger at (torsten.martiny-huenger@uit.no). </p>
 
         </div>`,  
@@ -275,33 +275,39 @@ const about_the_experiment_and_consent = {
         `<div style="font-size:${instruction_font_size}"> 
 
         <h3>About the experiment</h3>                
-        In this study, you will have to remember two instructions at once \n
-
-
-
-
-        mbe asked to remember two instructions which are to be implemented in the experiment. \n
-        The first task that you will be presented with will <b>remain the same </b> throughout the experiment. \n
-        The second task will change in the experiment and will only be executed once. \n
-        Each new run will start with a new instruction.  \n
-        Your task is to respond as fast and accurately as possible to the current task. \n
+        In this study, you will have to remember two tasks. \n
+        You will switch between these tasks based on some targets that appear on your screen. \n
+        The first task that you will be presented with, will <b>remain the same </b> throughout the experiment. \n
+        The second task will change throughout experiment and will only be executed once. \n
+        The second task will change a couple of times during the experiment. \n 
+        Each change will be indicated with a new instruction for the second task. \n
+        Your task is to respond as <b>fast and accurately</b> as possible to the current task. \n
         Only one task will be executed during any one trial. This will be indicated by its colour.<br><br> \n 
-        To response to any trial, you are asked to click either ${response_sides[0]} using ${allowed_responses[0]}, or \n
-        ${response_sides[1]} using ${allowed_responses[1]}
+        To response to any trial, you are asked to either click ${response_sides[0]} using ${allowed_responses[0]}, or \n
+        ${response_sides[1]} using ${allowed_responses[1]}. <br>\n
+        These keys will not change throughout the experiment. 
+        
         </div>`, 
-
         `<div style="font-size:${instruction_font_size}">
+        
         <h3> Consent </h3>
         
-        <p>Participation in the study is voluntary. \n
+        Participation in the study is voluntary. \n
         All responses are collected and stored anonymously and cannot be traced back to you. \n
         The anonymous storage means we cannot provide participants with their responses upon request. \n
-        You can quit the study without giving a reason by closing the browser tab. No data will be stored in that case.
-        </p>
-        </div>`,
+        You can quit the study without giving a reason by closing the browser tab. No data will be stored in that case.\n
+        <br><br> 
+        The data will be publicly availabe for other to download. By continuing you agree to have your data stored in this manner.\n
+        Note that your data is anaymous and cannot be traced back to you! This is done for open science practices - \n
+        a movement for more transparent research, inclding preregistering hypothesis, data analysis, and data. 
         
+        </div>`,
 
-    ]},
+        // Is it not possible to show participants ID for them to  later retrieve their own data, if they so choose? 
+            // In that case I guess we could really allow participants to download their own data while in the browser, but... 
+
+        ]
+    },
     show_clickable_nav: ["Next"],
     data: { stimulus: "The experiment and consent", trial_info: "The experiment and consent" }
 }
@@ -368,15 +374,18 @@ let diagnostic_task_instruction_description = {
         </div>`, //New page
 
         `<div style="font-size:${instruction_font_size}">
-        We ask that you put your left index finger on the <b> ${allowed_responses[0].toUpperCase()} </b> key and your right index finger on the <b> ${allowed_responses[1].toUpperCase()} </b> key. \n
-        This will be the only valid (and functional) responses in this experiment, unless otherwise noted. 
+        We ask that you put your left index finger on the <b> ${allowed_responses[0].toUpperCase()} </b> key \n
+        and your right index finger on the <b> ${allowed_responses[1].toUpperCase()} </b> key. \n
+        These will be the only valid (and functional) responses in this experiment (unless otherwise noted).
         <br><br>
 
-        In the next screen you will see the instructions that <b> will not change </b> in the experiment. \n 
+        In the next screen you will see the first task, that <b> will not change </b> in the experiment. \n 
         This task must be responded to when the target (stimulus) appears in <b> black </b> colour. \n
         After that screen, the other task will be shown. \n
-        This task will be changed in the experiment, and will be clearly indicated. \n
-        You are asked to respond to this task when the target appears in <span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour}</span>. \n
+        This task will change throughout the the experiment, and will be clearly indicated with a new instruction screen. \n
+        <br> 
+        You are asked to respond to this task when the target appears in \n
+         <span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour.toUpperCase()}</span>. \n
         <br><br>
 
         You will receive a maximum of 20 seconds reading each of the instructions (which is plenty of time). <br><br>
@@ -386,7 +395,7 @@ let diagnostic_task_instruction_description = {
     allow_keys: false, 
     show_clickable_nav: true,
     post_trial_gap: 1500,
-    data: { stimulus: "Instructions", trial_info: "Experiment description" }
+    data: { stimulus: "Instructions", trial_info: "Final experiment explanation" }
 }
 timeline.push(diagnostic_task_instruction_description)
 
@@ -397,7 +406,7 @@ let diagnostic_task_instruction = {
     stimulus: function(){   
         return [ 
         `<p style="font-size: ${general_font_size};"> If a target appears <i> italic </i> press ${rnd_diagnostic_response_sides[0]}`+
-        `<p style="font-size: ${general_font_size};"> If a target appeas upright press ${rnd_diagnostic_response_sides[1]}`]
+        `<p style="font-size: ${general_font_size};"> If a target appears upright press ${rnd_diagnostic_response_sides[1]}`]
     }, 
     prompt: "Press any SPACE to continue",
     choices: " ", 
@@ -406,7 +415,7 @@ let diagnostic_task_instruction = {
         stimulus: `If italic press ${rnd_diagnostic_response_sides[0]} | If upright press ${rnd_diagnostic_response_sides[1]}`,
         trial_info: "Diagnostic instructions",
     },
-    on_finish: () => { console.log(jsPsych.data.getLastTrialData()) }
+    on_finish: () => { if(debug){ console.log(jsPsych.data.getLastTrialData()) } }
 }
 timeline.push(diagnostic_task_instruction)
 
@@ -442,6 +451,8 @@ for(let exp_block = 0; exp_block < number_of_inducers; exp_block++){ // less tha
             trial_info: "Inducer instructions"
         },
         trial_duration: instruction_delay, 
+        on_finish: () => { if(debug){ console.log(jsPsych.data.getLastTrialData()) } 
+        }
     }
 
     timeline.push(inducer_instruction)
@@ -480,8 +491,8 @@ for(let exp_block = 0; exp_block < number_of_inducers; exp_block++){ // less tha
                 italic: run_rnd_italic,             // Whether the run is ITALIC or not
                 trial_info: "Diagnostic trial",         // This is a diagnostic trial
                 required_inducer_response_side: () => { // Required response side for the inducer task
-                    if(rnd_diag_stimulus == run_stimuli[0])  { return rnd_inducer_response_sides[0] }
-                    else                            { return rnd_inducer_response_sides[1] }
+                    if(rnd_diag_stimulus == run_stimuli[0]) { return rnd_inducer_response_sides[0] }
+                    else                                    { return rnd_inducer_response_sides[1] }
                 },
                 required_diag_response_side: () => {     // Required response side for the diagnostic task
                     if (run_rnd_italic) { return rnd_diagnostic_response_sides[0] } 
@@ -489,6 +500,8 @@ for(let exp_block = 0; exp_block < number_of_inducers; exp_block++){ // less tha
                 },
             },
             on_finish: (data) => {
+                if(debug){ console.log(jsPsych.data.getLastTrialData()) }
+
                 // Require diagnostic response key 
                 if(data.required_diag_response_side == response_sides[0]) 
                         { data.required_diag_response_key = allowed_responses[0] }
@@ -504,7 +517,7 @@ for(let exp_block = 0; exp_block < number_of_inducers; exp_block++){ // less tha
 
                 ////    GONGUENCEY      ////
                 // If the response side match, then congruent
-                if(required_diag_response_side == required_inducer_response_side){
+                if(data.required_diag_response_side == data.Arrayrequired_inducer_response_side){
                     data.congruency = true
                 } else { 
                     data.congruency = false
@@ -541,6 +554,7 @@ for(let exp_block = 0; exp_block < number_of_inducers; exp_block++){ // less tha
             },
         },
         on_finish: (data) => {
+            if(debug){ console.log(jsPsych.data.getLastTrialData()) }
             // Find correct response key 
             if(data.required_inducer_response_side == response_sides[0]){
                 data.required_inducer_response_key = allowed_responses[0] 
@@ -550,8 +564,6 @@ for(let exp_block = 0; exp_block < number_of_inducers; exp_block++){ // less tha
             // Correct response (according to the active trial)
             if(data.response == data.required_inducer_response_key) { data.correct_response = true }
             else                                                    { data.correct_response = false }
-
-            console.log(jsPsych.data.getLastTrialData())
         }
     }
     timeline.push(inducer_task)
