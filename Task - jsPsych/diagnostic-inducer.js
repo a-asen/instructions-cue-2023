@@ -3,7 +3,7 @@
 
 // CHANGE THESE BEFORE EXPERIMENT!
 const debug = true              // Show some console information
-const skip_instructions = true  // Skip intro? (to test trials)
+const skip_instructions = false  // Skip intro? (to test trials)
 const save_local_data = true    // Save a local file (test analysis)
 
 
@@ -422,8 +422,10 @@ for(let exp_block = 0; exp_block < number_of_inducers; exp_block++){ // less tha
     let run_stimuli = [rnd_stimuli[0], rnd_stimuli[1]] // Get new stimuli
     rnd_stimuli.splice(0,2) // Remove those stimuli from the list
 
-    let run_diagnostic_length = rnd_diagnostic_length[exp_block] // Get the curret diagnostic length
-    let rnd_inducer_response_sides = jsPsych.randomization.shuffle(response_sides); // randomize where left/right appears
+    let run_diagnostic_length = rnd_diagnostic_length[exp_block] 
+        // Get the curret diagnostic length from the pre-generated list
+    let rnd_inducer_response_sides = jsPsych.randomization.shuffle(response_sides)
+        // randomize left/right response for the inducer 
     
     ////        Inducer instruction         ////
     let inducer_instruction = { 
@@ -443,7 +445,6 @@ for(let exp_block = 0; exp_block < number_of_inducers; exp_block++){ // less tha
     }
 
     timeline.push(inducer_instruction)
-
     timeline.push(short_fixation)
 
 
@@ -454,63 +455,65 @@ for(let exp_block = 0; exp_block < number_of_inducers; exp_block++){ // less tha
     // Then we generate the diagnostic trials 
         // Should perhaps be a color? Or randomize a color? 
     for(let exp_diag = 0; exp_diag < run_diagnostic_length; exp_diag++){
-        // Randomize STIMULUS
-        let run_rnd_stimulus = jsPsych.randomization.sampleWithReplacement(run_stimuli, 1)[0]
+        // Randomize diagnostic STIMULUS
+        let rnd_diag_stimulus = jsPsych.randomization.sampleWithReplacement(run_stimuli, 1)[0]
 
-        // Randomize ITALIC 
+        // Randomize diagnostic ITALIC 
         let run_rnd_italic = jsPsych.randomization.sampleWithReplacement([true,false], 1, run_italic_bias)[0]
 
         let diagnostic_run = { 
             type: jsPsychHtmlKeyboardResponse,
             stimulus: () => {   
                 if(run_rnd_italic) {
-                    return `<p style="font-size: ${general_font_size};"><i>${run_rnd_stimulus}</i>`
+                    return `<p style="font-size: ${general_font_size};"><i>${rnd_diag_stimulus}</i>`
                 } else {
-                    return `<p style="font-size: ${general_font_size};">${run_rnd_stimulus}`
+                    return `<p style="font-size: ${general_font_size};">${rnd_diag_stimulus}`
                 }
             }, 
             choices: allowed_responses,
             trial_duration: trial_duration,
             data: {
-                stimulus: run_rnd_stimulus,         // Stimulus
-                inducer_run: exp_block,                     // Inducer run number (i.e., block)
-                diagnostic_run: exp_diag,                 // Diagnostic trial number
+                stimulus: rnd_diag_stimulus,         // Stimulus
+                inducer_run: exp_block+1,                   // Inducer run number (i.e., block)
+                diagnostic_run: exp_diag+1,                 // Diagnostic trial number //start with 1
                 inducer_trial: false,                   // Not an inducer trial
                 italic: run_rnd_italic,             // Whether the run is ITALIC or not
                 trial_info: "Diagnostic trial",         // This is a diagnostic trial
-                required_response_side: () => {     // Required response side
-                    if (run_rnd_italic == true) { return rnd_diagnostic_response_sides[0] } 
-                    else                        { return rnd_diagnostic_response_sides[1] } },
+                required_inducer_response_side: () => { // Required response side for the inducer task
+                    if(rnd_diag_stimulus == run_stimuli[0])  { return rnd_inducer_response_sides[0] }
+                    else                            { return rnd_inducer_response_sides[1] }
+                },
+                required_diag_response_side: () => {     // Required response side for the diagnostic task
+                    if (run_rnd_italic) { return rnd_diagnostic_response_sides[0] } 
+                    else                { return rnd_diagnostic_response_sides[1] } 
+                },
             },
             on_finish: (data) => {
-                // Require response key 
-                if(data.required_response_side == response_sides[0]) { data.required_response_key = allowed_responses[0] }
-                else                                                 { data.required_response_key = allowed_responses[1] }
-
+                // Require diagnostic response key 
+                if(data.required_diag_response_side == response_sides[0]) 
+                        { data.required_diag_response_key = allowed_responses[0] }
+                else    { data.required_diag_response_key = allowed_responses[1] }
+                
                 // Correct response
                 if(data.response == null){  data.correct = null  } 
                 else {
                     // If response equals correct_response_key
-                    if(data.required_response_key == data.response)  { data.correct_response = true }
-                    else                                             { data.correct_response = false }
+                    if(data.required_diag_response_key == data.response)    { data.correct_response = true }
+                    else                                                    { data.correct_response = false }
                 }
 
                 ////    GONGUENCEY      ////
-                
-                // If response side and stimulus overlap THEN cognruent (two possibilities)
-                if(rnd_diagnostic_response_sides[0] == rnd_inducer_response_sides[0] & data.stimulus == run_stimuli[0]){
-                    data.congruency = true
-                } else if (rnd_diagnostic_response_sides[1] == rnd_inducer_response_sides[1] & data.stimulus == run_stimuli[1]){
+                // If the response side match, then congruent
+                if(required_diag_response_side == required_inducer_response_side){
                     data.congruency = true
                 } else { 
-                    data.congruency = false 
+                    data.congruency = false
                 }
             }
         }
         timeline.push(diagnostic_run)
 
         ////     Feedback   ////
-        // If participants responded to slow, give feedback
         timeline.push(too_slow_trial)
         timeline.push(wrong_response_trial)
 
@@ -520,6 +523,7 @@ for(let exp_block = 0; exp_block < number_of_inducers; exp_block++){ // less tha
     ////        INDUCER TASK        ////
     ////////////////////////////////////
     let rnd_inducer_stimulus = jsPsych.randomization.sampleWithReplacement(run_stimuli, 1)[0]
+        // Randomly select inducer stimulus
 
     let inducer_task = {
         type: jsPsychHtmlKeyboardResponse,
@@ -528,24 +532,25 @@ for(let exp_block = 0; exp_block < number_of_inducers; exp_block++){ // less tha
         trial_duration: trial_duration,
         data: {
             stimulus: rnd_inducer_stimulus,     // Stimulus
-            inducer_run: exp_block,                     // Inducer run number 
+            inducer_run: exp_block+1,                     // Inducer run number // +1 b/c
             inducer_trial: true,                    // This is an inducer trial
             trial_info: "Inducer trial",            // General trial info 
-            required_response_side: () => {     // Get response side, according to run_stimuli
-                if(rnd_inducer_stimulus == run_stimuli[0])  { return rnd_inducer_response_sides[0] } 
+            required_inducer_response_side: () => { // Required inducer response side
+                if(rnd_inducer_stimulus == run_stimuli[0])  { return rnd_inducer_response_sides[0] }
                 else                                        { return rnd_inducer_response_sides[1] }
-            }
+            },
         },
         on_finish: (data) => {
             // Find correct response key 
-            if(data.required_response_side == response_sides[0]){
-                data.required_response_key = allowed_responses[0] 
+            if(data.required_inducer_response_side == response_sides[0]){
+                data.required_inducer_response_key = allowed_responses[0] 
             } else { 
-                data.required_response_key = allowed_responses[1] }
+                data.required_inducer_response_key = allowed_responses[1] }
 
-            // Test whether the response is correct
-            if(data.response == data.required_response_key)  { data.correct_response = true }
-            else                                             { data.correct_response = false }
+            // Correct response (according to the active trial)
+            if(data.response == data.required_inducer_response_key) { data.correct_response = true }
+            else                                                    { data.correct_response = false }
+
             console.log(jsPsych.data.getLastTrialData())
         }
     }
@@ -564,39 +569,13 @@ for(let exp_block = 0; exp_block < number_of_inducers; exp_block++){ // less tha
 }
 
 
-// For the final question - demographics and feedback - it is too much effort (from my investigation)
-// to change the background colour of the trial. Hence just change it to white...
-
 const white_bk = {
     type: jsPsychCallFunction,
     func: () => { changeBackground("white") }
 } 
 timeline.push(white_bk)
-
-
-////        Demographics        ////
-const demographics = {
-    type: jsPsychSurvey,
-    button_label_finish: "Next",
-    required_question_label: "*",
-    required_error: "Please check whether you responded to all the questions.",
-    pages: [
-
-    ],
-    data: { stimulus: "gender & age", trial_info: "Demographics" }, 
-    on_finish: () => {
-        // data = jsPsych.data.getLastTrialData().values()[0]
-        console.log(jsPsych.data.getLastTrialData())
-        console.log(jsPsych.data.getLastTrialData().values()[0])
-        
-        gender = data.response.gender 
-        age = data.response.age
-
-        console.log(jsPsych.data.getLastTrialData())
-    }
-}
-//timeline.push(demographics)
-
+    // It is too much effort (from my investigation) to change the background colour for these trials. 
+    // Hence just change it to white...
 
 
 
@@ -695,15 +674,24 @@ const experiment_feedback  = {
 
         ///////////// idk why we need this? // the only thing we need is ID, right=?
         jsPsych.data.get().addToAll({ id:                   ID });
-        jsPsych.data.get().addToAll({ age:                  age });
-        jsPsych.data.get().addToAll({ gender:               gender });
+        // jsPsych.data.get().addToAll({ age:                  age });
+        // jsPsych.data.get().addToAll({ gender:               gender });
 
-        jsPsych.data.get().addToAll({ distraction:          data.response.distraction });
-        jsPsych.data.get().addToAll({ distraction_feedback: data.response.distraction_feedback });
-        jsPsych.data.get().addToAll({ motivation:           data.response.motivation });
-        jsPsych.data.get().addToAll({ motivation_feedback:  data.response.motivation_feedback });
-        jsPsych.data.get().addToAll({ open_feedback:        data.open_feedback });
+        // jsPsych.data.get().addToAll({ distraction:          data.response.distraction });
+        // jsPsych.data.get().addToAll({ distraction_feedback: data.response.distraction_feedback });
+        // jsPsych.data.get().addToAll({ motivation:           data.response.motivation });
+        // jsPsych.data.get().addToAll({ motivation_feedback:  data.response.motivation_feedback });
+        // jsPsych.data.get().addToAll({ open_feedback:        data.open_feedback });
 
+        data.gender = data.response.gender
+        data.age = data.response.age
+
+        data.distraction = data.response.distraction
+        data.distraction_feedback = data.response.distraction_feedback
+        data.motivation = data.response.motivation
+        data.motivation_feedback = data.response.motivation_feedback
+        data.open_feedback = data.response.open_feedback
+        // Add available as its own column
         // Save the data
         if(save_local_data){ jsPsych.data.get().localSave('csv','mydata.csv') }
 
