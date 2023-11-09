@@ -1,4 +1,5 @@
 library(ProjectTemplate)
+
 load.project()
 
 l <- list()
@@ -22,5 +23,5 @@ max_diagnostic_length(4, 16, experiment_length = 24, reps = 5000,
                       probability = T, decent = .2, math = "linear", spare = 1) -> l$linear
 
 
-library(patchwork)
+
 l$none + l$log10 + l$log + l$log1p + l$log2 + l$linear
