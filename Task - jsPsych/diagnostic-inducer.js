@@ -12,6 +12,94 @@ const save_local_data = true    // Save a local file (test analysis)
 
 
 ////////////////////////////
+////    Parameters      ////
+////////////////////////////
+
+////    background default      ////
+const default_background_colour = "#cccccc" // Light grey
+const wrong_response_colour = "#d22d2d"     // Blood red-ish 
+
+////    Delay   ////
+// general
+const instruction_delay = 20000     // How long is each S-R mapping displayed?
+const trial_duration = 2000         // How long is each response trial?
+
+// Fixation
+const short_fixation_delay = 750      // Main fixation delay
+const long_fixation_delay = 1500    // second fixation delay (after each inducer)
+
+// Feedback
+const wrong_response_delay = 300    // How long is wrong response displayed?
+const too_slow_delay = 300          // How long is too slow response displayed
+
+////    Font size   ////
+const instruction_font_size = "24px"    // about the experiment / Consent / explanation
+const general_font_size = "42px"        // Diagnostic/inducer/stimulus size
+const fixation_size = "48px"            // Fixation 
+
+////    Responses    ////
+const allowed_responses = ["f","j"];        // Allowed responses
+const response_sides = ["LEFT","RIGHT"];     // What participants will RESPOND to (e.g., If X appears press responseSides[0])
+    // these two parameters correspond in appearance 
+    // i.e., f (or whatever key) should correspond to the response side (left)
+
+////    Inducer parameters     ////
+const inducer_colours = ["blue", "green", "yellow"]      // Inducer colour randomize between participants (if more than 1)
+    // This is also what is DISPLAYED to participants. Should therefore be a readable name. 
+
+////    Diagnostic parameters   ////
+const number_of_inducers = 24;       // Number of inducers 
+const diagnostic_min_length = 4         // Min run length
+const diagnostic_max_length = 16     // Max run length
+const run_italic_bias = [1,1]           // Left value correspond to ITALIC probability, right correspond to UPRIGHT probability
+
+////    Diagnostic probability calcuation     ////
+/* 
+Calculate a probability list that any trials away from the center will appear.
+That is, for every one increase/decrease in diagnostic length, we reduce the probability by "math" and "decent".
+Set "spare" if some trials around the center should have the same probability. 
+
+For instance, the paramteres "math = linear", "decent = .1", "spare = 1" will generate the list:
+[.5, .6, .7, .8, .9, 1,  1,  1, .9, .8, .7, .6, .5]
+[ 4,  5,  6,  7,  8, 9, 10, 11, 12, 13, 14,  15, 16] (Diagnostic lengths)
+
+Thus, there is a higher likelihood that lengths of 9, 10 and 11 happen than those further away 
+(e.g., 4, 5 at the start and 15, 16 at the end). 
+"Spare" saves the first cases around the center.
+"Decent" decrease each case away from the spared cases by .1. 
+"Math" attenuates the decent by a its function.
+
+
+The idea is to make the total amount of diagnostic length more similar between participants.
+    - See R script for a distribution graph
+*/
+
+const math = "log" 
+    // Choices: "none", "log10", "log", "log1p", "log2", "linear"
+const decent = .1     
+    // Decent per 1 distance from the center
+const spare = 1       
+    // Number (from the center) that are spared from decent modification. 
+
+
+////    Stimuli list    ////
+const stimuli = ["gwn", "eug", "sht", "cjm", "svs", "orp", "scy", "rve", "wjb", "drn", 
+    "emd", "nz1", "dlo", "hvp", "hmn", "auj", "cuo", "t&g", "jca", "ukt", "tne", "wue", 
+    "hhu", "m3p", "qut", "gbm", "byp", "mav", "sbk", "dnc", "mda", "clr", "uga", "ibb", 
+    "uau", "ozu", "lfd", "f.w", "mub", "kil", "yag", "hsm", "fef", "lbx", "kpt", "upv", 
+    "ifg", "foc", "mtd", "nh3", "wng", "t53", "wtc", "re8", "jme", "a82", "dym", "eif", 
+    "ctv", "tr6", "oco", "dmg", "crt", "vh1", "slp", "cea", "pwa", "eal", "f47", "ysh", 
+    "xss", "me1", "m45", "enw", "gft", "doy", "hrf", "oac", "wma", "lst", "yle", "s.r",
+    "hyo", "tey", "pib", "olt", "luu", "k19", "ff4", "efr", "k5u", "mhs", "pfl", "rch", 
+    "yrl", "nua", "afb", "ayy", "i50", "v&t", "m16", "dpf", "ubr", "syn", "lgs", "iec", 
+    "bsl", "vvm", "umf", "dba", "aip", "dts", "w&d", "avc", "dv6", "j&j", "sdc", "atr", 
+    "spm", "alh", "ows", "idd", "abv", "cml", "lpo", "r22", "z28", "eyt"]
+    // Randomly selected stimuli that should not overlapp by more than 1 character 
+
+
+
+
+////////////////////////////
 ////                    ////
 ////    Initialize      ////
 ////                    ////
@@ -130,7 +218,10 @@ const wrong_response_trial = {
     timeline: [set_background_colour_wrong_response, wrong_response , set_background_colour_default],
     conditional_function: () => {
         let data = jsPsych.data.get().last(1).values()[0]
-        if( data.correct == false)  { return true } 
+        
+        if(debug){ console.log(data) }
+
+        if( data.correct_response == false)  { return true } 
         else                        { return false }
     }
 }
@@ -308,9 +399,10 @@ const about_the_experiment_and_consent = {
         The anonymous storage means we cannot provide participants with their responses upon request. \n
         You can quit the study without giving a reason by closing the browser tab. No data will be stored in that case.\n
         <br><br> 
-        The data will be publicly availabe for other to download. By continuing you agree to have your data stored in this manner.\n
-        Note that your data is anaymous and cannot be traced back to you! This is done for open science practices - \n
-        a movement for more transparent research, inclding preregistering hypothesis, data analysis, and data. 
+        For scientific rigour, we will follow a practice known as "open science". \n
+        In that spirit, we will make the data publicly available for anyone to download. \n
+        By clicking NEXT, you agree to have your data used in this manner.\n
+        <i>Importantly, your data is anaymous and cannot be traced back to you</i>.\n
         
         </div>`,
 
@@ -336,7 +428,7 @@ if(skip_instructions){} else {
     timeline.push({
         type: jsPsychFullscreen,
         message: `<div style="font-size:${instruction_font_size}">
-        This experiment requires fullscreen and will be initiated when clicking the button below.
+        This experiment requires you to enter fullscreen. This will be initiated by clicking the button below.
         <br><br>
         </div>`,
         button_label: "Enable fullscreen",
@@ -367,7 +459,7 @@ let diagnostic_task_instruction_description = {
         return [`<div style="font-size:${instruction_font_size}">
         The experiment will proceed quickly without any breaks, \n
         please ensure that you are in a quite environment where you are unlikely to be distracted/disrupted.      
-        The experiment will take approximately 30 minutes.
+        The experiment takes approximately 30 minutes.
         </div>`, 
         ////  New page
         `<div style="font-size:${instruction_font_size}">
@@ -379,7 +471,7 @@ let diagnostic_task_instruction_description = {
         In the next screen you will see the first task, that <b> will not change </b> in the experiment. \n 
         This task must be responded to when the target (stimulus) appears in <b> black </b> colour. \n
         After that screen, the other task will be shown. \n
-        This task will change throughout the the experiment, and will be clearly indicated with a new instruction screen. \n
+        This task will change throughout the the experiment, and will be clearly indicated with a new instruction. \n
         <br> 
         You are asked to respond to this task when the target appears in \n
          <span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour.toUpperCase()}</span>. \n
@@ -551,6 +643,7 @@ for(let exp_block = 0; exp_block < number_of_inducers; exp_block++){ // less tha
         timeline.push(too_slow_trial)
         timeline.push(wrong_response_trial)
 
+        // Fixation
         timeline.push(short_fixation)
     }
     ////////////////////////////////////
@@ -598,7 +691,8 @@ for(let exp_block = 0; exp_block < number_of_inducers; exp_block++){ // less tha
     timeline.push(too_slow_trial)
     timeline.push(wrong_response_trial)
     
-    // Fixation IF another inducer round
+    // Fixation 
+        //IF another inducer round
     if( exp_block < number_of_inducers){
         timeline.push(long_fixation)
     }
@@ -606,6 +700,7 @@ for(let exp_block = 0; exp_block < number_of_inducers; exp_block++){ // less tha
 }
 
 
+// Change background colour...
 const white_bk = {
     type: jsPsychCallFunction,
     func: () => { changeBackground("white") }
@@ -730,11 +825,6 @@ const experiment_feedback  = {
         data.motivation = data.response.motivation
         data.motivation_feedback = data.response.motivation_feedback
         data.open_feedback = data.response.open_feedback
-
-        // screen
-        data.pre_screen = width_height_pre
-        data.post_screen = width_height_fullscreen
-
 
         // Save the data
         if(save_local_data){ jsPsych.data.get().localSave('csv','mydata.csv') }

@@ -8,11 +8,11 @@ const instruction_delay = 20000     // How long is each S-R mapping displayed?
 const trial_duration = 2000         // How long is each response trial?
 
 // Fixation
-const short_fixation_delay = 2 // 750      // Main fixation delay
+const short_fixation_delay = 750      // Main fixation delay
 const long_fixation_delay = 1500    // second fixation delay (after each inducer)
 
 // Feedback
-const wrong_response_delay = 2 // 300    // How long is wrong response displayed?
+const wrong_response_delay = 300    // How long is wrong response displayed?
 const too_slow_delay = 300          // How long is too slow response displayed
 
 ////    Font size   ////
@@ -31,9 +31,9 @@ const inducer_colours = ["blue", "green", "yellow"]      // Inducer colour rando
     // This is also what is DISPLAYED to participants. Should therefore be a readable name. 
 
 ////    Diagnostic parameters   ////
-const number_of_inducers = 1//24;       // Number of inducers 
+const number_of_inducers = 24;       // Number of inducers 
 const diagnostic_min_length = 4         // Min run length
-const diagnostic_max_length = 7//16     // Max run length
+const diagnostic_max_length = 16     // Max run length
 const run_italic_bias = [1,1]           // Left value correspond to ITALIC probability, right correspond to UPRIGHT probability
 
 ////    Diagnostic probability calcuation     ////
