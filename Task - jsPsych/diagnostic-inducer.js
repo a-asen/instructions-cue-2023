@@ -58,6 +58,11 @@ const short_fixation = {
     choices: "NO_KEYS",
     trial_duration: short_fixation_delay, 
     data: { stimulus: "+", trial_info: "Fixation - short" },
+    on_finish: (data) => {
+        // Current window size
+        data.width = window.innerWidth
+        data.height = window.innerHeight
+    }
 } 
 const long_fixation = {
     type: jsPsychHtmlKeyboardResponse,
@@ -65,6 +70,11 @@ const long_fixation = {
     choices: "NO_KEYS",
     trial_duration: long_fixation_delay, 
     data: { stimulus: "+", trial_info: "Fixation - long" },
+    on_finish: (data) => {
+        // Current window size
+        data.width = window.innerWidth
+        data.height = window.innerHeight
+    }
 }
 
 // Feedback trial
@@ -73,14 +83,24 @@ const wrong_response = {
     stimulus:  () => { return `<div style="font-size: ${general_font_size};"> Wrong! </div>` },
     choices: "NO_KEYS",
     trial_duration: wrong_response_delay,
-    data: { stimulus: "Wrong", trial_info: "Feedback" }
+    data: { stimulus: "Wrong", trial_info: "Feedback" },
+    on_finish: (data) => {
+        // Current window size
+        data.width = window.innerWidth
+        data.height = window.innerHeight
+    }
 }
 const too_slow = {
     type: jsPsychHtmlKeyboardResponse,
     stimulus: () => { return `<div style="font-size: ${general_font_size};"> Slow </div>` },
     choices: "NO_KEYS",
     trial_duration: too_slow_delay, 
-    data: { stimulus: "Slow", trial_info: "Feedback" }
+    data: { stimulus: "Slow", trial_info: "Feedback" },
+    on_finish: (data) => {
+        // Current window size
+        data.width = window.innerWidth
+        data.height = window.innerHeight
+    }
 }
 
 // Change background
@@ -115,24 +135,10 @@ const wrong_response_trial = {
     }
 }
 
+// Set background to a light gray
 timeline.push(set_background_colour_default) 
     // To ensure the background colour is correct.
 
-
-// Experiment vars
-var gender;
-var age; 
-var distraction;
-var distraction_feedback;
-var motivation;
-var motivation_feedback;
-
-// Technical variables
-var refresh_rate;               // Can be nice to gather
-var height_width_pre;           // Height-width pre fullscreen
-var height_width_fullscreen;    // Height-width after fullscreen
-
-var os_browser;     // not necessary, to debug          ???????????????????????????
 
 // Inducer colour
 let rnd_inducer_colour = jsPsych.randomization.sampleWithReplacement(inducer_colours, 1)[0]
@@ -154,7 +160,7 @@ if(math.toLowerCase() == "none"){
     final_probability_list = Array(diagnostic_max_length-(diagnostic_min_length-1)).fill(1)
 } else {
     let halfway = (diagnostic_min_length+diagnostic_max_length)/2 //Diag halfway value
-    if(debug){ console.log("Halway: ", halfway) }
+    if(debug){ console.log("Halfway: ", halfway) }
     
     let probability_list = [];
     for(let i = 0; i < spare; i++){
@@ -200,8 +206,13 @@ for(let i = 0; i < number_of_inducers; i++){
     // We randomize the length from "min" to "max" with the probabilities in "final_probability_list"
 }
 
-//// Or generate a maximum number of trials? 
-    // Using randomly generated lengths will yield varying limits
+// ???????????????????????????
+
+//   Or lengths based on a "maximum number of trials"? 
+// Past research used this
+// Using randomly generated lengths will yield varying limits
+
+// ???????????????????????????
 
 
 if(debug){ console.log("With these parameters we end up with an average length of: ",  
@@ -221,21 +232,17 @@ if(debug){ console.log("Experiment length: ", rnd_diagnostic_length.reduce((val,
 const check_browser = {
     type: jsPsychBrowserCheck,
     inclusion_function: (data) => {
-        // general info about browser
-        data.test = data.vsync_rate
-        os_browser = data.os + "_" + data.browser + "_" + data.browser_version
-        height_width_pre = "H:" + data.height + "-W:" + data.width
-        
-        if(debug){
-            console.log(screen.height) // total height
-            console.log(window.innerHeight) // showecased experiment height
-            
-            console.log(refresh_rate)
-            console.log(os_browser)
-            console.log(height_width_pre)
-        }
+        data.trial_info = "technicals"
+        // Current window size
+        data.height = window.innerHeight
+        data.width = window.innerWidth
+            // should correspond (closely) to "max_screen_size"
 
-        console.log(jsPsych.data.getLastTrialData())
+        // max size
+        data.max_screen_size = screen.width + "x" + screen.height
+
+        if(debug){ console.log(data) }
+
         // Conditional check
         return data.fullscreen === true && data.mobile === false && data.browser.toLowerCase != "safari"
             // safari does not support keyboard input in fullscreen
@@ -265,14 +272,14 @@ const about_the_experiment_and_consent = {
         
         <h3>Welcome to this cognitive psychology study!</h3>
         We are investigating cognitive flexibility in humans.
-        <br>
+        <br><br>
+
         The study is conducted by Steffen Aasen (Master student) and \n
         Torsten Martiny-Huenger (Supervisor) at UiT – The Arctic University of Norway.
-        <br>
+        <br><br>
         If you have questions about the study, you may contact Torsten Martiny-Huenger at (torsten.martiny-huenger@uit.no). </p>
 
-        </div>`,  
-        /// New page
+        </div>`,    ////  New page
         `<div style="font-size:${instruction_font_size}"> 
 
         <h3>About the experiment</h3>                
@@ -287,8 +294,11 @@ const about_the_experiment_and_consent = {
         To response to any trial, you are asked to either click ${response_sides[0]} using ${allowed_responses[0]}, or \n
         ${response_sides[1]} using ${allowed_responses[1]}. <br>\n
         These keys will not change throughout the experiment. 
+        <br><br>
         
-        </div>`, 
+        At the end of the experiment you will have an opportunity to proviod feedback related to the experiment. 
+        
+        </div>`,    ////  New page
         `<div style="font-size:${instruction_font_size}">
         
         <h3> Consent </h3>
@@ -310,7 +320,14 @@ const about_the_experiment_and_consent = {
         ]
     },
     show_clickable_nav: ["Next"],
-    data: { stimulus: "The experiment and consent", trial_info: "The experiment and consent" }
+    data: { stimulus: "The experiment and consent", trial_info: "The experiment and consent" },
+    on_finish: (data) => {
+        data.page_index1 = data.view_history[0].viewing_time
+        data.page_index2 = data.view_history[1].viewing_time
+        data.page_index3 = data.view_history[2].viewing_time
+        
+        if(debug){ console.log(data) }
+    }
 }
 if(skip_instructions){} else { timeline.push(about_the_experiment_and_consent) }
 
@@ -324,13 +341,15 @@ if(skip_instructions){} else {
         </div>`,
         button_label: "Enable fullscreen",
         fullscreen_mode: true, 
-        on_finish: () => { 
-            data.height = 
-            console.log(jspsych.data.getLastTrialData()) 
+        data: {trial_info: "technicals" },
+        on_finish: (data) => { 
+            // Current window size
+            data.width = window.innerWidth
+            data.height = window.innerHeight
+            if(debug){  console.log(data)  }
         }
     });
 }
-
 
 
 /////////////////////////////////////////
@@ -349,8 +368,8 @@ let diagnostic_task_instruction_description = {
         The experiment will proceed quickly without any breaks, \n
         please ensure that you are in a quite environment where you are unlikely to be distracted/disrupted.      
         The experiment will take approximately 30 minutes.
-        </div>`, //New page
-
+        </div>`, 
+        ////  New page
         `<div style="font-size:${instruction_font_size}">
         We ask that you put your left index finger on the <b> ${allowed_responses[0].toUpperCase()} </b> key \n
         and your right index finger on the <b> ${allowed_responses[1].toUpperCase()} </b> key. \n
@@ -373,7 +392,17 @@ let diagnostic_task_instruction_description = {
     allow_keys: false, 
     show_clickable_nav: true,
     post_trial_gap: 1500,
-    data: { stimulus: "Instructions", trial_info: "Final experiment explanation" }
+    data: { stimulus: "Instructions", trial_info: "Final experiment explanation" },
+    on_finish: (data) => {
+        data.page_index1 = data.view_history[0].viewing_time
+        data.page_index2 = data.view_history[1].viewing_time
+
+        // Current window size
+        data.width = window.innerWidth
+        data.height = window.innerHeight
+
+        if(debug){ console.log(data) }
+    }
 }
 timeline.push(diagnostic_task_instruction_description)
 
@@ -393,7 +422,13 @@ let diagnostic_task_instruction = {
         stimulus: `If italic press ${rnd_diagnostic_response_sides[0]} | If upright press ${rnd_diagnostic_response_sides[1]}`,
         trial_info: "Diagnostic instructions",
     },
-    on_finish: () => { if(debug){ console.log(jsPsych.data.getLastTrialData()) } }
+    on_finish: (data) => { 
+        // Current window size
+        data.width = window.innerWidth
+        data.height = window.innerHeight
+
+        if(debug){ console.log(data) }
+    }
 }
 timeline.push(diagnostic_task_instruction)
 
@@ -424,12 +459,16 @@ for(let exp_block = 0; exp_block < number_of_inducers; exp_block++){ // less tha
         prompt: "Press any SPACE to continue",
         choices: " ", 
         data: {
-            inducer_run: exp_block,     // Inducer run number
+            inducer_run: exp_block+1,     // Inducer run number
             stimulus: `If ${run_stimuli[0]} press ${rnd_inducer_response_sides[0]} | If ${run_stimuli[1]} press ${rnd_inducer_response_sides[1]}`,
             trial_info: "Inducer instructions"
         },
         trial_duration: instruction_delay, 
-        on_finish: () => { if(debug){ console.log(jsPsych.data.getLastTrialData()) } 
+        on_finish: (data) => { 
+            // Current window size
+            data.width = window.innerWidth
+            data.height = window.innerHeight
+            if(debug){ console.log(data) } 
         }
     }
 
@@ -468,38 +507,42 @@ for(let exp_block = 0; exp_block < number_of_inducers; exp_block++){ // less tha
                 inducer_trial: false,                   // Not an inducer trial
                 italic: run_rnd_italic,             // Whether the run is ITALIC or not
                 trial_info: "Diagnostic trial",         // This is a diagnostic trial
-                required_inducer_response_side: () => { // Required response side for the inducer task
+                correct_inducer_response_side: () => { // Required response side for the inducer task
                     if(rnd_diag_stimulus == run_stimuli[0]) { return rnd_inducer_response_sides[0] }
                     else                                    { return rnd_inducer_response_sides[1] }
                 },
-                required_diag_response_side: () => {     // Required response side for the diagnostic task
+                correct_diag_response_side: () => {     // Required response side for the diagnostic task
                     if (run_rnd_italic) { return rnd_diagnostic_response_sides[0] } 
                     else                { return rnd_diagnostic_response_sides[1] } 
                 },
             },
             on_finish: (data) => {
-                if(debug){ console.log(jsPsych.data.getLastTrialData()) }
+                // Current window size
+                data.width = window.innerWidth
+                data.height = window.innerHeight
 
                 // Require diagnostic response key 
-                if(data.required_diag_response_side == response_sides[0]) 
-                        { data.required_diag_response_key = allowed_responses[0] }
-                else    { data.required_diag_response_key = allowed_responses[1] }
+                if(data.correct_diag_response_side == response_sides[0]) 
+                        { data.correct_response_key = allowed_responses[0] }
+                else    { data.correct_response_key = allowed_responses[1] }
                 
                 // Correct response
                 if(data.response == null){  data.correct = null  } 
                 else {
                     // If response equals correct_response_key
-                    if(data.required_diag_response_key == data.response)    { data.correct_response = true }
+                    if(data.correct_response_key == data.response)    { data.correct_response = true }
                     else                                                    { data.correct_response = false }
                 }
 
                 ////    GONGUENCEY      ////
                 // If the response side match, then congruent
-                if(data.required_diag_response_side == data.Arrayrequired_inducer_response_side){
-                    data.congruency = true
+                if(data.correct_diag_response_side == data.correct_inducer_response_side){
+                    data.congruent = true
                 } else { 
-                    data.congruency = false
+                    data.congruent = false
                 }
+
+                if(debug){ console.log(data) } // debg
             }
         }
         timeline.push(diagnostic_run)
@@ -526,22 +569,25 @@ for(let exp_block = 0; exp_block < number_of_inducers; exp_block++){ // less tha
             inducer_run: exp_block+1,                     // Inducer run number // +1 b/c
             inducer_trial: true,                    // This is an inducer trial
             trial_info: "Inducer trial",            // General trial info 
-            required_inducer_response_side: () => { // Required inducer response side
+            correct_inducer_response_side: () => { // Required inducer response side
                 if(rnd_inducer_stimulus == run_stimuli[0])  { return rnd_inducer_response_sides[0] }
                 else                                        { return rnd_inducer_response_sides[1] }
             },
         },
         on_finish: (data) => {
-            if(debug){ console.log(jsPsych.data.getLastTrialData()) }
+            // Current window size
+            data.width = window.innerWidth
+            data.height = window.innerHeight
+            
             // Find correct response key 
-            if(data.required_inducer_response_side == response_sides[0]){
-                data.required_inducer_response_key = allowed_responses[0] 
+            if(data.correct_inducer_response_side == response_sides[0]){
+                data.correct_response_key = allowed_responses[0] 
             } else { 
-                data.required_inducer_response_key = allowed_responses[1] }
-
-            // Correct response (according to the active trial)
-            if(data.response == data.required_inducer_response_key) { data.correct_response = true }
-            else                                                    { data.correct_response = false }
+                data.correct_response_key = allowed_responses[1] }
+                // Correct response (according to the active trial)
+                if(data.response == data.correct_response_key) { data.correct_response = true }
+                else                                           { data.correct_response = false }
+            if(debug){ console.log(data) }
         }
     }
     timeline.push(inducer_task)
@@ -552,42 +598,10 @@ for(let exp_block = 0; exp_block < number_of_inducers; exp_block++){ // less tha
     timeline.push(too_slow_trial)
     timeline.push(wrong_response_trial)
     
-    
-    ////       CHECK FULLSCREEN       ////
-    // have to use "resize check" thingy
-        // We could add a check after each block, ensuring that participants are in fullscreen ? 
-    const check_fullscreen = {
-        type: jsPsychBrowserCheck,
-        inclusion_function: (data) => {
-            height_width_fullscreen = "H:" + data.height + "-W:" + data.width  // var
-            
-            if(debug){ console.log("Height and width of fullscreen: ", height_width_fullscreen) }
-
-
-            if(screen.height - window.innerHeight <= 10 && screen.height - window.innerHeight >= -10){
-                // We accept a couple of pixel in difference, since there is apparently some small differences between these (or there can be) 
-                if(debug){ 
-                    console.log("Fullscreen detected") 
-                    console.log("Screen and window difference: ", screen.height - window.innerHeight) 
-                }
-                return true
-            }
-        },
-        exclusion_message: (data) => {
-            return `We have detected that you are not in fullscreen,`
-        }
-    }
-    timeline.push(check_fullscreen)
-    
-    
-
-
-
     // Fixation IF another inducer round
     if( exp_block < number_of_inducers){
         timeline.push(long_fixation)
     }
-
 
 }
 
@@ -599,8 +613,6 @@ const white_bk = {
 timeline.push(white_bk)
     // It is too much effort (from my investigation) to change the background colour for these trials. 
     // Hence just change it to white...
-
-
 
 const experiment_feedback  = {
     type: jsPsychSurvey,
@@ -630,7 +642,8 @@ const experiment_feedback  = {
                     textbox_columns: 5,
                     required: true,
                 },
-            ],
+            ], 
+            //// NEW PAGE
             [
                 {
                     type:"html",
@@ -654,6 +667,7 @@ const experiment_feedback  = {
                     textbox_rows: 3,
                 },
             ],
+            //// NEW PAGE
             [
                 {
                     type:"html",
@@ -677,6 +691,7 @@ const experiment_feedback  = {
                     textbox_rows: 3,
                 }
             ],
+            //// NEW PAGE
             [
                 {
                     type: "text",
@@ -689,32 +704,38 @@ const experiment_feedback  = {
             ]
         ]
     },
-    data: { stimulus: "gender-age-distraction-motivation-feedback", trial_info: "Demographics, motivation, distraction and feedback " },
-    on_finish: () => {
-        data = jsPsych.data.getLastTrialData().values()[0]
-        
-        if(debug){console.log("Adding variables to data...")}
-
-        ///////////// idk why we need this? // the only thing we need is ID, right=?
+    data: { stimulus: "gender-age-distraction-motivation-feedback", trial_info: "Demographics, motivation, distraction and feedback" },
+    on_finish: (data) => {
+        // Add to all...
         jsPsych.data.get().addToAll({ id:                   ID });
         // jsPsych.data.get().addToAll({ age:                  age });
         // jsPsych.data.get().addToAll({ gender:               gender });
-
         // jsPsych.data.get().addToAll({ distraction:          data.response.distraction });
         // jsPsych.data.get().addToAll({ distraction_feedback: data.response.distraction_feedback });
         // jsPsych.data.get().addToAll({ motivation:           data.response.motivation });
         // jsPsych.data.get().addToAll({ motivation_feedback:  data.response.motivation_feedback });
         // jsPsych.data.get().addToAll({ open_feedback:        data.open_feedback });
 
+        // Current window size
+        data.height = window.innerHeight
+        data.width = window.innerWidth
+
+        // Demograpghics
         data.gender = data.response.gender
         data.age = data.response.age
-
+        
+        // feedback
         data.distraction = data.response.distraction
         data.distraction_feedback = data.response.distraction_feedback
         data.motivation = data.response.motivation
         data.motivation_feedback = data.response.motivation_feedback
         data.open_feedback = data.response.open_feedback
-        // Add available as its own column
+
+        // screen
+        data.pre_screen = width_height_pre
+        data.post_screen = width_height_fullscreen
+
+
         // Save the data
         if(save_local_data){ jsPsych.data.get().localSave('csv','mydata.csv') }
 
