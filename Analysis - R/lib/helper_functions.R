@@ -177,5 +177,10 @@ max_diagnostic_length <- \(min, max, reps = 1000, experiment_length = 24,
     geom_histogram(aes(y=after_stat(density)))+
     geom_density(fill="black", alpha=.2)+
     geom_vline(xintercept = mean(n), colour="red")+
-    labs(title = paste0("Math: ", math, ". Decent: ", decent, ". Spare: ", spare))
+    labs(title = ifelse(tolower(math)=="linear", "Math: Not applicable",
+                        paste0("Math: ", math, ". Decent: ", decent, ". Spare: ", spare)),
+         subtitle = paste0("Min diag.: ", min, ". Max diag.: ", max, ".\n",
+                           "Mean: ", round(mean(n),2), ". SD: ", round(sd(n),2)) )
+    #annotate("text", x=mean(n)-2*sd(n), y=max(n)/1000-.1, label=min)
+
 }
