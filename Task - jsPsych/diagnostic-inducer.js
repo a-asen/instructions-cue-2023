@@ -48,7 +48,7 @@ const inducer_colours = ["blue", "green", "yellow"]      // Inducer colour rando
     // This is also what is DISPLAYED to participants. Should therefore be a readable name. 
 
 ////    Diagnostic parameters   ////
-const number_of_inducers = 24;       // Number of inducers 
+const number_of_inducers = 2//24;       // Number of inducers 
 const diagnostic_min_length = 4         // Min run length
 const diagnostic_max_length = 16     // Max run length
 const run_italic_bias = [1,1]           // Left value correspond to ITALIC probability, right correspond to UPRIGHT probability
@@ -551,7 +551,7 @@ for(let exp_block = 0; exp_block < number_of_inducers; exp_block++){ // less tha
         prompt: "Press any SPACE to continue",
         choices: " ", 
         data: {
-            inducer_run: exp_block+1,     // Inducer run number
+            inducer_run: exp_block,     // Inducer run number
             stimulus: `If ${run_stimuli[0]} press ${rnd_inducer_response_sides[0]} | If ${run_stimuli[1]} press ${rnd_inducer_response_sides[1]}`,
             trial_info: "Inducer instructions"
         },
@@ -594,8 +594,8 @@ for(let exp_block = 0; exp_block < number_of_inducers; exp_block++){ // less tha
             trial_duration: trial_duration,
             data: {
                 stimulus: rnd_diag_stimulus,         // Stimulus
-                inducer_run: exp_block+1,                   // Inducer run number (i.e., block)
-                diagnostic_run: exp_diag+1,                 // Diagnostic trial number //start with 1
+                inducer_run: exp_block,                   // Inducer run number (i.e., block)
+                diagnostic_run: exp_diag,                 // Diagnostic trial number //start with 1
                 inducer_trial: false,                   // Not an inducer trial
                 italic: run_rnd_italic,             // Whether the run is ITALIC or not
                 trial_info: "Diagnostic trial",         // This is a diagnostic trial
@@ -659,7 +659,7 @@ for(let exp_block = 0; exp_block < number_of_inducers; exp_block++){ // less tha
         trial_duration: trial_duration,
         data: {
             stimulus: rnd_inducer_stimulus,     // Stimulus
-            inducer_run: exp_block+1,                     // Inducer run number // +1 b/c
+            inducer_run: exp_block,                     // Inducer run number
             inducer_trial: true,                    // This is an inducer trial
             trial_info: "Inducer trial",            // General trial info 
             correct_inducer_response_side: () => { // Required inducer response side
@@ -678,8 +678,8 @@ for(let exp_block = 0; exp_block < number_of_inducers; exp_block++){ // less tha
             } else { 
                 data.correct_response_key = allowed_responses[1] }
                 // Correct response (according to the active trial)
-                if(data.response == data.correct_response_key) { data.correct_response = true }
-                else                                           { data.correct_response = false }
+                if(data.response == data.correct_response_key) { data.inducer_correct_response = true }
+                else                                           { data.inducer_correct_response = false }
             if(debug){ console.log(data) }
         }
     }
@@ -780,7 +780,7 @@ const experiment_feedback  = {
                 },
                 {
                     type: "text",
-                    prompt: "Is there anything you want to add in relation to the MOTIVATION question (above)?",
+                    prompt: "Is there anything you want to add in relation to the motivation question (above)?",
                     name: 'motivation_feedback',
                     textbox_columns: 50,
                     textbox_rows: 3,
