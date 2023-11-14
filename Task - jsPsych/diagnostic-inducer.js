@@ -354,6 +354,37 @@ const check_browser = {
 }
 timeline.push(check_browser)
 
+
+
+// TRY html-slider-response
+// TRY html-slider-response
+// TRY html-slider-response
+// TRY html-slider-response
+
+
+const test  = {
+    type: jsPsychSurvey,
+    button_label_finish: "Next",
+    required_error: `Please check whether you responded to (all) the question(s)`,
+    required_question_label: "*",
+    pages: () => {
+        return [
+            [
+                {
+                    type: 'likert',
+                    prompt: `Gender`, 
+                    name: 'gender', 
+                    likert_scale_max: 100,
+                    likert_scale_min_label: "Not at all distracted  -  ",
+                    likert_scale_max_label: "  -  Very distracted",
+                    required: true, 
+                }, 
+            ]
+        ]
+    }
+}
+timeline.push(test)
+
 // About the experiment 
 const about_the_experiment_and_consent = {
     type: jsPsychInstructions,
