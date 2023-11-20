@@ -1,7 +1,7 @@
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ###
 
 levenshtein_distance <- function(word1, word2) {
-  #'Function: levenshtein_distance
+  #'Function: Levenshtein distance
   #'
   #'Description: Calculates the number of character that two words differ by.
   #'See Levenstein distance: https://en.wikipedia.org/wiki/Levenshtein_distance.
