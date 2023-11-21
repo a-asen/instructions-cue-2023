@@ -1,5 +1,4 @@
 library(ProjectTemplate)
-
 load.project()
 
 l <- list()
@@ -19,9 +18,9 @@ max_diagnostic_length(4, 16, experiment_length = 24, reps = 5000,
 max_diagnostic_length(4, 16, experiment_length = 24, reps = 5000,
                       probability = T, decent = .2, math = "log2", spare = 1) -> l$log2
 
-max_diagnostic_length(4, 16, experiment_length = 24, reps = 5000,
-                      probability = T, decent = .2, math = "linear", spare = 1) -> l$linear
+max_diagnostic_length(4, 16, experiment_length = 24, reps = 60,
+                      probability = T, decent = .15, math = "linear", spare = 1) -> l$linear
 
-
+l$linear
 
 l$none + l$log10 + l$log + l$log1p + l$log2 + l$linear
