@@ -51,7 +51,7 @@ const inducer_colours = ["blue", "green", "yellow"]      // Inducer colour rando
 const number_of_inducers = 10//4;       // Number of inducers 
 const diagnostic_min_length = 4         // Min run length
 const diagnostic_max_length = 16     // Max run length
-const max_diagnostic_trials = 20     // Total max diagnostic trials
+const max_diagnostic_trials = 120     // Total max diagnostic trials
 const prac = 10                       // Number of diagnostic practice rounds
     // Set to 0 if no practice rounds should occur.
 
@@ -73,13 +73,6 @@ const stimuli = ["gwn", "eug", "sht", "cjm", "svs", "orp", "scy", "rve", "wjb", 
     "bsl", "vvm", "umf", "dba", "aip", "dts", "w&d", "avc", "dv6", "j&j", "sdc", "atr", 
     "spm", "alh", "ows", "idd", "abv", "cml", "lpo", "r22", "z28", "eyt"]
     // Randomly selected stimuli that should not overlapp by more than 1 character 
-
-
-    // Training stims? 
-    // Training stims? 
-    // Training stims? 
-    // Training stims? 
-
 
 ////////////////////////////
 ////                    ////
@@ -313,7 +306,6 @@ const check_browser = {
     }
 }
 timeline.push(check_browser)
-
 
 
 // About the experiment 
