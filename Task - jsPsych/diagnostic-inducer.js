@@ -48,38 +48,13 @@ const inducer_colours = ["blue", "green", "yellow"]      // Inducer colour rando
     // This is also what is DISPLAYED to participants. Should therefore be a readable name. 
 
 ////    Diagnostic parameters   ////
-const number_of_inducers = 2//24;       // Number of inducers 
+const number_of_inducers = 24;       // Number of inducers 
 const diagnostic_min_length = 4         // Min run length
 const diagnostic_max_length = 16     // Max run length
+const max_diagnostic_trials = 240     // Total max diagnostic trials
+
+
 const run_italic_bias = [1,1]           // Left value correspond to ITALIC probability, right correspond to UPRIGHT probability
-
-////    Diagnostic probability calcuation     ////
-/* 
-Calculate a probability list that any trials away from the center will appear.
-That is, for every one increase/decrease in diagnostic length, we reduce the probability by "math" and "decent".
-Set "spare" if some trials around the center should have the same probability. 
-
-For instance, the paramteres "math = linear", "decent = .1", "spare = 1" will generate the list:
-[.5, .6, .7, .8, .9, 1,  1,  1, .9, .8, .7, .6, .5]
-[ 4,  5,  6,  7,  8, 9, 10, 11, 12, 13, 14,  15, 16] (Diagnostic lengths)
-
-Thus, there is a higher likelihood that lengths of 9, 10 and 11 happen than those further away 
-(e.g., 4, 5 at the start and 15, 16 at the end). 
-"Spare" saves the first cases around the center.
-"Decent" decrease each case away from the spared cases by .1. 
-"Math" attenuates the decent by a its function.
-
-
-The idea is to make the total amount of diagnostic length more similar between participants.
-    - See R script for a distribution graph
-*/
-
-const math = "log" 
-    // Choices: "none", "log10", "log", "log1p", "log2", "linear"
-const decent = .1     
-    // Decent per 1 distance from the center
-const spare = 1       
-    // Number (from the center) that are spared from decent modification. 
 
 
 ////    Stimuli list    ////
@@ -97,6 +72,10 @@ const stimuli = ["gwn", "eug", "sht", "cjm", "svs", "orp", "scy", "rve", "wjb", 
     // Randomly selected stimuli that should not overlapp by more than 1 character 
 
 
+    // Training stims? 
+    // Training stims? 
+    // Training stims? 
+    // Training stims? 
 
 
 ////////////////////////////
@@ -203,6 +182,7 @@ const set_background_colour_wrong_response = {
   // https://github.com/jspsych/jsPsych/discussions/936
   // https://github.com/psychbruce/jspsych/blob/master/exp_demo/experiment/experiment.js
 
+
 // Feedback block
     // Too slow
 const too_slow_trial = {
@@ -246,72 +226,49 @@ if(debug) { console.log(rnd_stimuli) }
 let diagnostic_range = Array.from(Array(diagnostic_max_length-3), (x,i) => i + diagnostic_min_length) 
 if(debug){ console.log("The range of diagnostic lengths: ", diagnostic_range) }
 
-// Generate probability distribution of the diagnostic run (if relevant)
-if(math.toLowerCase() == "none"){
-    final_probability_list = Array(diagnostic_max_length-(diagnostic_min_length-1)).fill(1)
-} else {
-    let halfway = (diagnostic_min_length+diagnostic_max_length)/2 //Diag halfway value
-    if(debug){ console.log("Halfway: ", halfway) }
-    
-    let probability_list = [];
-    for(let i = 0; i < spare; i++){
-        probability_list.push(1)
-        if(debug){ console.log("Probability list: ", probability_list) }
-    }
-    
-    for(let i = 1; i < Math.floor(halfway - diagnostic_min_length - spare) + 1; i++){
-        // Start at 1 (cause it is the first distance)
-        switch(math.toLowerCase()){
-            case "log":
-                probability_list.push(Number((1-(Math.log(1+i) * decent)).toFixed(2)))
+
+let rnd_diagnostic_length = [];
+// We randomy sample "number_of_inducer" times from the "diagnostic_range"
+for(let i = 0; i < number_of_inducers; i++){
+    rnd_diagnostic_length.push(jsPsych.randomization.sampleWithReplacement(diagnostic_range, 1)[0]);
+}
+if(debug){ console.log(rnd_diagnostic_length) }
+// Sum total diagnostic trials
+const sum_diags = rnd_diagnostic_length.reduce((list, i) => list + i, 0);
+if(debug){ console.log(sum_diags) }
+
+
+/// IF max_diagnostic_trial is a weird number (less than min*inducers or max*inducers) weird stuff will happen
+// Fix
+
+// If the sum is more or less than the specified value, adjust accordingly
+if(sum_diags != max_diagnostic_trials){
+    let operation = (sum_diags < max_diagnostic_trials) ? "+" : (sum_diags > max_diagnostic_trials) ? "-" : "";
+    let diff = Math.abs(sum_diags-max_diagnostic_trials)
+    var cond;
+    if(debug){ console.log("Current operation", operation, "with a differences of", diff) }
+    do{
+        if(debug){ console.log("Diff: ", diff) }
+        // Randomly sample a location
+        let loc = Math.floor(Math.random() * rnd_diagnostic_length.length)
+        switch(operation){ // Test that the location value does not equal min/max values
+            case "+":
+                var cond = rnd_diagnostic_length[loc] != diagnostic_max_length
                 break;
-            case "log2":
-                probability_list.push(Number((1-(Math.log2(1+i) * decent)).toFixed(2)))
-                break;
-            case "log1p":
-                probability_list.push(Number((1-(Math.log1p(1+i) * decent)).toFixed(2)))
-                break;
-            case "log10":
-                probability_list.push(Number((1-(Math.log10(1+i) * decent)).toFixed(2)))
-                break;
-            case "linear":
-                probability_list.push(Number((1-(i * decent)).toFixed(2)))
+            case "-":	
+                var cond = rnd_diagnostic_length[loc] != diagnostic_min_length
                 break;
         }
-    }
-    if(diagnostic_range.length % 2 == 0){
-        probability_list.unshift(1) 
-        var final_probability_list = Object.assign([],probability_list).reverse().concat(probability_list); 
-        // If it is even, then add 1 at the start
-    } else {
-        var final_probability_list = Object.assign([],probability_list).reverse().concat(1, probability_list); 
-        // If odd add one in the middle
-    }
-}
-if(debug){ console.log("Final probabilities are: ", final_probability_list) }
-
-// Randomize diagnostic length across the experiment & distribute according to probability distribution
-let rnd_diagnostic_length = [];
-for(let i = 0; i < number_of_inducers; i++){
-    rnd_diagnostic_length.push(jsPsych.randomization.sampleWithReplacement(diagnostic_range, 1, final_probability_list)[0]);
-    // We randomize the length from "min" to "max" with the probabilities in "final_probability_list"
+        if(cond){ //IF NOT EQUAL: Add one to the location and remove one to diff
+            if(debug){ console.log("Adjusting:",  rnd_diagnostic_length[loc], "at location", loc) }
+            operation=="+" ? rnd_diagnostic_length[loc]++ : operation=="-" ? rnd_diagnostic_length[loc]-- : "";
+            diff--;
+        } else { // else skip
+            if(debug){ console.log("Value: ", rnd_diagnostic_length[loc], "at location", loc, "is at threshold, skipping...") } }
+    } while( diff > 0)
 }
 
-// ???????????????????????????
-
-//   Or lengths based on a "maximum number of trials"? 
-// Past research used this
-// Using randomly generated lengths will yield varying limits
-
-// ???????????????????????????
-
-
-if(debug){ console.log("With these parameters we end up with an average length of: ",  
-                        (diagnostic_min_length+diagnostic_max_length)/2*number_of_inducers) }
-if(debug){ console.log("Diag lengths: ", rnd_diagnostic_length) }
-if(debug){ console.log("Experiment length: ", rnd_diagnostic_length.reduce((val, a) => val + a)) } // sum the list
-
-
+if(debug){ console.log(rnd_diagnostic_length) }
 
 ////////////////////////////
 ////    Instructions    ////
@@ -355,35 +312,6 @@ const check_browser = {
 timeline.push(check_browser)
 
 
-
-// TRY html-slider-response
-// TRY html-slider-response
-// TRY html-slider-response
-// TRY html-slider-response
-
-
-const test  = {
-    type: jsPsychSurvey,
-    button_label_finish: "Next",
-    required_error: `Please check whether you responded to (all) the question(s)`,
-    required_question_label: "*",
-    pages: () => {
-        return [
-            [
-                {
-                    type: 'likert',
-                    prompt: `Gender`, 
-                    name: 'gender', 
-                    likert_scale_max: 100,
-                    likert_scale_min_label: "Not at all distracted  -  ",
-                    likert_scale_max_label: "  -  Very distracted",
-                    required: true, 
-                }, 
-            ]
-        ]
-    }
-}
-timeline.push(test)
 
 // About the experiment 
 const about_the_experiment_and_consent = {
@@ -730,7 +658,6 @@ for(let exp_block = 0; exp_block < number_of_inducers; exp_block++){ // less tha
 
 }
 
-
 // Change background colour...
 const white_bk = {
     type: jsPsychCallFunction,
@@ -739,6 +666,30 @@ const white_bk = {
 timeline.push(white_bk)
     // It is too much effort (from my investigation) to change the background colour for these trials. 
     // Hence just change it to white...
+
+const finished_main = {
+    type: jsPsychHtmlKeyboardResponse,
+    stimulus: `You have now completed the central part of the experiment.<br>\n
+    To complete the study, please answer the following questions:`,
+    response: "ALL_KEYS",
+    prompt: "Press any key to continue."
+}
+
+const motivation = {
+    type: jsPsychHtmlSliderResponse,
+    stimulus:  () => {
+        return `<div style="font-size:${instruction_font_size}"> 
+       People are motivated to various degrees for various reasons.<br> \n 
+        There is nothing wrong with low motivation and kindly ask that you answer truthfully <brd><br>\n
+        How motivated were you to do well on the task?`},
+    require_movement: true,
+    labels: ['Not at all motivated', 'Very motivated']
+};
+timeline.push(motivation)
+
+const motivation_feedback = {
+
+}
 
 const experiment_feedback  = {
     type: jsPsychSurvey,
@@ -749,10 +700,42 @@ const experiment_feedback  = {
         return [
             [
                 {
-                    type: 'html',
-                    prompt: `You have now completed the central part of the experiment.<br>\n
-                    To complete the study, please answer the following questions:`,
+                    type: "text",
+                    prompt: "Is there anything you want to add in relation to the distraction question above?",
+                    name: 'distraction_feedback', 
+                    textbox_columns: 50,
+                    textbox_rows: 3,
                 },
+            ],
+            
+            //// NEW PAGE
+            [
+                {
+                    type:"html",
+                    prompt: `People are distracted to various degrees for various reasons. \n 
+                    There is nothing wrong with being distracted and we kindly ask that you answer truthfully.` 
+                },
+                {
+                    type: "likert",
+                    prompt: `Click the number that you believe reflect the degree to which you were distracted during the task.`,
+                    name: "distraction", 
+                    likert_scale_max: 7,
+                    likert_scale_min_label: "Not at all distracted  -  ",
+                    likert_scale_max_label: "  -  Very distracted",
+                    required: true, 
+                },
+                {
+                    type: "text",
+                    prompt: "Is there anything you want to add in relation to the motivation question (above)?",
+                    name: 'motivation_feedback',
+                    textbox_columns: 50,
+                    textbox_rows: 3,
+                }
+
+            ],
+            [   /// Distracted ? (Likert scale may be weird)
+
+            [ /// Demographic
                 {
                     type: 'multi-choice',
                     prompt: `Gender`, 
@@ -769,56 +752,7 @@ const experiment_feedback  = {
                     required: true,
                 },
             ], 
-            //// NEW PAGE
-            [
-                {
-                    type:"html",
-                    prompt: `People are motivated to various degrees for various reasons. \n 
-                    There is nothing wrong with being distracted and we kindly ask that you answer truthfully.` 
-                },
-                {
-                    type: "likert",
-                    prompt: `Click the number that you believe reflect the degree to which you were distracted during the task.`,
-                    name: "distraction", 
-                    likert_scale_max: 7,
-                    likert_scale_min_label: "Not at all distracted  -  ",
-                    likert_scale_max_label: "  -  Very distracted",
-                    required: true, 
-                },
-                {
-                    type: "text",
-                    prompt: "Is there anything you want to add in relation to the distraction question above?",
-                    name: 'distraction_feedback', 
-                    textbox_columns: 50,
-                    textbox_rows: 3,
-                },
-            ],
-            //// NEW PAGE
-            [
-                {
-                    type:"html",
-                    prompt: `Similarly to being distracted, people are motivated to different degrees for various reasons. \n
-                    There is nothing wrong with low motivation and we kindly ask that you answer truthfully.` 
-                },
-                {
-                    type: "likert",
-                    prompt: `Click the number (it will turn gray) you believe reflect the degree of motivation you had during the experiment.`,
-                    name: "motivation",
-                    likert_scale_max: 7,
-                    likert_scale_min_label: "Not at all motivated  -  ",
-                    likert_scale_max_label: "  -  Very motivated",
-                    required: true, 
-                },
-                {
-                    type: "text",
-                    prompt: "Is there anything you want to add in relation to the motivation question (above)?",
-                    name: 'motivation_feedback',
-                    textbox_columns: 50,
-                    textbox_rows: 3,
-                }
-            ],
-            //// NEW PAGE
-            [
+            [ /// General feedback
                 {
                     type: "text",
                     prompt: `Do you have any other comments, thoughts, or remarks in relation to the experiment? \n
