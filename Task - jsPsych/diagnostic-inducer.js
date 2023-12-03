@@ -48,12 +48,15 @@ const inducer_colours = ["blue", "green", "yellow"]      // Inducer colour rando
     // This is also what is DISPLAYED to participants. Should therefore be a readable name. 
 
 ////    Diagnostic parameters   ////
-const number_of_inducers = 24;       // Number of inducers 
+const number_of_inducers = 10//4;       // Number of inducers 
 const diagnostic_min_length = 4         // Min run length
 const diagnostic_max_length = 16     // Max run length
-const max_diagnostic_trials = 240     // Total max diagnostic trials
+const max_diagnostic_trials = 20     // Total max diagnostic trials
+const prac = 10                       // Number of diagnostic practice rounds
+    // Set to 0 if no practice rounds should occur.
 
 
+// Not used 
 const run_italic_bias = [1,1]           // Left value correspond to ITALIC probability, right correspond to UPRIGHT probability
 
 
@@ -383,7 +386,7 @@ const about_the_experiment_and_consent = {
 if(skip_instructions){} else { timeline.push(about_the_experiment_and_consent) }
 
 ////       Initialize fullscreen and START        ////
-if(skip_instructions){} else {
+if(skip_instructions==false){
     timeline.push({
         type: jsPsychFullscreen,
         message: `<div style="font-size:${instruction_font_size}">
@@ -410,6 +413,10 @@ if(skip_instructions){} else {
 let rnd_diagnostic_response_sides = jsPsych.randomization.shuffle(response_sides);    // randomize response side 
         // Could/would probably be a good idea to randomize italic/upright appearance as well, but w/e
 
+var short_prac = ""
+if(prac>0){
+    var short_prac = `You will receive a short practice round following the task on the next screen.<br>`
+}
 
 ////    GENERAL DIAGNOSTIC INSTRUCTIONS   ////
 let diagnostic_task_instruction_description = {
@@ -418,9 +425,9 @@ let diagnostic_task_instruction_description = {
         return [`<div style="font-size:${instruction_font_size}">
         The experiment will proceed quickly without any breaks, \n
         please ensure that you are in a quite environment where you are unlikely to be distracted/disrupted.      
-        The experiment takes approximately 30 minutes.
+        The experiment takes approximately 20 minutes.
         </div>`, 
-        ////  New page
+
         `<div style="font-size:${instruction_font_size}">
         We ask that you put your left index finger on the <b> ${allowed_responses[0].toUpperCase()} </b> key \n
         and your right index finger on the <b> ${allowed_responses[1].toUpperCase()} </b> key. \n
@@ -428,15 +435,18 @@ let diagnostic_task_instruction_description = {
         <br><br>
 
         In the next screen you will see the first task, that <b> will not change </b> in the experiment. \n 
-        This task must be responded to when the target (stimulus) appears in <b> black </b> colour. \n
-        After that screen, the other task will be shown. \n
-        This task will change throughout the the experiment, and will be clearly indicated with a new instruction. \n
+        This task must be responded to when the target (stimulus) appears in <b> black </b> colour.
+        <br><br>
+
+        ${short_prac}
         <br> 
-        You are asked to respond to this task when the target appears in \n
+        After that, the second task will be shown. \n
+        This task will change throughout the the experiment, and will be clearly indicated with a new description.<br> \n
+        You must respond to this task when the target appears in \n
          <span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour.toUpperCase()}</span>. \n
         <br><br>
 
-        You will receive a maximum of 20 seconds reading each of the instructions (which is plenty of time). <br><br>
+        You will receive a maximum of 20 seconds reading each of the tasks (which is plenty of time). <br><br>
         The experiment starts immediately when you click NEXT.
         </div>`]
     },
@@ -456,7 +466,6 @@ let diagnostic_task_instruction_description = {
     }
 }
 timeline.push(diagnostic_task_instruction_description)
-
 
 // Only displayed once, instruction remains the same throughout the experiment
 let diagnostic_task_instruction = {
@@ -483,6 +492,65 @@ let diagnostic_task_instruction = {
 }
 timeline.push(diagnostic_task_instruction)
 
+/////////  PRAC DIAG    ////// 
+if(prac > 0){
+    for(let pi = 0; pi < prac; pi++){
+        let rnd_diag_stim = jsPsych.randomization.sampleWithReplacement(["cat", "dog"], 1)[0]
+        let run_rnd_italic = jsPsych.randomization.sampleWithReplacement([true,false], 1, run_italic_bias)[0]
+    
+        let diagnostic_run = { 
+            type: jsPsychHtmlKeyboardResponse,
+            stimulus: () => {   
+                if(run_rnd_italic) {
+                    return `<p style="font-size: ${general_font_size};"><i>${rnd_diag_stim}</i>`
+                } else {
+                    return `<p style="font-size: ${general_font_size};">${rnd_diag_stim}`
+                }
+            }, 
+            choices: allowed_responses,
+            trial_duration: trial_duration,
+            data: {
+                stimulus: rnd_diag_stim,         // Stimulus
+                inducer_run: 0,                   // Inducer run number (i.e., block)
+                diagnostic_run: pi,                 // Diagnostic trial number //start with 1
+                inducer_trial: false,                   // Not an inducer trial
+                italic: run_rnd_italic,             // Whether the run is ITALIC or not
+                trial_info: "practice",         // This is a diagnostic trial
+                correct_diag_response_side: () => {     // Required response side for the diagnostic task
+                    if (run_rnd_italic) { return rnd_diagnostic_response_sides[0] } 
+                    else                { return rnd_diagnostic_response_sides[1] } 
+                },
+            },
+            on_finish: (data) => {
+                // Current window size
+                data.width = window.innerWidth
+                data.height = window.innerHeight
+    
+                // Require diagnostic response key 
+                if(data.correct_diag_response_side == response_sides[0]) 
+                        { data.correct_response_key = allowed_responses[0] }
+                else    { data.correct_response_key = allowed_responses[1] }
+                
+                // Correct response
+                if(data.response == null){  data.correct = null  } 
+                else {
+                    // If response equals correct_response_key
+                    if(data.correct_response_key == data.response)    { data.correct_response = true }
+                    else                                               { data.correct_response = false }
+                }
+                if(debug){ console.log(data) } // debg
+            }
+        }
+        timeline.push(diagnostic_run)
+    
+        ////     Feedback   ////
+        timeline.push(too_slow_trial)
+        timeline.push(wrong_response_trial)
+    
+        // Fixation
+        timeline.push(short_fixation)
+    }
+}
 
 // Here we create the experiment blocks
 for(let exp_block = 0; exp_block < number_of_inducers; exp_block++){ // less than, since we start at 0
@@ -674,22 +742,19 @@ const finished_main = {
     response: "ALL_KEYS",
     prompt: "Press any key to continue."
 }
+timeline.push(finished_main)
 
 const motivation = {
     type: jsPsychHtmlSliderResponse,
     stimulus:  () => {
         return `<div style="font-size:${instruction_font_size}"> 
-       People are motivated to various degrees for various reasons.<br> \n 
-        There is nothing wrong with low motivation and kindly ask that you answer truthfully <brd><br>\n
+        People are motivated to various degrees for various reasons.<br> \n 
+        There is nothing wrong with low motivation and kindly ask that you answer truthfully <br><br>\n
         How motivated were you to do well on the task?`},
     require_movement: true,
     labels: ['Not at all motivated', 'Very motivated']
 };
 timeline.push(motivation)
-
-const motivation_feedback = {
-
-}
 
 const experiment_feedback  = {
     type: jsPsychSurvey,
@@ -711,7 +776,8 @@ const experiment_feedback  = {
                 {
                     type:"html",
                     prompt: `Similar to motivation, people are distracted to various degrees for various reasons. \n 
-                    There is nothing wrong with being distracted and we kindly ask that you answer truthfully.` 
+                    There is nothing wrong with being distracted and we kindly ask that you answer truthfully.<br><br>
+                    (The number will be highlighted when you click it)` 
                 },
                 {
                     type: "likert",
