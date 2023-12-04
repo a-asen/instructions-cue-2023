@@ -329,27 +329,28 @@ const about_the_experiment_and_consent = {
 
         <h3>About the experiment</h3>                
         In this study, you will have to remember two tasks. \n
-        You will switch between these tasks based on some targets that appear on your screen. \n
+        You will switch between these tasks based on the targets that appear on the screen. \n
         The first task that you will be presented with, will <b>remain the same </b> throughout the experiment. \n
         The second task will change throughout experiment and will only be executed once. \n
-        The second task will change a couple of times during the experiment. \n 
-        Each change will be indicated with a new instruction for the second task. \n
+        When the task changes, a new instruction will appear, indicating the new relationships. \n
         Your task is to respond as <b>fast and accurately</b> as possible to the current task. \n
         Only one task will be executed during any one trial. This will be indicated by its colour.<br><br> \n 
-        To response to any trial, you are asked to either click ${response_sides[0]} using ${allowed_responses[0]}, or \n
-        ${response_sides[1]} using ${allowed_responses[1]}. <br>\n
-        These keys will not change throughout the experiment. 
-        <br><br>
-        
+
+        In the experiment you will only respond using a the ${allowed_responses[0]} and ${response_sides[1]} key (unless otherwise noted).\n
+        These will be indicated with a ${response_sides[0]} or ${response_sides[1]} side.\n
+        That is, when the task asks you to respond with a ${response_sides[0]} response, you need to press the ${allowed_responses[0]} key. \n
+        If it asks for a ${response_sides[1]} response, you must respond with the ${allowed_responses[1]} key.<br>
+
+        These keys will remain the same throughout the experiment. <br><br>
+                
         At the end of the experiment you will have an opportunity to proviod feedback related to the experiment. 
-        
         </div>`,    ////  New page
         `<div style="font-size:${instruction_font_size}">
         
         <h3> Consent </h3>
         
         Participation in the study is voluntary. \n
-        All responses are collected and stored anonymously and cannot be traced back to you. \n
+        All responses to this experiment are collected and stored anonymously. That means they cannot be traced back to you. \n
         The anonymous storage means we cannot provide participants with their responses upon request. \n
         You can quit the study without giving a reason by closing the browser tab. No data will be stored in that case.\n
         <br><br> 
@@ -359,9 +360,6 @@ const about_the_experiment_and_consent = {
         <i>Importantly, your data is anaymous and cannot be traced back to you</i>.\n
         
         </div>`,
-
-        // Is it not possible to show participants ID for them to  later retrieve their own data, if they so choose? 
-            // In that case I guess we could really allow participants to download their own data while in the browser, but... 
 
         ]
     },
@@ -439,6 +437,7 @@ let diagnostic_task_instruction_description = {
         <br><br>
 
         You will receive a maximum of 20 seconds reading each of the tasks (which is plenty of time). <br><br>
+
         The experiment starts immediately when you click NEXT.
         </div>`]
     },
@@ -524,7 +523,7 @@ if(prac > 0){
                 else    { data.correct_response_key = allowed_responses[1] }
                 
                 // Correct response
-                if(data.response == null){  data.correct = null  } 
+                if(data.response == null){  data.correct_response = null  } 
                 else {
                     // If response equals correct_response_key
                     if(data.correct_response_key == data.response)    { data.correct_response = true }
@@ -638,7 +637,7 @@ for(let exp_block = 0; exp_block < number_of_inducers; exp_block++){ // less tha
                 else    { data.correct_response_key = allowed_responses[1] }
                 
                 // Correct response
-                if(data.response == null){  data.correct = null  } 
+                if(data.response == null){  data.correct_response = null  } 
                 else {
                     // If response equals correct_response_key
                     if(data.correct_response_key == data.response)    { data.correct_response = true }
@@ -697,8 +696,8 @@ for(let exp_block = 0; exp_block < number_of_inducers; exp_block++){ // less tha
             } else { 
                 data.correct_response_key = allowed_responses[1] }
                 // Correct response (according to the active trial)
-                if(data.response == data.correct_response_key) { data.inducer_correct_response = true }
-                else                                           { data.inducer_correct_response = false }
+                if(data.response == data.correct_response_key) { data.correct_response = true }
+                else                                           { data.correct_response = false }
             if(debug){ console.log(data) }
         }
     }
@@ -736,18 +735,6 @@ const finished_main = {
 }
 timeline.push(finished_main)
 
-const motivation = {
-    type: jsPsychHtmlSliderResponse,
-    stimulus:  () => {
-        return `<div style="font-size:${instruction_font_size}"> 
-        People are motivated to various degrees for various reasons.<br> \n 
-        There is nothing wrong with low motivation and kindly ask that you answer truthfully <br><br>\n
-        How motivated were you to do well on the task?`},
-    require_movement: true,
-    labels: ['Not at all motivated', 'Very motivated']
-};
-timeline.push(motivation)
-
 const experiment_feedback  = {
     type: jsPsychSurvey,
     button_label_finish: "Next",
@@ -755,15 +742,6 @@ const experiment_feedback  = {
     required_question_label: "*",
     pages:() => {
         return [
-            [   /// Motivation feedback here.
-                { 
-                    type: "text",
-                    prompt: "Is there anything you want to add in relation to the motivation question?",
-                    name: 'motivaiton_feedback', 
-                    textbox_columns: 50,
-                    textbox_rows: 3,
-                },
-            ],
             [  /// Distracted ? (Likert scale may be weird)
                 {
                     type:"html",
@@ -787,23 +765,6 @@ const experiment_feedback  = {
                     textbox_columns: 50,
                     textbox_rows: 3,
                 }
-            ], 
-            [ /// Demographic
-                {
-                    type: 'multi-choice',
-                    prompt: `Gender`, 
-                    name: 'gender', 
-                    options: ['Female', 'Male', 'Other', 'I would rather not tell.'], 
-                    required: true
-                }, 
-                {
-                    type: 'text',
-                    prompt: `What is you age? (enter answer into text box below)`, 
-                    name: 'age', 
-                    input_type: "number",   // Only allow number input
-                    textbox_columns: 5,
-                    required: true,
-                },
             ], 
             [ /// General feedback
                 {
