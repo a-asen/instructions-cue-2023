@@ -4,9 +4,12 @@ load.project()
 # pilot analysis
 read.csv("data/raw/pilot/mydata2.csv") -> data
 data |>
-  mutate(test = case_when(trial_info=="Diagnostic trial" ~ correct_response,
-                          trial_info=="Inducer trial" ~ inducer_correct_response,
-                          T~NA))
+  mutate(correct_response = case_when(
+    trial_info=="Diagnostic trial" ~ correct_response,
+    trial_info=="Inducer trial" ~ inducer_correct_response,
+    T~NA),
+    correct_response = ifelse(correct_response=="true", 1, 0)) -> data
+
 
 #   Get files     =====
 list.files("data/raw/experiment1", pattern = "*.csv", full.names = T) -> fnames
@@ -17,28 +20,58 @@ map_df(fnames, \(x){
 }) -> data
 
 
-#   Exclusion       =====
-# Practice round
+# Pre-transformation
 data |>
-  select(id, trial_info, inducer_run, correct_response, inducer_correct_response, rt, congruent) |>
-  filter(inducer_run>0 & !(trial_info=="Inducer instructions"))
-  mutate(correct_response = as.integer(ifelse(correct_response == "true", 1,0)),
-         rt = as.integer(ifelse(rt=="null", NA, rt)),
-#         )-> data
+  mutate(rt = as.integer(ifelse(rt=="null", NA, rt))) -> data
 
-# Overall accuracy
+#   Behaviour       =====
 data |>
+  select(id, trial_info, inducer_run, correct_response, rt, congruent) |>
+  filter(trial_info=="Diagnostic trial" | trial_info=="Inducer trial") -> d
+
+##   Exclusion       =====
+exclusion_loss <- list()
+### Practice round      =====
+d |>
+  filter(inducer_run>0) -> d
+
+### Overall accuracy      ====
+d |>
   filter(trial_info=="Diagnostic trial" | trial_info == "Inducer trial") |>
   group_by(id) |>
   summarize(acc = sum(correct_response)/length(correct_response)) |>
   filter(acc<.7) |>
   pull(id) -> exclude_par
 
-# Trials more than 2.5 SD
-data |>
-  mutate(rt_crit = mean(rt, na.rm=T), rt_crit_sd=sd(rt, na.rm=T), rt_exc=rt_crit+rt_crit_sd*2.5) |>
-  filter(rt>rt_exc)
+d |> filter(!(id %in% exclud_par)) -> d
 
+cat(length(exclude_par), " participant(s) have been excluded")
+
+###  Trials more than 2.5 SD    ======
+d |>
+  group_by(id) |>
+  mutate(rt_crit = mean(rt, na.rm=T) + sd(rt, na.rm=T)*2.5) -> d
+
+
+cat(d |> filter(rt>=rt_crit) |> nrow(), " lost trial(s) from ", d |> nrow())
+cat("Resulting in a ", nrow(d[d$rt >= d$rt_crit,]) / nrow(d) * 100, " loss of trials")
+
+d |>
+  filter(rt<rt_crit) -> d
+
+
+### Only correct inducers         =====
+d |>
+  filter(trial_info=="Inducer trial" & correct_response==1) |>
+  pull(inducer_run) -> inducers
+
+cat("Only correct inducers resulted in the loss of ", sum(!d[["inducer_run"]] %in% inducers) / nrow(d)*100, "percent of the data")
+sum(!d[["inducer_run"]] %in% inducers) / nrow(d)*100 ->
+
+d |> filter(!(inducer_run %in% inducers)) |> nrow()
+
+d |>
+  filter(inducer_run %in% inducers) |> nrow()
 
   # filter(!(id %in% exclude_par)) |>
   select(id, inducer_run, trial_info, congruent, rt, correct_response) |>
