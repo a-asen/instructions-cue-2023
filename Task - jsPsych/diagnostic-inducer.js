@@ -523,11 +523,11 @@ if(prac > 0){
                 else    { data.correct_response_key = allowed_responses[1] }
                 
                 // Correct response
-                if(data.response == null){  data.correct_response = null  } 
+                if(data.response == null){  data.correct_response = NaN  } 
                 else {
                     // If response equals correct_response_key
-                    if(data.correct_response_key == data.response)    { data.correct_response = true }
-                    else                                               { data.correct_response = false }
+                    if(data.correct_response_key == data.response)    { data.correct_response = 1 }
+                    else                                               { data.correct_response = 0 }
                 }
                 if(debug){ console.log(data) } // debg
             }
@@ -637,11 +637,11 @@ for(let exp_block = 0; exp_block < number_of_inducers; exp_block++){ // less tha
                 else    { data.correct_response_key = allowed_responses[1] }
                 
                 // Correct response
-                if(data.response == null){  data.correct_response = null  } 
+                if(data.response == null){  data.correct_response = NaN  } 
                 else {
                     // If response equals correct_response_key
-                    if(data.correct_response_key == data.response)    { data.correct_response = true }
-                    else                                                    { data.correct_response = false }
+                    if(data.correct_response_key == data.response)    { data.correct_response = 1 }
+                    else                                                    { data.correct_response = 0 }
                 }
 
                 ////    GONGUENCEY      ////
@@ -696,8 +696,8 @@ for(let exp_block = 0; exp_block < number_of_inducers; exp_block++){ // less tha
             } else { 
                 data.correct_response_key = allowed_responses[1] }
                 // Correct response (according to the active trial)
-                if(data.response == data.correct_response_key) { data.correct_response = true }
-                else                                           { data.correct_response = false }
+                if(data.response == data.correct_response_key) { data.correct_response = 1 }
+                else                                           { data.correct_response = 0 }
             if(debug){ console.log(data) }
         }
     }
