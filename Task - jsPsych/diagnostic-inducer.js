@@ -51,7 +51,12 @@ const inducer_colours = ["blue", "green", "yellow"]      // Inducer colour rando
 const number_of_inducers = 10//4;       // Number of inducers 
 const diagnostic_min_length = 4         // Min run length
 const diagnostic_max_length = 16     // Max run length
-const max_diagnostic_trials = 120     // Total max diagnostic trials
+const max_diagnostic_trials = 80     // Total max diagnostic trials
+    // NOTE IS THIS VALUE IS NOT WITHIN THE BOUNDS OF NUMBER OF INDUCER*diagnostic_max/min an INFINITE LOOP IS CREATED
+    // e.g.: 
+    // MIN: 4*10 = 40 (max_diagnostic_trials SHOULD NOT BE LESS THAN 40)
+    // MAX: 16*10 = 160 (max_diagnostic_trials SHOULD NOT EXCEED 160)
+
 const prac = 10                       // Number of diagnostic practice rounds
     // Set to 0 if no practice rounds should occur.
 
@@ -219,9 +224,8 @@ let rnd_stimuli = jsPsych.randomization.shuffle(stimuli);  // Shuffle stimuli li
 if(debug) { console.log(rnd_stimuli) }
 
 // Generate diagnostic length range
-let diagnostic_range = Array.from(Array(diagnostic_max_length-3), (x,i) => i + diagnostic_min_length) 
+let diagnostic_range = Array.from(Array(diagnostic_max_length-diagnostic_min_length+1), (x,i) => i + diagnostic_min_length) 
 if(debug){ console.log("The range of diagnostic lengths: ", diagnostic_range) }
-
 
 let rnd_diagnostic_length = [];
 // We randomy sample "number_of_inducer" times from the "diagnostic_range"
@@ -265,6 +269,7 @@ if(sum_diags != max_diagnostic_trials){
 }
 
 if(debug){ console.log(rnd_diagnostic_length) }
+if(debug){ console.log(rnd_diagnostic_length.reduce((list, i) => list + i, 0)) }
 
 ////////////////////////////
 ////    Instructions    ////
@@ -394,7 +399,6 @@ if(skip_instructions==false){
         }
     });
 }
-
 
 /////////////////////////////////////////
 /////            TASK               /////
@@ -547,7 +551,7 @@ if(prac > 0){
 for(let exp_block = 0; exp_block < number_of_inducers; exp_block++){ // less than, since we start at 0
 
     ////////////////////////////////////////
-    ////    Diagnostic instructions     ////
+    ////    Inducer instructions        ////
     ////////////////////////////////////////
 
     // This first get the number of different inducers
@@ -558,7 +562,7 @@ for(let exp_block = 0; exp_block < number_of_inducers; exp_block++){ // less tha
         // Get the curret diagnostic length from the pre-generated list
     let rnd_inducer_response_sides = jsPsych.randomization.shuffle(response_sides)
         // randomize left/right response for the inducer 
-    
+
     ////        Inducer instruction         ////
     let inducer_instruction = { 
         type: jsPsychHtmlKeyboardResponse,
@@ -664,6 +668,8 @@ for(let exp_block = 0; exp_block < number_of_inducers; exp_block++){ // less tha
         // Fixation
         timeline.push(short_fixation)
     }
+
+
     ////////////////////////////////////
     ////        INDUCER TASK        ////
     ////////////////////////////////////
@@ -726,15 +732,6 @@ timeline.push(white_bk)
     // It is too much effort (from my investigation) to change the background colour for these trials. 
     // Hence just change it to white...
 
-const finished_main = {
-    type: jsPsychHtmlKeyboardResponse,
-    stimulus: `You have now completed the central part of the experiment.<br>\n
-    To complete the study, please answer the following questions:`,
-    response: "ALL_KEYS",
-    prompt: "Press any key to continue."
-}
-timeline.push(finished_main)
-
 const experiment_feedback  = {
     type: jsPsychSurvey,
     button_label_finish: "Next",
@@ -742,6 +739,13 @@ const experiment_feedback  = {
     required_question_label: "*",
     pages:() => {
         return [
+            [
+                {
+                    type:"html",
+                    prompt: `You have now completed the central part of the experiment.<br>\n
+                    To complete the study, please respond to the preceding question.`
+                }
+            ],
             [  /// Distracted ? (Likert scale may be weird)
                 {
                     type:"html",
