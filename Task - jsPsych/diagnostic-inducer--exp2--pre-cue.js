@@ -143,7 +143,7 @@ function draw_up_arrow(c){
     // Draw the arrowhead
     ctx.beginPath();
     ctx.moveTo(150, 90);
-    ctx.lineTo(100, 150);
+    ctx.lineTo(100, 150);s
     ctx.lineTo(200, 150);
     ctx.closePath();
     ctx.fill();
