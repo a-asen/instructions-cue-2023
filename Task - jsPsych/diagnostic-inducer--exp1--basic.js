@@ -44,7 +44,7 @@ const response_sides = ["LEFT","RIGHT"];     // What participants will RESPOND t
     // i.e., f (or whatever key) should correspond to the response side (left)
 
 ////    Inducer parameters     ////
-const inducer_colours = ["blue", "green", "yellow"]      // Inducer colour randomize between participants (if more than 1)
+const experiment_colours = ["darkred", "yellow", "purple"]      // Inducer colour randomize between participants (if more than 1)
     // This is also what is DISPLAYED to participants. Should therefore be a readable name. 
 
 ////    Diagnostic parameters   ////
@@ -79,6 +79,7 @@ const stimuli = ["gwn", "eug", "sht", "cjm", "svs", "orp", "scy", "rve", "wjb", 
     "spm", "alh", "ows", "idd", "abv", "cml", "lpo", "r22", "z28", "eyt"]
     // Randomly selected stimuli that should not overlapp by more than 1 character 
 
+
 ////////////////////////////
 ////                    ////
 ////    Initialize      ////
@@ -111,14 +112,25 @@ Date.prototype.timeNow = function () {
 var start_dateTime = new Date().today() + "_" + new Date().timeNow();
 if(debug) { console.log(start_dateTime) }
 
-
 // Change background function
 function changeBackground(colour) {
     document.body.style.background = colour;
 }
 
-
 ////        Trials          ////
+// Change background trials
+const set_background_colour_default = {
+    type: jsPsychCallFunction,
+    func: () => { changeBackground(default_background_colour) }
+} 
+const set_background_colour_wrong_response = {
+    type: jsPsychCallFunction,
+    func: () => { changeBackground(wrong_response_colour) },
+}
+  // https://github.com/jspsych/jsPsych/discussions/936
+  // https://github.com/psychbruce/jspsych/blob/master/exp_demo/experiment/experiment.js
+
+
 // Fixations
 const short_fixation = {
     type: jsPsychHtmlKeyboardResponse,
@@ -145,7 +157,8 @@ const long_fixation = {
     }
 }
 
-// Feedback trial
+//// FEEDBACK ////
+// Wrong response info
 const wrong_response = {
     type: jsPsychHtmlKeyboardResponse,
     stimulus:  () => { return `<div style="font-size: ${general_font_size};"> Wrong! </div>` },
@@ -158,6 +171,7 @@ const wrong_response = {
         data.height = window.innerHeight
     }
 }
+// Too slow info
 const too_slow = {
     type: jsPsychHtmlKeyboardResponse,
     stimulus: () => { return `<div style="font-size: ${general_font_size};"> Slow </div>` },
@@ -171,21 +185,20 @@ const too_slow = {
     }
 }
 
-// Change background
-const set_background_colour_default = {
-    type: jsPsychCallFunction,
-    func: () => { changeBackground(default_background_colour) }
-} 
-const set_background_colour_wrong_response = {
-    type: jsPsychCallFunction,
-    func: () => { changeBackground(wrong_response_colour) },
+//// Feedback block
+// Wrong response trial (background change + info)
+const wrong_response_trial = {
+    timeline: [set_background_colour_wrong_response, wrong_response , set_background_colour_default],
+    conditional_function: () => {
+        let data = jsPsych.data.get().last(1).values()[0]
+        
+        if(debug){ console.log(data) }
+        
+        if( data.correct_response == false)  { return true } 
+        else                        { return false }
+    }
 }
-  // https://github.com/jspsych/jsPsych/discussions/936
-  // https://github.com/psychbruce/jspsych/blob/master/exp_demo/experiment/experiment.js
-
-
-// Feedback block
-    // Too slow
+// To slow trial (background change + info)
 const too_slow_trial = {
     timeline: [set_background_colour_wrong_response, too_slow, set_background_colour_default],
     conditional_function: () => {
@@ -194,26 +207,17 @@ const too_slow_trial = {
         else                        { return false }
     }
 }
-    // Wrong response
-const wrong_response_trial = {
-    timeline: [set_background_colour_wrong_response, wrong_response , set_background_colour_default],
-    conditional_function: () => {
-        let data = jsPsych.data.get().last(1).values()[0]
-        
-        if(debug){ console.log(data) }
 
-        if( data.correct_response == false)  { return true } 
-        else                        { return false }
-    }
-}
 
+///////////////////////////////////////////////////////////////////////////////////////
 // Set background to a light gray
 timeline.push(set_background_colour_default) 
     // To ensure the background colour is correct.
 
 
 // Inducer colour
-let rnd_inducer_colour = jsPsych.randomization.sampleWithReplacement(inducer_colours, 1)[0]
+let rnd_inducer_colour = jsPsych.randomization.sampleWithReplacement(experiment_colours, 1)[0]
+if(debug){ console.log("Inducer colour: ", rnd_inducer_colour) }
 
 // Unique ID
 var ID = jsPsych.randomization.randomID(8);
@@ -221,10 +225,11 @@ if(debug){ console.log("ID = " + ID) }
 
 // Shuffle stimuli list
 let rnd_stimuli = jsPsych.randomization.shuffle(stimuli);  // Shuffle stimuli list
-if(debug) { console.log(rnd_stimuli) }
+if(debug) { console.log("Randomized stimuli list:", rnd_stimuli) }
 
+//// Diagnostic stuff ////
 // Generate diagnostic length range
-let diagnostic_range = Array.from(Array(diagnostic_max_length-diagnostic_min_length+1), (x,i) => i + diagnostic_min_length) 
+let diagnostic_range = Array.from(Array(diagnostic_max_length-diagnostic_min_length+1), (x, i) => i + diagnostic_min_length) 
 if(debug){ console.log("The range of diagnostic lengths: ", diagnostic_range) }
 
 let rnd_diagnostic_length = [];
@@ -232,14 +237,10 @@ let rnd_diagnostic_length = [];
 for(let i = 0; i < number_of_inducers; i++){
     rnd_diagnostic_length.push(jsPsych.randomization.sampleWithReplacement(diagnostic_range, 1)[0]);
 }
-if(debug){ console.log(rnd_diagnostic_length) }
+if(debug){ console.log("Random diagnostic lengths list:", rnd_diagnostic_length) }
 // Sum total diagnostic trials
 const sum_diags = rnd_diagnostic_length.reduce((list, i) => list + i, 0);
-if(debug){ console.log(sum_diags) }
-
-
-/// IF max_diagnostic_trial is a weird number (less than min*inducers or max*inducers) weird stuff will happen
-// Fix
+if(debug){ console.log("Total diagnostic trials:", sum_diags) }
 
 // If the sum is more or less than the specified value, adjust accordingly
 if(sum_diags != max_diagnostic_trials){
@@ -266,10 +267,8 @@ if(sum_diags != max_diagnostic_trials){
         } else { // else skip
             if(debug){ console.log("Value: ", rnd_diagnostic_length[loc], "at location", loc, "is at threshold, skipping...") } }
     } while( diff > 0)
+    if(debug){ console.log("Fixed diagnostic lengths:", rnd_diagnostic_length) }
 }
-
-if(debug){ console.log(rnd_diagnostic_length) }
-if(debug){ console.log(rnd_diagnostic_length.reduce((list, i) => list + i, 0)) }
 
 ////////////////////////////
 ////    Instructions    ////
