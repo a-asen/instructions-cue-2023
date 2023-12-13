@@ -88,13 +88,6 @@ const jsPsych = initJsPsych({
 const timeline = []; // Timeline
 
 
-// Connection to server? idk
-function saveData(name, data){
-    var xhr = new XMLHttpRequest();
-    xhr.open('POST', 'write_data.php'); // 'write_data.php' is the path to the php file described above.
-    xhr.setRequestHeader('Content-Type', 'application/json');
-    xhr.send(JSON.stringify({filename: name, filedata: data}));
-}
 
 // Get data function
 Date.prototype.today = function () { 
@@ -813,6 +806,25 @@ const experiment_feedback  = {
     }
 }
 timeline.push(experiment_feedback)
+
+var save_file_trial = {
+    type: jsPsychCallFunction,
+    async: true,
+    func: function(done){
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', 'write_data.php');
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        xhr.onload = function() {
+        if(xhr.status == 200){
+            var response = JSON.parse(xhr.responseText);
+            if(debug){ console.log(response.success) }
+        }
+        done(); // invoking done() causes experiment to progress to next trial.
+    };
+    xhr.send(jsPsych.data.get().json());
+    }
+}
+timeline.push(save_file_trial)
 
 
 // Exit fullscreen and end experiment. 
