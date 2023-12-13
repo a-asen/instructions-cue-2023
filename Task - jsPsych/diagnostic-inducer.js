@@ -4,7 +4,7 @@
 // CHANGE THESE BEFORE EXPERIMENT!
 const debug = true              // Show some console information
 const skip_instructions = false  // Skip intro? (to test trials)
-const save_local_data = true    // Save a local file (test analysis)
+const save_local_data = false    // Save a local file (test analysis)
 
 
 ////////////////////////////////////////////////////////////////////////
@@ -48,10 +48,11 @@ const inducer_colours = ["blue", "green", "yellow"]      // Inducer colour rando
     // This is also what is DISPLAYED to participants. Should therefore be a readable name. 
 
 ////    Diagnostic parameters   ////
-const number_of_inducers = 10//4;       // Number of inducers 
+const number_of_inducers = 10;       // Number of inducers 
 const diagnostic_min_length = 4         // Min run length
 const diagnostic_max_length = 16     // Max run length
-const max_diagnostic_trials = 120     // Total max diagnostic trials
+const max_diagnostic_trials = 80     // Total max diagnostic trials
+    // max/2 * number_of_inducers
 const prac = 10                       // Number of diagnostic practice rounds
     // Set to 0 if no practice rounds should occur.
 
@@ -88,8 +89,8 @@ const jsPsych = initJsPsych({
 const timeline = []; // Timeline
 
 
-
-// Get data function
+/// Functions ////
+// Date functions 
 Date.prototype.today = function () { 
     return this.getFullYear() + "-" + (((this.getMonth()+1) < 10)?"0":"") + (this.getMonth()+1) +"-"+ ((this.getDate() < 10)?"0":"") + this.getDate();
 }
@@ -98,6 +99,23 @@ Date.prototype.timeNow = function () {
 }
 var start_dateTime = new Date().today() + "_" + new Date().timeNow();
 if(debug) { console.log(start_dateTime) }
+
+// Save data (to server)
+var saveData = function(name, data) {
+    // Create data JSON 
+    var data2 = JSON.stringify( { filename: name, filedata: data } )
+
+    // Establish connection
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', 'upload.php');
+    xhr.setRequestHeader('Content-Type', 'application/json');
+ 
+    // Send data
+    xhr.send( data2 );
+
+    // Print response
+    if(debug){ console.log(xhr.responseText) }
+}
 
 
 // Change background function
@@ -369,7 +387,7 @@ const about_the_experiment_and_consent = {
 if(skip_instructions){} else { timeline.push(about_the_experiment_and_consent) }
 
 ////       Initialize fullscreen and START        ////
-if(skip_instructions==false){
+if(skip_instructions){} else{
     timeline.push({
         type: jsPsychFullscreen,
         message: `<div style="font-size:${instruction_font_size}">
@@ -388,7 +406,6 @@ if(skip_instructions==false){
     });
 }
 
-
 /////////////////////////////////////////
 /////            TASK               /////
 /////////////////////////////////////////
@@ -398,7 +415,7 @@ let rnd_diagnostic_response_sides = jsPsych.randomization.shuffle(response_sides
 
 var short_prac = ""
 if(prac>0){
-    var short_prac = `You will receive a short practice round following the task on the next screen.<br>`
+        var short_prac = `You will receive a short practice round following the task on the next screen.<br>`
 }
 
 ////    GENERAL DIAGNOSTIC INSTRUCTIONS   ////
@@ -446,10 +463,10 @@ let diagnostic_task_instruction_description = {
         data.width = window.innerWidth
         data.height = window.innerHeight
 
-        if(debug){ console.log(data) }
+        skip_instructions ? null : console.log(data) 
     }
 }
-timeline.push(diagnostic_task_instruction_description)
+if(skip_instructions){}else{ timeline.push(diagnostic_task_instruction_description) }
 
 // Only displayed once, instruction remains the same throughout the experiment
 let diagnostic_task_instruction = {
@@ -477,7 +494,7 @@ let diagnostic_task_instruction = {
 timeline.push(diagnostic_task_instruction)
 
 /////////  PRAC DIAG    ////// 
-if(prac > 0){
+if(prac > 0 & skip_instructions === false){
     for(let pi = 0; pi < prac; pi++){
         let rnd_diag_stim = jsPsych.randomization.sampleWithReplacement(["cat", "dog"], 1)[0]
         let run_rnd_italic = jsPsych.randomization.sampleWithReplacement([true,false], 1, run_italic_bias)[0]
@@ -696,7 +713,6 @@ for(let exp_block = 0; exp_block < number_of_inducers; exp_block++){ // less tha
     }
     timeline.push(inducer_task)
 
-
     ////     Feedback   ////
     // If participants responded to slow, give feedback
     timeline.push(too_slow_trial)
@@ -719,13 +735,6 @@ timeline.push(white_bk)
     // It is too much effort (from my investigation) to change the background colour for these trials. 
     // Hence just change it to white...
 
-const finished_main = {
-    type: jsPsychHtmlKeyboardResponse,
-    stimulus: ,
-    response: "ALL_KEYS",
-    prompt: "Press any key to continue."
-}
-timeline.push(finished_main)
 
 const experiment_feedback  = {
     type: jsPsychSurvey,
@@ -738,7 +747,7 @@ const experiment_feedback  = {
                 {
                     type: "html",
                     prompt: `You have now completed the central part of the experiment.<br>\n
-                    To complete the study, please answer the following questions:`
+                    To complete the study, please answer the following questions:<br><br>`
                 },
                 {
                     type:"html",
@@ -779,11 +788,6 @@ const experiment_feedback  = {
     on_finish: (data) => {
         // Add ID to all entries: 
         jsPsych.data.get().addToAll({ id:                   ID });
-        // jsPsych.data.get().addToAll({ distraction:          data.response.distraction });
-        // jsPsych.data.get().addToAll({ distraction_feedback: data.response.distraction_feedback });
-        // jsPsych.data.get().addToAll({ motivation:           data.response.motivation });
-        // jsPsych.data.get().addToAll({ motivation_feedback:  data.response.motivation_feedback });
-        // jsPsych.data.get().addToAll({ open_feedback:        data.open_feedback });
 
         // Add all the other information in a separate column (easy to filter out), but is strictly not necessary
         // Current window size
@@ -796,35 +800,16 @@ const experiment_feedback  = {
         data.distraction_feedback = data.response.distraction_feedback
         data.open_feedback = data.response.open_feedback
 
+        // save interactive data
+        data.interactive = jsPsych.data.getInteractionData()["trials"]
 
         // Save the data
-        if(save_local_data){ jsPsych.data.get().localSave('csv','mydata.csv') }
+        if(save_local_data) { jsPsych.data.get().localSave('csv','mydata.csv') }
 
-        // Return data to server
-        saveData("data_" + start_dateTime + "_" + ID, jsPsych.data.get().csv());
+        saveData( "data_" + start_dateTime + "_" + ID + ".csv", jsPsych.data.get().csv() )
     }
 }
 timeline.push(experiment_feedback)
-
-var save_file_trial = {
-    type: jsPsychCallFunction,
-    async: true,
-    func: function(done){
-        var xhr = new XMLHttpRequest();
-        xhr.open('POST', 'write_data.php');
-        xhr.setRequestHeader('Content-Type', 'application/json');
-        xhr.onload = function() {
-        if(xhr.status == 200){
-            var response = JSON.parse(xhr.responseText);
-            if(debug){ console.log(response.success) }
-        }
-        done(); // invoking done() causes experiment to progress to next trial.
-    };
-    xhr.send(jsPsych.data.get().json());
-    }
-}
-timeline.push(save_file_trial)
-
 
 // Exit fullscreen and end experiment. 
 timeline.push({
@@ -832,6 +817,9 @@ timeline.push({
     message: "Thank you for participating in this study! <br><br>", 
     button_label: "End experiment", 
     fullscreen_mode: false,
+    on_finish: () => {
+        window.location = "https://app.prolific.com/submissions/complete?cc=C1BHSUPK"
+    }
 }); 
 
 jsPsych.run(timeline)
