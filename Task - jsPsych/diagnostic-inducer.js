@@ -721,8 +721,7 @@ timeline.push(white_bk)
 
 const finished_main = {
     type: jsPsychHtmlKeyboardResponse,
-    stimulus: `You have now completed the central part of the experiment.<br>\n
-    To complete the study, please answer the following questions:`,
+    stimulus: ,
     response: "ALL_KEYS",
     prompt: "Press any key to continue."
 }
@@ -737,9 +736,14 @@ const experiment_feedback  = {
         return [
             [  /// Distracted ? (Likert scale may be weird)
                 {
+                    type: "html",
+                    prompt: `You have now completed the central part of the experiment.<br>\n
+                    To complete the study, please answer the following questions:`
+                },
+                {
                     type:"html",
-                    prompt: `Similar to motivation, people are distracted to various degrees for various reasons. \n 
-                    There is nothing wrong with being distracted and we kindly ask that you answer truthfully.<br><br>
+                    prompt: `People are distracted to various degrees for various reasons. \n 
+                    There is nothing wrong with being distracted and we kindly ask that you answer truthfully.<br>
                     (The number will be highlighted when you click it)` 
                 },
                 {
@@ -753,8 +757,8 @@ const experiment_feedback  = {
                 },
                 {
                     type: "text",
-                    prompt: "Is there anything you want to add in relation to the motivation question (above)?",
-                    name: 'motivation_feedback',
+                    prompt: "Is there anything you want to add in relation to the distraction question (above)?",
+                    name: 'distaction_feedback',
                     textbox_columns: 50,
                     textbox_rows: 3,
                 }
@@ -771,12 +775,10 @@ const experiment_feedback  = {
             ]
         ]
     },
-    data: { stimulus: "gender-age-distraction-motivation-feedback", trial_info: "Demographics, motivation, distraction and feedback" },
+    data: { stimulus: "distraction-feedback", trial_info: "Distraction and feedback" },
     on_finish: (data) => {
         // Add ID to all entries: 
         jsPsych.data.get().addToAll({ id:                   ID });
-        // jsPsych.data.get().addToAll({ age:                  age });
-        // jsPsych.data.get().addToAll({ gender:               gender });
         // jsPsych.data.get().addToAll({ distraction:          data.response.distraction });
         // jsPsych.data.get().addToAll({ distraction_feedback: data.response.distraction_feedback });
         // jsPsych.data.get().addToAll({ motivation:           data.response.motivation });
@@ -788,15 +790,12 @@ const experiment_feedback  = {
         data.height = window.innerHeight
         data.width = window.innerWidth
 
-        // Demograpghics
-        data.gender = data.response.gender
-        data.age = data.response.age
-        
         // feedback
         data.motivation_feedback = data.response.motivation_feedback
         data.distraction = data.response.distraction
         data.distraction_feedback = data.response.distraction_feedback
         data.open_feedback = data.response.open_feedback
+
 
         // Save the data
         if(save_local_data){ jsPsych.data.get().localSave('csv','mydata.csv') }
