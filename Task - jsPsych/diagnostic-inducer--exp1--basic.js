@@ -45,6 +45,7 @@ const response_sides = ["LEFT","RIGHT"];     // What participants will RESPOND t
 
 ////    Inducer parameters     ////
 const inducer_colours = ["red", "yellow", "blue"]      // Inducer colour randomize between participants (if more than 1)
+    // ["darkred", "yellow", "purple"] 
     // This is also what is DISPLAYED to participants. Should therefore be a readable name. 
 
 ////    Diagnostic parameters   ////
@@ -102,6 +103,22 @@ var start_dateTime = new Date().today() + "_" + new Date().timeNow();
 if(debug) { console.log(start_dateTime) }
 
 
+// Save data (to server)
+var saveData = function(name, data) {
+    // Create data JSON 
+    var data2 = JSON.stringify( { filename: name, filedata: data } )
+
+    // Establish connection
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', 'upload.php');
+    xhr.setRequestHeader('Content-Type', 'application/json');
+ 
+    // Send data
+    xhr.send( data2 );
+
+    // Print response
+    if(debug){ console.log(xhr.responseText) }
+}
 
 // Change background function
 function changeBackground(colour) {
