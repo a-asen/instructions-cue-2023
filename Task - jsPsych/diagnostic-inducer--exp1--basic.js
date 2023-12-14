@@ -4,7 +4,7 @@
 // CHANGE THESE BEFORE EXPERIMENT!
 const debug = true              // Show some console information
 const skip_instructions = false  // Skip intro? (to test trials)
-const save_local_data = true    // Save a local file (test analysis)
+const save_local_data = false    // Save a local file (test analysis)
 
 
 ////////////////////////////////////////////////////////////////////////
@@ -44,19 +44,15 @@ const response_sides = ["LEFT","RIGHT"];     // What participants will RESPOND t
     // i.e., f (or whatever key) should correspond to the response side (left)
 
 ////    Inducer parameters     ////
-const experiment_colours = ["darkred", "yellow", "purple"]      // Inducer colour randomize between participants (if more than 1)
+const inducer_colours = ["red", "yellow", "blue"]      // Inducer colour randomize between participants (if more than 1)
     // This is also what is DISPLAYED to participants. Should therefore be a readable name. 
 
 ////    Diagnostic parameters   ////
-const number_of_inducers = 10//4;       // Number of inducers 
+const number_of_inducers = 10;       // Number of inducers 
 const diagnostic_min_length = 4         // Min run length
 const diagnostic_max_length = 16     // Max run length
 const max_diagnostic_trials = 80     // Total max diagnostic trials
-    // NOTE IS THIS VALUE IS NOT WITHIN THE BOUNDS OF NUMBER OF INDUCER*diagnostic_max/min an INFINITE LOOP IS CREATED
-    // e.g.: 
-    // MIN: 4*10 = 40 (max_diagnostic_trials SHOULD NOT BE LESS THAN 40)
-    // MAX: 16*10 = 160 (max_diagnostic_trials SHOULD NOT EXCEED 160)
-
+    // max/2 * number_of_inducers
 const prac = 10                       // Number of diagnostic practice rounds
     // Set to 0 if no practice rounds should occur.
 
@@ -94,15 +90,8 @@ const jsPsych = initJsPsych({
 const timeline = []; // Timeline
 
 
-// Connection to server? idk
-function saveData(name, data){
-    var xhr = new XMLHttpRequest();
-    xhr.open('POST', 'write_data.php'); // 'write_data.php' is the path to the php file described above.
-    xhr.setRequestHeader('Content-Type', 'application/json');
-    xhr.send(JSON.stringify({filename: name, filedata: data}));
-}
-
-// Get data function
+/// Functions ////
+// Date functions 
 Date.prototype.today = function () { 
     return this.getFullYear() + "-" + (((this.getMonth()+1) < 10)?"0":"") + (this.getMonth()+1) +"-"+ ((this.getDate() < 10)?"0":"") + this.getDate();
 }
@@ -111,6 +100,8 @@ Date.prototype.timeNow = function () {
 }
 var start_dateTime = new Date().today() + "_" + new Date().timeNow();
 if(debug) { console.log(start_dateTime) }
+
+
 
 // Change background function
 function changeBackground(colour) {
@@ -320,7 +311,7 @@ const about_the_experiment_and_consent = {
        `<div style="font-size:${instruction_font_size}"> 
         
         <h3>Welcome to this cognitive psychology study!</h3>
-        We are investigating cognitive flexibility in humans.
+        We are investigating memory and concentration.
         <br><br>
 
         The study is conducted by Steffen Aasen (Master student) and \n
@@ -333,21 +324,13 @@ const about_the_experiment_and_consent = {
 
         <h3>About the experiment</h3>                
         In this study, you will have to remember two tasks. \n
-        You will switch between these tasks based on the targets that appear on the screen. \n
-        The first task that you will be presented with, will <b>remain the same </b> throughout the experiment. \n
-        The second task will change throughout experiment and will only be executed once. \n
-        When the task changes, a new instruction will appear, indicating the new relationships. \n
-        Your task is to respond as <b>fast and accurately</b> as possible to the current task. \n
-        Only one task will be executed during any one trial. This will be indicated by its colour.<br><br> \n 
+        One of the tasks will remain the same throughout the experiment. \n
+        The other task will change throughout the experiment. This will be clearly indicated. \n
+        You will receive one practice round for each of the tasks.<br><br>
 
-        In the experiment you will only respond using a the ${allowed_responses[0]} and ${response_sides[1]} key (unless otherwise noted).\n
-        These will be indicated with a ${response_sides[0]} or ${response_sides[1]} side.\n
-        That is, when the task asks you to respond with a ${response_sides[0]} response, you need to press the ${allowed_responses[0]} key. \n
-        If it asks for a ${response_sides[1]} response, you must respond with the ${allowed_responses[1]} key.<br>
-
-        These keys will remain the same throughout the experiment. <br><br>
-                
-        At the end of the experiment you will have an opportunity to proviod feedback related to the experiment. 
+        Your task is to respond as fast and accurately to the current task. \n
+        The current task will be indicated by the colour of the target that appear on screen. 
+        
         </div>`,    ////  New page
         `<div style="font-size:${instruction_font_size}">
         
@@ -362,7 +345,6 @@ const about_the_experiment_and_consent = {
         In that spirit, we will make the data publicly available for anyone to download. \n
         By clicking NEXT, you agree to have your data used in this manner.\n
         <i>Importantly, your data is anaymous and cannot be traced back to you</i>.\n
-        
         </div>`,
 
         ]
@@ -380,7 +362,7 @@ const about_the_experiment_and_consent = {
 if(skip_instructions){} else { timeline.push(about_the_experiment_and_consent) }
 
 ////       Initialize fullscreen and START        ////
-if(skip_instructions==false){
+if(skip_instructions){} else{
     timeline.push({
         type: jsPsychFullscreen,
         message: `<div style="font-size:${instruction_font_size}">
@@ -408,41 +390,64 @@ let rnd_diagnostic_response_sides = jsPsych.randomization.shuffle(response_sides
 
 var short_prac = ""
 if(prac>0){
-    var short_prac = `You will receive a short practice round following the task on the next screen.<br>`
+        var short_prac = `You will receive a short practice round following the task on the next screen.<br>`
 }
 
 ////    GENERAL DIAGNOSTIC INSTRUCTIONS   ////
 let diagnostic_task_instruction_description = {
     type: jsPsychInstructions,
     pages: () => { 
-        return [`<div style="font-size:${instruction_font_size}">
-        The experiment will proceed quickly without any breaks, \n
-        please ensure that you are in a quite environment where you are unlikely to be distracted/disrupted.      
-        The experiment takes approximately 20 minutes.
-        </div>`, 
+        return [
+            `
+            You will switch between these tasks based on the targets that appear on the screen. <br><br>\n
+            The first task that you will be presented with, will <b>remain the same </b> throughout the experiment. \n
+    
+            
+            The second task will change throughout experiment and will only be executed once. \n
+            When the task changes, a new instruction will appear, indicating the new relationships. \n
+            Your task is to respond as <b>fast and accurately</b> as possible to the current task. \n
+            Only one task will be executed during any one trial. This will be indicated by its colour.<br><br> \n 
+    
+            In the experiment you will only respond using a the ${allowed_responses[0]} and ${response_sides[1]} key (unless otherwise noted).\n
+            These will be indicated with a ${response_sides[0]} or ${response_sides[1]} side.\n
+            That is, when the task asks you to respond with a ${response_sides[0]} response, you need to press the ${allowed_responses[0]} key. \n
+            If it asks for a ${response_sides[1]} response, you must respond with the ${allowed_responses[1]} key.<br>
+    
+            These keys will remain the same throughout the experiment. <br><br>
+                    
+            At the end of the experiment you will have an opportunity to proviod feedback related to the experiment. `,
+            /// PAGE
+        
+            `<div style="font-size:${instruction_font_size}">
+            The experiment will proceed quickly without any breaks, \n
+            please ensure that you are in a quite environment where you are unlikely to be distracted/disrupted.      
+            The experiment takes approximately 20 minutes.
+            </div>`, 
 
-        `<div style="font-size:${instruction_font_size}">
-        We ask that you put your left index finger on the <b> ${allowed_responses[0].toUpperCase()} </b> key \n
-        and your right index finger on the <b> ${allowed_responses[1].toUpperCase()} </b> key. \n
-        These will be the only valid (and functional) responses in this experiment (unless otherwise noted).
-        <br><br>
+            /// PAGE
+            `<div style="font-size:${instruction_font_size}">
+            We ask that you put your left index finger on the <b> ${allowed_responses[0].toUpperCase()} </b> key \n
+            and your right index finger on the <b> ${allowed_responses[1].toUpperCase()} </b> key. \n
+            These will be the only valid (and functional) responses in this experiment (unless otherwise noted).
+            <br><br>
 
-        In the next screen you will see the first task, that <b> will not change </b> in the experiment. \n 
-        This task must be responded to when the target (stimulus) appears in <b> black </b> colour.
-        <br><br>
+            In the next screen you will see the first task, that <b> will not change </b> in the experiment. \n 
+            This task must be responded to when the target (stimulus) appears in <b> black </b> colour.
+            <br><br>
 
-        ${short_prac}
-        <br> 
-        After that, the second task will be shown. \n
-        This task will change throughout the the experiment, and will be clearly indicated with a new description.<br> \n
-        You must respond to this task when the target appears in \n
-         <span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour.toUpperCase()}</span>. \n
-        <br><br>
+            ${short_prac}
+            <br> 
+            After that, the second task will be shown. \n
+            This task will change throughout the the experiment, and will be clearly indicated with a new description.<br> \n
+            You must respond to this task when the target appears in \n
+            <span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour.toUpperCase()}</span>. \n
+            <br><br>
 
-        You will receive a maximum of 20 seconds reading each of the tasks (which is plenty of time). <br><br>
+            You will receive a maximum of 20 seconds reading each of the tasks (which is plenty of time). <br><br>
 
-        The experiment starts immediately when you click NEXT.
-        </div>`]
+            The experiment starts immediately when you click NEXT.
+            </div>`
+        ]
     },
     allow_keys: false, 
     show_clickable_nav: true,
@@ -456,10 +461,10 @@ let diagnostic_task_instruction_description = {
         data.width = window.innerWidth
         data.height = window.innerHeight
 
-        if(debug){ console.log(data) }
+        skip_instructions ? null : console.log(data) 
     }
 }
-timeline.push(diagnostic_task_instruction_description)
+if(skip_instructions){}else{ timeline.push(diagnostic_task_instruction_description) }
 
 // Only displayed once, instruction remains the same throughout the experiment
 let diagnostic_task_instruction = {
@@ -487,7 +492,7 @@ let diagnostic_task_instruction = {
 timeline.push(diagnostic_task_instruction)
 
 /////////  PRAC DIAG    ////// 
-if(prac > 0){
+if(prac > 0 & skip_instructions === false){
     for(let pi = 0; pi < prac; pi++){
         let rnd_diag_stim = jsPsych.randomization.sampleWithReplacement(["cat", "dog"], 1)[0]
         let run_rnd_italic = jsPsych.randomization.sampleWithReplacement([true,false], 1, run_italic_bias)[0]
@@ -708,7 +713,6 @@ for(let exp_block = 0; exp_block < number_of_inducers; exp_block++){ // less tha
     }
     timeline.push(inducer_task)
 
-
     ////     Feedback   ////
     // If participants responded to slow, give feedback
     timeline.push(too_slow_trial)
@@ -747,9 +751,14 @@ const experiment_feedback  = {
             ],
             [  /// Distracted ? (Likert scale may be weird)
                 {
+                    type: "html",
+                    prompt: `You have now completed the central part of the experiment.<br>\n
+                    To complete the study, please answer the following questions:<br><br>`
+                },
+                {
                     type:"html",
-                    prompt: `Similar to motivation, people are distracted to various degrees for various reasons. \n 
-                    There is nothing wrong with being distracted and we kindly ask that you answer truthfully.<br><br>
+                    prompt: `People are distracted to various degrees for various reasons. \n 
+                    There is nothing wrong with being distracted and we kindly ask that you answer truthfully.<br>
                     (The number will be highlighted when you click it)` 
                 },
                 {
@@ -763,8 +772,8 @@ const experiment_feedback  = {
                 },
                 {
                     type: "text",
-                    prompt: "Is there anything you want to add in relation to the motivation question (above)?",
-                    name: 'motivation_feedback',
+                    prompt: "Is there anything you want to add in relation to the distraction question (above)?",
+                    name: 'distaction_feedback',
                     textbox_columns: 50,
                     textbox_rows: 3,
                 }
@@ -781,42 +790,32 @@ const experiment_feedback  = {
             ]
         ]
     },
-    data: { stimulus: "gender-age-distraction-motivation-feedback", trial_info: "Demographics, motivation, distraction and feedback" },
+    data: { stimulus: "distraction-feedback", trial_info: "Distraction and feedback" },
     on_finish: (data) => {
         // Add ID to all entries: 
         jsPsych.data.get().addToAll({ id:                   ID });
-        // jsPsych.data.get().addToAll({ age:                  age });
-        // jsPsych.data.get().addToAll({ gender:               gender });
-        // jsPsych.data.get().addToAll({ distraction:          data.response.distraction });
-        // jsPsych.data.get().addToAll({ distraction_feedback: data.response.distraction_feedback });
-        // jsPsych.data.get().addToAll({ motivation:           data.response.motivation });
-        // jsPsych.data.get().addToAll({ motivation_feedback:  data.response.motivation_feedback });
-        // jsPsych.data.get().addToAll({ open_feedback:        data.open_feedback });
 
         // Add all the other information in a separate column (easy to filter out), but is strictly not necessary
         // Current window size
         data.height = window.innerHeight
         data.width = window.innerWidth
 
-        // Demograpghics
-        data.gender = data.response.gender
-        data.age = data.response.age
-        
         // feedback
         data.motivation_feedback = data.response.motivation_feedback
         data.distraction = data.response.distraction
         data.distraction_feedback = data.response.distraction_feedback
         data.open_feedback = data.response.open_feedback
 
-        // Save the data
-        if(save_local_data){ jsPsych.data.get().localSave('csv','mydata.csv') }
+        // save interactive data
+        data.interactive = jsPsych.data.getInteractionData()["trials"]
 
-        // Return data to server
-        saveData("data_" + start_dateTime + "_" + ID, jsPsych.data.get().csv());
+        // Save the data
+        if(save_local_data) { jsPsych.data.get().localSave('csv','mydata.csv') }
+
+        saveData( "data_" + start_dateTime + "_" + ID + ".csv", jsPsych.data.get().csv() )
     }
 }
 timeline.push(experiment_feedback)
-
 
 // Exit fullscreen and end experiment. 
 timeline.push({
@@ -824,6 +823,9 @@ timeline.push({
     message: "Thank you for participating in this study! <br><br>", 
     button_label: "End experiment", 
     fullscreen_mode: false,
+    on_finish: () => {
+        window.location = "https://app.prolific.com/submissions/complete?cc=C1BHSUPK"
+    }
 }); 
 
 jsPsych.run(timeline)

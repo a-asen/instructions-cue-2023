@@ -1,6 +1,10 @@
 library(ProjectTemplate)
 load.project()
 
+# Not used.
+
+# An early version of generating the diagnostic lengths (would result in varying lengths for subjects)
+
 l <- list()
 
 # Generate probability distribution of the diagnostic run (if relevant)
