@@ -44,7 +44,7 @@ const response_sides = ["LEFT","RIGHT"];     // What participants will RESPOND t
     // i.e., f (or whatever key) should correspond to the response side (left)
 
 ////    Inducer parameters     ////
-const inducer_colours = ["blue", "green", "yellow"]      // Inducer colour randomize between participants (if more than 1)
+const inducer_colours = ["red", "yellow", "blue"]      // Inducer colour randomize between participants (if more than 1)
     // This is also what is DISPLAYED to participants. Should therefore be a readable name. 
 
 ////    Diagnostic parameters   ////
@@ -327,7 +327,7 @@ const about_the_experiment_and_consent = {
        `<div style="font-size:${instruction_font_size}"> 
         
         <h3>Welcome to this cognitive psychology study!</h3>
-        We are investigating cognitive flexibility in humans.
+        We are investigating memory and concentration.
         <br><br>
 
         The study is conducted by Steffen Aasen (Master student) and \n
@@ -340,21 +340,13 @@ const about_the_experiment_and_consent = {
 
         <h3>About the experiment</h3>                
         In this study, you will have to remember two tasks. \n
-        You will switch between these tasks based on the targets that appear on the screen. \n
-        The first task that you will be presented with, will <b>remain the same </b> throughout the experiment. \n
-        The second task will change throughout experiment and will only be executed once. \n
-        When the task changes, a new instruction will appear, indicating the new relationships. \n
-        Your task is to respond as <b>fast and accurately</b> as possible to the current task. \n
-        Only one task will be executed during any one trial. This will be indicated by its colour.<br><br> \n 
+        One of the tasks will remain the same throughout the experiment. \n
+        The other task will change throughout the experiment. This will be clearly indicated. \n
+        You will receive one practice round for each of the tasks.<br><br>
 
-        In the experiment you will only respond using a the ${allowed_responses[0]} and ${response_sides[1]} key (unless otherwise noted).\n
-        These will be indicated with a ${response_sides[0]} or ${response_sides[1]} side.\n
-        That is, when the task asks you to respond with a ${response_sides[0]} response, you need to press the ${allowed_responses[0]} key. \n
-        If it asks for a ${response_sides[1]} response, you must respond with the ${allowed_responses[1]} key.<br>
-
-        These keys will remain the same throughout the experiment. <br><br>
-                
-        At the end of the experiment you will have an opportunity to proviod feedback related to the experiment. 
+        Your task is to respond as fast and accurately to the current task. \n
+        The current task will be indicated by the colour of the target that appear on screen. 
+        
         </div>`,    ////  New page
         `<div style="font-size:${instruction_font_size}">
         
@@ -369,7 +361,6 @@ const about_the_experiment_and_consent = {
         In that spirit, we will make the data publicly available for anyone to download. \n
         By clicking NEXT, you agree to have your data used in this manner.\n
         <i>Importantly, your data is anaymous and cannot be traced back to you</i>.\n
-        
         </div>`,
 
         ]
@@ -422,34 +413,57 @@ if(prac>0){
 let diagnostic_task_instruction_description = {
     type: jsPsychInstructions,
     pages: () => { 
-        return [`<div style="font-size:${instruction_font_size}">
-        The experiment will proceed quickly without any breaks, \n
-        please ensure that you are in a quite environment where you are unlikely to be distracted/disrupted.      
-        The experiment takes approximately 20 minutes.
-        </div>`, 
+        return [
+            `
+            You will switch between these tasks based on the targets that appear on the screen. <br><br>\n
+            The first task that you will be presented with, will <b>remain the same </b> throughout the experiment. \n
+    
+            
+            The second task will change throughout experiment and will only be executed once. \n
+            When the task changes, a new instruction will appear, indicating the new relationships. \n
+            Your task is to respond as <b>fast and accurately</b> as possible to the current task. \n
+            Only one task will be executed during any one trial. This will be indicated by its colour.<br><br> \n 
+    
+            In the experiment you will only respond using a the ${allowed_responses[0]} and ${response_sides[1]} key (unless otherwise noted).\n
+            These will be indicated with a ${response_sides[0]} or ${response_sides[1]} side.\n
+            That is, when the task asks you to respond with a ${response_sides[0]} response, you need to press the ${allowed_responses[0]} key. \n
+            If it asks for a ${response_sides[1]} response, you must respond with the ${allowed_responses[1]} key.<br>
+    
+            These keys will remain the same throughout the experiment. <br><br>
+                    
+            At the end of the experiment you will have an opportunity to proviod feedback related to the experiment. `,
+            /// PAGE
+        
+            `<div style="font-size:${instruction_font_size}">
+            The experiment will proceed quickly without any breaks, \n
+            please ensure that you are in a quite environment where you are unlikely to be distracted/disrupted.      
+            The experiment takes approximately 20 minutes.
+            </div>`, 
 
-        `<div style="font-size:${instruction_font_size}">
-        We ask that you put your left index finger on the <b> ${allowed_responses[0].toUpperCase()} </b> key \n
-        and your right index finger on the <b> ${allowed_responses[1].toUpperCase()} </b> key. \n
-        These will be the only valid (and functional) responses in this experiment (unless otherwise noted).
-        <br><br>
+            /// PAGE
+            `<div style="font-size:${instruction_font_size}">
+            We ask that you put your left index finger on the <b> ${allowed_responses[0].toUpperCase()} </b> key \n
+            and your right index finger on the <b> ${allowed_responses[1].toUpperCase()} </b> key. \n
+            These will be the only valid (and functional) responses in this experiment (unless otherwise noted).
+            <br><br>
 
-        In the next screen you will see the first task, that <b> will not change </b> in the experiment. \n 
-        This task must be responded to when the target (stimulus) appears in <b> black </b> colour.
-        <br><br>
+            In the next screen you will see the first task, that <b> will not change </b> in the experiment. \n 
+            This task must be responded to when the target (stimulus) appears in <b> black </b> colour.
+            <br><br>
 
-        ${short_prac}
-        <br> 
-        After that, the second task will be shown. \n
-        This task will change throughout the the experiment, and will be clearly indicated with a new description.<br> \n
-        You must respond to this task when the target appears in \n
-         <span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour.toUpperCase()}</span>. \n
-        <br><br>
+            ${short_prac}
+            <br> 
+            After that, the second task will be shown. \n
+            This task will change throughout the the experiment, and will be clearly indicated with a new description.<br> \n
+            You must respond to this task when the target appears in \n
+            <span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour.toUpperCase()}</span>. \n
+            <br><br>
 
-        You will receive a maximum of 20 seconds reading each of the tasks (which is plenty of time). <br><br>
+            You will receive a maximum of 20 seconds reading each of the tasks (which is plenty of time). <br><br>
 
-        The experiment starts immediately when you click NEXT.
-        </div>`]
+            The experiment starts immediately when you click NEXT.
+            </div>`
+        ]
     },
     allow_keys: false, 
     show_clickable_nav: true,
