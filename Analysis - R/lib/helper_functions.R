@@ -1,18 +1,21 @@
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ###
 
 levenshtein_distance <- function(word1, word2) {
-  #'Function: Levenshtein distance
+  #' Test Levenshtein distance of two words
   #'
-  #'Description: Calculates the number of character that two words differ by.
-  #'See Levenstein distance: https://en.wikipedia.org/wiki/Levenshtein_distance.
-  #'See also: https://doi.org/10.1145%2F375360.375365
-  #'Aided by ChatGPT, see response: https://chat.openai.com/share/c1de9fe4-4c86-4135-84fd-3ba8c0eff1e9
+  #' @description Calculates the number of character that two words differ by.
   #'
-  #'@param word1 (string): The first word to compare
-  #'@param word2 (string): The second word to compare
+  #' @seealso Levenstein distance: https://en.wikipedia.org/wiki/Levenshtein_distance.
+  #'   See also: https://doi.org/10.1145%2F375360.375365
+  #'   Aided by ChatGPT, see response: https://chat.openai.com/share/c1de9fe4-4c86-4135-84fd-3ba8c0eff1e9
   #'
-  #'@return A positive (or 0) number indicating the number of changes
-  #'that are necessary to do for the words to be the same.
+  #' @param word1 (string): The first word to compare
+  #' @param word2 (string): The second word to compare
+  #'
+  #' @return A positive (or 0) number indicating the number of changes
+  #'   that are necessary to do for the words to be the same.
+  #'
+  #' @export
 
   len1 <- nchar(word1)
   len2 <- nchar(word2)
@@ -72,11 +75,11 @@ word_test <- function(word_list, new_word){
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ###
 
 gen_prob <- \(min, max, decent, math, spare = 0){
-  #' Function: gen_prob
+  #' Generate probability distribution
   #'
-  #' Description: This function generates a probability distribution (from the
-  #' halfway midpoint of the min-max) in relation to the diagnostic length of
-  #' any run for the diagnostic-inducer task.
+  #' @description This function generates a probability distribution (from the
+  #'   halfway midpoint of the min-max) in relation to the diagnostic length of
+  #'   any run for the diagnostic-inducer task.
   #'
   #' @param min (numeric): Minimum diagnostic length
   #' @param max (numeric): Maximum diagnostic length
@@ -87,7 +90,7 @@ gen_prob <- \(min, max, decent, math, spare = 0){
   #' @return A list of values ranging from 0 to 1.
   #'
   #' @examples
-  #' add_numbers(4, 16, .1, "linear", spare = 9, debug = F)
+  #'   add_numbers(4, 16, .1, "linear", spare = 9, debug = F)
 
   halfway <- (min + max) / 2
   cat("Halway: ", halfway, "\n")
