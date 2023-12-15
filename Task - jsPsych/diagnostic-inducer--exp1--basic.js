@@ -328,7 +328,8 @@ const about_the_experiment_and_consent = {
        `<div style="font-size:${instruction_font_size}"> 
         
         <h3>Welcome to this cognitive psychology study!</h3>
-        We are investigating memory and concentration.
+        We are investigating concentration and memory. \n
+        In this experiment you will be presented with two tasks that you are to switch between. 
         <br><br>
 
         The study is conducted by Steffen Aasen (Master student) and \n
@@ -340,13 +341,13 @@ const about_the_experiment_and_consent = {
         `<div style="font-size:${instruction_font_size}"> 
 
         <h3>About the experiment</h3>                
-        In this study, you will have to remember two tasks. \n
+        In this study, you will be presented with two different tasks. \n
         One of the tasks will remain the same throughout the experiment. \n
         The other task will change throughout the experiment. This will be clearly indicated. \n
-        You will receive one practice round for each of the tasks.<br><br>
+        Before the experiment starts, you will receive one practice round.<br><br>
 
-        Your task is to respond as fast and accurately to the current task. \n
-        The current task will be indicated by the colour of the target that appear on screen. 
+        Your task will be to respond as fast and accurately to the current task as possible. \n
+        The current task will be indicated by the colour of the target that appear in the centre of the screen. 
         
         </div>`,    ////  New page
         `<div style="font-size:${instruction_font_size}">
@@ -383,12 +384,17 @@ if(skip_instructions){} else{
     timeline.push({
         type: jsPsychFullscreen,
         message: `<div style="font-size:${instruction_font_size}">
-        This experiment requires you to enter fullscreen. This will be initiated by clicking the button below.
+        
+        The experiment will proceed quickly without any breaks, \n
+        please ensure that you are in a quite environment where you are unlikely to be distracted/disrupted.      
+        The experiment lasts for approximately 20 minutes. <br><br>
+
+        This experiment requires full screen. If you are ready, enable full screen to proceed.
         <br><br>
         </div>`,
-        button_label: "Enable fullscreen",
+        button_label: "Enable full screen",
         fullscreen_mode: true, 
-        data: {trial_info: "technicals" },
+        data: {trial_info: "Full screen" },
         on_finish: (data) => { 
             // Current window size
             data.width = window.innerWidth
@@ -407,7 +413,7 @@ let rnd_diagnostic_response_sides = jsPsych.randomization.shuffle(response_sides
 
 var short_prac = ""
 if(prac>0){
-        var short_prac = `You will receive a short practice round following the task on the next screen.<br>`
+        var short_prac = `You will receive a short practice round of the categorization task after the presentation of the task on the next screen.<br>`
 }
 
 ////    GENERAL DIAGNOSTIC INSTRUCTIONS   ////
@@ -415,11 +421,43 @@ let diagnostic_task_instruction_description = {
     type: jsPsychInstructions,
     pages: () => { 
         return [
-            `
-            You will switch between these tasks based on the targets that appear on the screen. <br><br>\n
-            The first task that you will be presented with, will <b>remain the same </b> throughout the experiment. \n
-    
+            // FIRST, what keys will be used in this experiment? 
+            `<div style="font-size:${instruction_font_size}">
+            <h3> Responding to the task </h3>
+            The experiment will only use the <b>${allowed_responses[0].toUpperCase()}</b> or <b>${allowed_responses[1].toUpperCase()}</b> key (unless otherwise noted).\n
+            <br>
+            We kindly ask that you put your left index finger on the <b> ${allowed_responses[0].toUpperCase()} </b> key \n
+            and your right index finger on the <b> ${allowed_responses[1].toUpperCase()} </b> key.\n
+            <br><br>
+            The tasks will describe the response side that a certain target require. \n
+            That is, the task will be presented as requiring a LEFT or RIGHT response. \n
+            These response sides correspond to the response keys. \n
+            That is, if the task require a LEFT response, that corresponds to pressing the F key. \n
+            If the task require a RIGHT response, that corresponds to pressing the J key. \n
+            </div> `,
             
+            // About the first task
+            `<div style="font-size:${instruction_font_size}">
+            <h3> The unchanging task </h3>
+            The first task that you will be presented with, will <b>remain the same </b> throughout the experiment. \n
+            The task is to categorize the target as appearing in either italic or upright font. <br> \n
+            <br><br> 
+            For instance, if the target <i> house </i> appears, then a certain response is required (for instance, left - corresponding to a certain response (left or right; 
+            
+            
+            <h3> The second task </h3>
+            The second task presented to you 
+
+            The first task you will engage in is a categorization task. \n
+            You will be asked to categorize the target as appearing in either italic or upright font. 
+            
+            You will switch between these tasks based on the targets that appear on the screen. <br><br>\n
+
+           `
+            
+            // The 
+            `<div style="font-size:${instruction_font_size}">
+
             The second task will change throughout experiment and will only be executed once. \n
             When the task changes, a new instruction will appear, indicating the new relationships. \n
             Your task is to respond as <b>fast and accurately</b> as possible to the current task. \n
@@ -432,9 +470,10 @@ let diagnostic_task_instruction_description = {
     
             These keys will remain the same throughout the experiment. <br><br>
                     
-            At the end of the experiment you will have an opportunity to proviod feedback related to the experiment. `,
+            At the end of the experiment you will have an opportunity to proviod feedback related to the experiment. 
+            </div>`,
             /// PAGE
-        
+
             `<div style="font-size:${instruction_font_size}">
             The experiment will proceed quickly without any breaks, \n
             please ensure that you are in a quite environment where you are unlikely to be distracted/disrupted.      
@@ -443,17 +482,13 @@ let diagnostic_task_instruction_description = {
 
             /// PAGE
             `<div style="font-size:${instruction_font_size}">
-            We ask that you put your left index finger on the <b> ${allowed_responses[0].toUpperCase()} </b> key \n
-            and your right index finger on the <b> ${allowed_responses[1].toUpperCase()} </b> key. \n
-            These will be the only valid (and functional) responses in this experiment (unless otherwise noted).
-            <br><br>
-
-            In the next screen you will see the first task, that <b> will not change </b> in the experiment. \n 
+            In the next screen you will be presented with the first task, that <b> will not change </b> in the experiment. \n 
             This task must be responded to when the target (stimulus) appears in <b> black </b> colour.
             <br><br>
 
             ${short_prac}
             <br> 
+
             After that, the second task will be shown. \n
             This task will change throughout the the experiment, and will be clearly indicated with a new description.<br> \n
             You must respond to this task when the target appears in \n
@@ -463,6 +498,7 @@ let diagnostic_task_instruction_description = {
             You will receive a maximum of 20 seconds reading each of the tasks (which is plenty of time). <br><br>
 
             The experiment starts immediately when you click NEXT.
+
             </div>`
         ]
     },
@@ -552,7 +588,7 @@ if(prac > 0 & skip_instructions === false){
                 else {
                     // If response equals correct_response_key
                     if(data.correct_response_key == data.response)    { data.correct_response = 1 }
-                    else                                               { data.correct_response = 0 }
+                    else                                              { data.correct_response = 0 }
                 }
                 if(debug){ console.log(data) } // debg
             }
@@ -567,6 +603,9 @@ if(prac > 0 & skip_instructions === false){
         timeline.push(short_fixation)
     }
 }
+
+
+
 
 // Here we create the experiment blocks
 for(let exp_block = 0; exp_block < number_of_inducers; exp_block++){ // less than, since we start at 0
