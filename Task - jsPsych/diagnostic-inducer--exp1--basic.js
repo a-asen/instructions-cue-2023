@@ -224,7 +224,7 @@ timeline.push(set_background_colour_default)
 
 
 // Inducer colour
-let rnd_inducer_colour = jsPsych.randomization.sampleWithReplacement(experiment_colours, 1)[0]
+let rnd_inducer_colour = jsPsych.randomization.sampleWithReplacement(inducer_colours, 1)[0]
 if(debug){ console.log("Inducer colour: ", rnd_inducer_colour) }
 
 // Unique ID
@@ -329,7 +329,6 @@ const about_the_experiment_and_consent = {
         
         <h3>Welcome to this cognitive psychology study!</h3>
         We are investigating concentration and memory. \n
-        In this experiment you will be presented with two tasks that you are to switch between. 
         <br><br>
 
         The study is conducted by Steffen Aasen (Master student) and \n
@@ -413,7 +412,7 @@ let rnd_diagnostic_response_sides = jsPsych.randomization.shuffle(response_sides
 
 var short_prac = ""
 if(prac>0){
-        var short_prac = `You will receive a short practice round of the categorization task after the presentation of the task on the next screen.<br>`
+        var short_prac = `You will receive a short practice round of the categorization task after the presentation of the task on the next screen.<br><br>`
 }
 
 ////    GENERAL DIAGNOSTIC INSTRUCTIONS   ////
@@ -424,62 +423,51 @@ let diagnostic_task_instruction_description = {
             // FIRST, what keys will be used in this experiment? 
             `<div style="font-size:${instruction_font_size}">
             <h3> Responding to the task </h3>
-            The experiment will only use the <b>${allowed_responses[0].toUpperCase()}</b> or <b>${allowed_responses[1].toUpperCase()}</b> key (unless otherwise noted).\n
+            The experiment will only use the <b> F </b> or <b> J </b> key (unless otherwise noted).\n
             <br>
-            We kindly ask that you put your left index finger on the <b> ${allowed_responses[0].toUpperCase()} </b> key \n
-            and your right index finger on the <b> ${allowed_responses[1].toUpperCase()} </b> key.\n
+            We kindly ask that you put your left index finger on the <b> F </b> key \n
+            and your right index finger on the <b> J </b> key.\n
             <br><br>
-            The tasks will describe the response side that a certain target require. \n
-            That is, the task will be presented as requiring a LEFT or RIGHT response. \n
+            The tasks will describe the response side that a certain target requires. \n
+            That is, the tasks will describe the response side as a LEFT or RIGHT. \n
             These response sides correspond to the response keys. \n
-            That is, if the task require a LEFT response, that corresponds to pressing the F key. \n
-            If the task require a RIGHT response, that corresponds to pressing the J key. \n
+            If the task requires a LEFT response, that corresponds to pressing the F key. \n
+            If the task requires a RIGHT response, that corresponds to pressing the J key. \n
             </div> `,
-            
+
             // About the first task
             `<div style="font-size:${instruction_font_size}">
             <h3> The unchanging task </h3>
             The first task that you will be presented with, will <b>remain the same </b> throughout the experiment. \n
-            The task is to categorize the target as appearing in either italic or upright font. <br> \n
-            <br><br> 
-            For instance, if the target <i> house </i> appears, then a certain response is required (for instance, left - corresponding to a certain response (left or right; 
+            The task is to categorize the target as appearing in either italic or upright font.  \n
+            The target for this task will be present in <b> black </b> colour.\n
+            <br>
+            For instance, if the target is <i>italic</i> then press a certain response (e.g., left).
+            <br><br>
             
-            
-            <h3> The second task </h3>
-            The second task presented to you 
+            <h3> The changing task </h3>
+            The requirement for this task will change throughout the experiment, and will be clearly indicated. \n
+            Each round start with a new description for this task and ends with the execution of this task. \n
+            The task description will describe two new targets and their response requirement. \n
+            The targets for this task will be presented in \n
+            <span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour.toUpperCase()}</span>. \n
+            <br><br>
+            For instance: "If house press left" and "if chat press right". 
+            `,
 
-            The first task you will engage in is a categorization task. \n
-            You will be asked to categorize the target as appearing in either italic or upright font. 
-            
-            You will switch between these tasks based on the targets that appear on the screen. <br><br>\n
-
-           `
-            
-            // The 
+            // Your task
             `<div style="font-size:${instruction_font_size}">
-
-            The second task will change throughout experiment and will only be executed once. \n
-            When the task changes, a new instruction will appear, indicating the new relationships. \n
-            Your task is to respond as <b>fast and accurately</b> as possible to the current task. \n
-            Only one task will be executed during any one trial. This will be indicated by its colour.<br><br> \n 
-    
-            In the experiment you will only respond using a the ${allowed_responses[0]} and ${response_sides[1]} key (unless otherwise noted).\n
-            These will be indicated with a ${response_sides[0]} or ${response_sides[1]} side.\n
-            That is, when the task asks you to respond with a ${response_sides[0]} response, you need to press the ${allowed_responses[0]} key. \n
-            If it asks for a ${response_sides[1]} response, you must respond with the ${allowed_responses[1]} key.<br>
-    
-            These keys will remain the same throughout the experiment. <br><br>
-                    
-            At the end of the experiment you will have an opportunity to proviod feedback related to the experiment. 
+            <h3> Your task </h3>
+            Your task is to respond to the current task as <b>fast and accurately</b> as possible. \n
+            Each trial will be indicated by the colour of the target. \n            
+            You will receive a maximum of 20 seconds reading each of the tasks descriptions (which is plenty of time). \n
+            <br><br>
+            
+            The F key corresponds to a LEFT response and the J key corresponds to a RIGHT response. 
+            <br><br>        
+            At the end of the experiment, you will have an opportunity to provide feedback related to the experiment. 
             </div>`,
-            /// PAGE
-
-            `<div style="font-size:${instruction_font_size}">
-            The experiment will proceed quickly without any breaks, \n
-            please ensure that you are in a quite environment where you are unlikely to be distracted/disrupted.      
-            The experiment takes approximately 20 minutes.
-            </div>`, 
-
+       
             /// PAGE
             `<div style="font-size:${instruction_font_size}">
             In the next screen you will be presented with the first task, that <b> will not change </b> in the experiment. \n 
@@ -487,15 +475,13 @@ let diagnostic_task_instruction_description = {
             <br><br>
 
             ${short_prac}
-            <br> 
+
 
             After that, the second task will be shown. \n
             This task will change throughout the the experiment, and will be clearly indicated with a new description.<br> \n
             You must respond to this task when the target appears in \n
             <span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour.toUpperCase()}</span>. \n
             <br><br>
-
-            You will receive a maximum of 20 seconds reading each of the tasks (which is plenty of time). <br><br>
 
             The experiment starts immediately when you click NEXT.
 
@@ -578,7 +564,7 @@ if(prac > 0 & skip_instructions === false){
                 data.width = window.innerWidth
                 data.height = window.innerHeight
     
-                // Require diagnostic response key 
+                // Required diagnostic response key 
                 if(data.correct_diag_response_side == response_sides[0]) 
                         { data.correct_response_key = allowed_responses[0] }
                 else    { data.correct_response_key = allowed_responses[1] }
@@ -603,7 +589,6 @@ if(prac > 0 & skip_instructions === false){
         timeline.push(short_fixation)
     }
 }
-
 
 
 
