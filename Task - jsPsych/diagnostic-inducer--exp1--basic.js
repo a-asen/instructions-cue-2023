@@ -7,15 +7,22 @@ const skip_instructions = false  // Skip intro? (to test trials)
 const save_local_data = false    // Save a local file (test analysis)
 
 
+
+// INSERT THE PROPER SUBMISSION COMPLETION LINK!! @ THE BOTTOM
+
+
+
+
+
 ////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////
 
 
 ////////////////////////////
 ////    Parameters      ////
-////////////////////////////
+////////////////////////
 
-////    background default      ////
+//    background default      ////
 const default_background_colour = "#cccccc" // Light grey
 const wrong_response_colour = "#d22d2d"     // Blood red-ish 
 
@@ -54,8 +61,14 @@ const diagnostic_min_length = 4         // Min run length
 const diagnostic_max_length = 16     // Max run length
 const max_diagnostic_trials = 80     // Total max diagnostic trials
     // max/2 * number_of_inducers
-const prac = 10                       // Number of diagnostic practice rounds
+
+////    Practice parameters     ////
+const diagnostic_rounds = 10                       // Number of diagnostic practice rounds
     // Set to 0 if no practice rounds should occur.
+const prac_include_inducer = true
+    // Include inducer?
+const prac_rounds = 1
+    // To include an inducer, prac round must be 2
 
 
 // Not used 
@@ -100,7 +113,7 @@ Date.prototype.timeNow = function () {
     return ((this.getHours() < 10)?"0":"") + this.getHours() +"-"+ ((this.getMinutes() < 10)?"0":"") + this.getMinutes() +"-"+ ((this.getSeconds() < 10)?"0":"") + this.getSeconds();
 }
 var start_dateTime = new Date().today() + "_" + new Date().timeNow();
-if(debug) { console.log(start_dateTime) }
+if( debug ) { console.log(start_dateTime) }
 
 
 // Save data (to server)
@@ -166,7 +179,7 @@ const long_fixation = {
 }
 
 //// FEEDBACK ////
-// Wrong response info
+// Wrong response trial
 const wrong_response = {
     type: jsPsychHtmlKeyboardResponse,
     stimulus:  () => { return `<div style="font-size: ${general_font_size};"> Wrong! </div>` },
@@ -179,7 +192,7 @@ const wrong_response = {
         data.height = window.innerHeight
     }
 }
-// Too slow info
+// Too slow trial
 const too_slow = {
     type: jsPsychHtmlKeyboardResponse,
     stimulus: () => { return `<div style="font-size: ${general_font_size};"> Slow </div>` },
@@ -193,7 +206,9 @@ const too_slow = {
     }
 }
 
-//// Feedback block
+////     Feedback block trial   //// 
+// Relates to changing the background and then showing trial 
+
 // Wrong response trial (background change + info)
 const wrong_response_trial = {
     timeline: [set_background_colour_wrong_response, wrong_response , set_background_colour_default],
@@ -278,6 +293,9 @@ if(sum_diags != max_diagnostic_trials){
     if(debug){ console.log("Fixed diagnostic lengths:", rnd_diagnostic_length) }
 }
 
+////////////////////////////////////////////////////////////////////
+
+
 ////////////////////////////
 ////    Instructions    ////
 ////////////////////////////
@@ -325,6 +343,7 @@ const about_the_experiment_and_consent = {
     type: jsPsychInstructions,
     pages: () => {
         return [
+        //// About us
        `<div style="font-size:${instruction_font_size}"> 
         
         <h3>Welcome to this cognitive psychology study!</h3>
@@ -336,19 +355,21 @@ const about_the_experiment_and_consent = {
         <br><br>
         If you have questions about the study, you may contact Torsten Martiny-Huenger at (torsten.martiny-huenger@uit.no). </p>
 
-        </div>`,    ////  New page
-        `<div style="font-size:${instruction_font_size}"> 
-
-        <h3>About the experiment</h3>                
-        In this study, you will be presented with two different tasks. \n
-        One of the tasks will remain the same throughout the experiment. \n
-        The other task will change throughout the experiment. This will be clearly indicated. \n
-        Before the experiment starts, you will receive one practice round.<br><br>
-
-        Your task will be to respond as fast and accurately to the current task as possible. \n
-        The current task will be indicated by the colour of the target that appear in the centre of the screen. 
+        </div>`,    
         
-        </div>`,    ////  New page
+        ////  General about the task
+        `<div style="font-size:${instruction_font_size}"> 
+        
+        <h3>About the experiment</h3>                
+        In this experiment, you will be presented with targets that require either a left or right response. \n
+        These correspond to the F and J keys on the keyboard. \n
+        <br>
+        Your task will be to respond as <b> fast and accurately </b> to the current target as possible. \n
+        <br><br>
+        At the end of the experiment, you will receive the opportunity to provide feedback. 
+        </div>`,
+        
+        ////  New page
         `<div style="font-size:${instruction_font_size}">
         
         <h3> Consent </h3>
@@ -356,12 +377,12 @@ const about_the_experiment_and_consent = {
         Participation in the study is voluntary. \n
         All responses to this experiment are collected and stored anonymously. That means they cannot be traced back to you. \n
         The anonymous storage means we cannot provide participants with their responses upon request. \n
-        You can quit the study without giving a reason by closing the browser tab. No data will be stored in that case.\n
+        You can quit the experiment without giving a reason by closing the browser tab. No data will be stored in that case.\n
         <br><br> 
         For scientific rigour, we will follow a practice known as "open science". \n
         In that spirit, we will make the data publicly available for anyone to download. \n
         By clicking NEXT, you agree to have your data used in this manner.\n
-        <i>Importantly, your data is anaymous and cannot be traced back to you</i>.\n
+        <i>Importantly, your data is anonymous and cannot be traced back to you</i>.\n
         </div>`,
 
         ]
@@ -376,16 +397,16 @@ const about_the_experiment_and_consent = {
         if(debug){ console.log(data) }
     }
 }
-if(skip_instructions){} else { timeline.push(about_the_experiment_and_consent) }
+if( !skip_instructions ){ timeline.push(about_the_experiment_and_consent) }
 
 ////       Initialize fullscreen and START        ////
-if(skip_instructions){} else{
+if( !skip_instructions ){
     timeline.push({
         type: jsPsychFullscreen,
         message: `<div style="font-size:${instruction_font_size}">
         
-        The experiment will proceed quickly without any breaks, \n
-        please ensure that you are in a quite environment where you are unlikely to be distracted/disrupted.      
+        The experiment will proceed quickly, without any breaks, \n
+        please ensure that you are in a quiet environment where you are unlikely to be distracted/disrupted.      
         The experiment lasts for approximately 20 minutes. <br><br>
 
         This experiment requires full screen. If you are ready, enable full screen to proceed.
@@ -410,10 +431,6 @@ if(skip_instructions){} else{
 let rnd_diagnostic_response_sides = jsPsych.randomization.shuffle(response_sides);    // randomize response side 
         // Could/would probably be a good idea to randomize italic/upright appearance as well, but w/e
 
-var short_prac = ""
-if(prac>0){
-        var short_prac = `You will receive a short practice round of the categorization task after the presentation of the task on the next screen.<br><br>`
-}
 
 ////    GENERAL DIAGNOSTIC INSTRUCTIONS   ////
 let diagnostic_task_instruction_description = {
@@ -423,68 +440,62 @@ let diagnostic_task_instruction_description = {
             // FIRST, what keys will be used in this experiment? 
             `<div style="font-size:${instruction_font_size}">
             <h3> Responding to the task </h3>
-            The experiment will only use the <b> F </b> or <b> J </b> key (unless otherwise noted).\n
-            <br>
-            We kindly ask that you put your left index finger on the <b> F </b> key \n
-            and your right index finger on the <b> J </b> key.\n
-            <br><br>
-            The tasks will describe the response side that a certain target requires. \n
-            That is, the tasks will describe the response side as a LEFT or RIGHT. \n
-            These response sides correspond to the response keys. \n
-            If the task requires a LEFT response, that corresponds to pressing the F key. \n
-            If the task requires a RIGHT response, that corresponds to pressing the J key. \n
+
+            You will be presented with two instructions of the relationship between targets and responses. \n
+            The instructions relate to certain features of the targets. \n
+            The targets will be 3-letter none-wrods, and the responses will either be a left (corresponding the the F key) \n
+            or right (corresponding to the J key) press. \n
+
             </div> `,
 
             // About the first task
             `<div style="font-size:${instruction_font_size}">
-            <h3> The unchanging task </h3>
-            The first task that you will be presented with, will <b>remain the same </b> throughout the experiment. \n
-            The task is to categorize the target as appearing in either italic or upright font.  \n
-            The target for this task will be present in <b> black </b> colour.\n
+            <h3> The task </h3>
+            
+            The first instruciton will only be shown once and remain the same throughout the experiment. \n
+            This instruction relates to targets appearing in black colour. \n
+            The instruction will relate the responses (left and right) to whether the target (none-word) appears in either <i> italic </i> or upright font. \n
             <br>
-            For instance, if the target is <i>italic</i> then press a certain response (e.g., left).
+            For instance:  'If <i>italic</i> press left' and 'If upright press right'.
             <br><br>
             
-            <h3> The changing task </h3>
-            The requirement for this task will change throughout the experiment, and will be clearly indicated. \n
-            Each round start with a new description for this task and ends with the execution of this task. \n
-            The task description will describe two new targets and their response requirement. \n
-            The targets for this task will be presented in \n
-            <span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour.toUpperCase()}</span>. \n
+            The other instruction will change throughout the experiment and will only be executed once at the end of each block. \n
+            This instruction only relates to targets appearing in \n
+            <span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour.toLowerCase() + " colour"} </span>. \n
+            A new block started by presenting two new targets and their relation to the responses. \n 
+            <br>
+            For instance:  'If house press left' and 'if mouse press right'.
             <br><br>
-            For instance: "If house press left" and "if chat press right". 
-            `,
 
-            // Your task
-            `<div style="font-size:${instruction_font_size}">
-            <h3> Your task </h3>
-            Your task is to respond to the current task as <b>fast and accurately</b> as possible. \n
-            Each trial will be indicated by the colour of the target. \n            
-            You will receive a maximum of 20 seconds reading each of the tasks descriptions (which is plenty of time). \n
-            <br><br>
-            
-            The F key corresponds to a LEFT response and the J key corresponds to a RIGHT response. 
-            <br><br>        
-            At the end of the experiment, you will have an opportunity to provide feedback related to the experiment. 
+            There will be multiple blocks in this experiment. \n
+            Each block will have two new targets. \n 
+            <br>
+            Each block starts with the instructions of the relation between the new targets and the responses. \n
+            Then some black targets will be presented. \n
+            At the end of the block, a target appearing in
+            <span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour.toLowerCase() + " colour"} </span>\n
+            will be presented. \n
             </div>`,
-       
+
             /// PAGE
             `<div style="font-size:${instruction_font_size}">
-            In the next screen you will be presented with the first task, that <b> will not change </b> in the experiment. \n 
-            This task must be responded to when the target (stimulus) appears in <b> black </b> colour.
+
+            You will receive a maximum of 20 seconds reading each of the instructions (which is plenty of time). \n
             <br><br>
 
-            ${short_prac}
-
-
-            After that, the second task will be shown. \n
-            This task will change throughout the the experiment, and will be clearly indicated with a new description.<br> \n
-            You must respond to this task when the target appears in \n
-            <span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour.toUpperCase()}</span>. \n
+            In the next screen the instructions that do not change throughout the experiment will be presented. \n
+            It will be followed by a practice round. \n
             <br><br>
+
+            Thereafter, a full block will be presented. \n
+            The block starts with the instructions of two new targets that must be remembered till the end of the block. \n
+            The end of the block will be indicated by the 
+            <span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour.toLowerCase() + " colour"} </span> \n
+            of the target.
+            
+            <br><br><br>
 
             The experiment starts immediately when you click NEXT.
-
             </div>`
         ]
     },
@@ -493,9 +504,6 @@ let diagnostic_task_instruction_description = {
     post_trial_gap: 1500,
     data: { stimulus: "Instructions", trial_info: "Final experiment explanation" },
     on_finish: (data) => {
-        data.page_index1 = data.view_history[0].viewing_time
-        data.page_index2 = data.view_history[1].viewing_time
-
         // Current window size
         data.width = window.innerWidth
         data.height = window.innerHeight
@@ -503,7 +511,8 @@ let diagnostic_task_instruction_description = {
         skip_instructions ? null : console.log(data) 
     }
 }
-if(skip_instructions){}else{ timeline.push(diagnostic_task_instruction_description) }
+if( !skip_instructions ){ timeline.push(diagnostic_task_instruction_description) }
+
 
 // Only displayed once, instruction remains the same throughout the experiment
 let diagnostic_task_instruction = {
@@ -528,73 +537,199 @@ let diagnostic_task_instruction = {
         if(debug){ console.log(data) }
     }
 }
-timeline.push(diagnostic_task_instruction)
+timeline.push( diagnostic_task_instruction )
+timeline.push( short_fixation )
 
-/////////  PRAC DIAG    ////// 
-if(prac > 0 & skip_instructions === false){
-    for(let pi = 0; pi < prac; pi++){
-        let rnd_diag_stim = jsPsych.randomization.sampleWithReplacement(["cat", "dog"], 1)[0]
-        let run_rnd_italic = jsPsych.randomization.sampleWithReplacement([true,false], 1, run_italic_bias)[0]
+
+/////////  PRAC ROUND    ////// 
+if(diagnostic_rounds > 0){ // & skip_instructions === false
+
+    // This first get the number of different inducers
+    let prac_stim = [rnd_stimuli[0], rnd_stimuli[1]] // Get new stimuli
+    rnd_stimuli.splice(0, 2) // Remove those stimuli from the list
     
-        let diagnostic_run = { 
-            type: jsPsychHtmlKeyboardResponse,
-            stimulus: () => {   
-                if(run_rnd_italic) {
-                    return `<p style="font-size: ${general_font_size};"><i>${rnd_diag_stim}</i>`
-                } else {
-                    return `<p style="font-size: ${general_font_size};">${rnd_diag_stim}`
-                }
-            }, 
-            choices: allowed_responses,
-            trial_duration: trial_duration,
-            data: {
-                stimulus: rnd_diag_stim,         // Stimulus
-                inducer_run: 0,                   // Inducer run number (i.e., block)
-                diagnostic_run: pi,                 // Diagnostic trial number //start with 1
-                inducer_trial: false,                   // Not an inducer trial
-                italic: run_rnd_italic,             // Whether the run is ITALIC or not
-                trial_info: "practice",         // This is a diagnostic trial
-                correct_diag_response_side: () => {     // Required response side for the diagnostic task
-                    if (run_rnd_italic) { return rnd_diagnostic_response_sides[0] } 
-                    else                { return rnd_diagnostic_response_sides[1] } 
+    for(let exp_block = 0; exp_block < prac_rounds + 1; exp_block++){ // less than, since we start at 0
+
+        let rnd_inducer_response_sides = jsPsych.randomization.shuffle(response_sides)
+        //// Inducer instructions ////
+        if(prac_include_inducer & exp_block > 0){
+                // randomize left/right response for the inducer 
+
+            let inducer_instruction = { 
+                type: jsPsychHtmlKeyboardResponse,
+                stimulus: () => {   
+                    return  `<p style="font-size: ${general_font_size};"> If ${prac_stim[0]} press ${rnd_inducer_response_sides[0]}`+
+                            `<p style="font-size: ${general_font_size};"> If ${prac_stim[1]} press ${rnd_inducer_response_sides[1]}`; 
+                }, 
+                prompt: "Press any SPACE to continue",
+                choices: " ", 
+                data: {
+                    inducer_run: exp_block,     // Inducer run number
+                    stimulus: `If ${prac_stim[0]} press ${rnd_inducer_response_sides[0]} | If ${prac_stim[1]} press ${rnd_inducer_response_sides[1]}`,
+                    trial_info: "Inducer instructions"
                 },
-            },
-            on_finish: (data) => {
-                // Current window size
-                data.width = window.innerWidth
-                data.height = window.innerHeight
-    
-                // Required diagnostic response key 
-                if(data.correct_diag_response_side == response_sides[0]) 
-                        { data.correct_response_key = allowed_responses[0] }
-                else    { data.correct_response_key = allowed_responses[1] }
-                
-                // Correct response
-                if(data.response == null){  data.correct_response = NaN  } 
-                else {
-                    // If response equals correct_response_key
-                    if(data.correct_response_key == data.response)    { data.correct_response = 1 }
-                    else                                              { data.correct_response = 0 }
+                trial_duration: instruction_delay, 
+                on_finish: (data) => { 
+                    // Current window size
+                    data.width = window.innerWidth
+                    data.height = window.innerHeight
+                    if(debug){ console.log(data) } 
                 }
-                if(debug){ console.log(data) } // debg
+            }
+            timeline.push(inducer_instruction)
+            ////     Feedback   ////
+            timeline.push(too_slow_trial)
+            timeline.push(wrong_response_trial)
+        
+            // Fixation
+            timeline.push(short_fixation)
+        }
+        
+        //// Diagnostic task ////
+        for(let pi = 0; pi < diagnostic_rounds; pi++){
+            let rnd_diag_stim = jsPsych.randomization.sampleWithReplacement(prac_stim, 1)[0]
+            let run_rnd_italic = jsPsych.randomization.sampleWithReplacement([true,false], 1, run_italic_bias)[0]
+        
+            let diagnostic_run = { 
+                type: jsPsychHtmlKeyboardResponse,
+                stimulus: () => {   
+                    if(run_rnd_italic) {
+                        return `<p style="font-size: ${general_font_size};"><i>${rnd_diag_stim}</i>`
+                    } else {
+                        return `<p style="font-size: ${general_font_size};">${rnd_diag_stim}`
+                    }
+                }, 
+                choices: allowed_responses,
+                trial_duration: trial_duration,
+                data: {
+                    stimulus: rnd_diag_stim,         // Stimulus
+                    inducer_run: 0,                   // Inducer run number (i.e., block)
+                    diagnostic_run: pi,                 // Diagnostic trial number //start with 1
+                    inducer_trial: false,                   // Not an inducer trial
+                    italic: run_rnd_italic,             // Whether the run is ITALIC or not
+                    trial_info: "practice",         // This is a diagnostic trial
+                    correct_diag_response_side: () => {     // Required response side for the diagnostic task
+                        if (run_rnd_italic) { return rnd_diagnostic_response_sides[0] } 
+                        else                { return rnd_diagnostic_response_sides[1] } 
+                    },
+                },
+                on_finish: (data) => {
+                    // Current window size
+                    data.width = window.innerWidth
+                    data.height = window.innerHeight
+        
+                    // Required diagnostic response key 
+                    if(data.correct_diag_response_side == response_sides[0]) 
+                            { data.correct_response_key = allowed_responses[0] }
+                    else    { data.correct_response_key = allowed_responses[1] }
+                    
+                    // Correct response
+                    if(data.response == null){  data.correct_response = NaN  } 
+                    else {
+                        // If response equals correct_response_key
+                        if(data.correct_response_key == data.response)    { data.correct_response = 1 }
+                        else                                              { data.correct_response = 0 }
+                    }
+                    if(debug){ console.log(data) } // debg
+                }
+            }
+            timeline.push(diagnostic_run)
+            ////     Feedback   ////
+            timeline.push(too_slow_trial)
+            timeline.push(wrong_response_trial)
+        
+            // Fixation
+            timeline.push(short_fixation)
+        }
+
+        ////        INDUCER TASK        ////
+        if(prac_include_inducer & exp_block > 0){
+            let rnd_inducer_stimulus = jsPsych.randomization.sampleWithReplacement(prac_stim, 1)[0]
+            // Randomly select inducer stimulus
+
+            let inducer_task = {
+                type: jsPsychHtmlKeyboardResponse,
+                stimulus: () => { return `<p style="font-size: ${general_font_size}; color:${rnd_inducer_colour}">${rnd_inducer_stimulus}` },
+                choices: allowed_responses,
+                trial_duration: trial_duration,
+                data: {
+                    stimulus: rnd_inducer_stimulus,     // Stimulus
+                    inducer_run: "practice",                // Inducer run number
+                    inducer_trial: true,                    // This is an inducer trial
+                    trial_info: "Inducer trial",            // General trial info 
+                    correct_inducer_response_side: () => {  // Required inducer response side
+                        if(rnd_inducer_stimulus == prac_stim[0])  { return rnd_inducer_response_sides[0] }
+                        else                                      { return rnd_inducer_response_sides[1] }
+                    },
+                },
+                on_finish: (data) => {
+                    // Current window size
+                    data.width = window.innerWidth
+                    data.height = window.innerHeight
+                    
+                    // Find correct response key 
+                    if(data.correct_inducer_response_side == response_sides[0]){
+                        data.correct_response_key = allowed_responses[0] 
+                    } else { 
+                        data.correct_response_key = allowed_responses[1] }
+                        // Correct response (according to the active trial)
+                        if(data.response == data.correct_response_key) { data.correct_response = 1 }
+                        else                                           { data.correct_response = 0 }
+                    if(debug){ console.log(data) }
+                }
+            }
+            timeline.push(inducer_task)
+
+            ////     Feedback   ////
+            // If participants responded to slow or wrong give feedback
+            timeline.push(too_slow_trial)
+            timeline.push(wrong_response_trial)
+            
+            // Fixation 
+                //IF another inducer round
+            if( exp_block < prac_rounds ){
+                timeline.push(long_fixation)
             }
         }
-        timeline.push(diagnostic_run)
-    
-        ////     Feedback   ////
-        timeline.push(too_slow_trial)
-        timeline.push(wrong_response_trial)
-    
-        // Fixation
-        timeline.push(short_fixation)
     }
+
+    let proper_task_start = {
+        type: jsPsychHtmlKeyboardResponse,
+        stimulus: function(){   
+            return `<div style="font-size:${instruction_font_size}">
+            You have now completed the practice round. \n
+            <br>
+            The task proper will start when you press SPACE.\n
+            The descriptions  
+            </div>`
+        }, 
+        prompt: "Press any SPACE to continue",
+        choices: " ", 
+        trial_duration: instruction_delay,
+        data: {
+            stimulus: `End practice`,
+            trial_info: "End of practice",
+        },
+        on_finish: (data) => { 
+            // Current window size
+            data.width = window.innerWidth
+            data.height = window.innerHeight
+    
+            if( debug ){ console.log(data) }
+        }
+    }
+    timeline.push( proper_task_start )
+    timeline.push( short_fixation )
 }
 
 
 
-// Here we create the experiment blocks
-for(let exp_block = 0; exp_block < number_of_inducers; exp_block++){ // less than, since we start at 0
 
+////////////////////////////////
+////    EXPERIMENT PROPER   ////
+////////////////////////////////
+
+for(let exp_block = 0; exp_block < number_of_inducers; exp_block++){ // less than, since we start at 0
     ////////////////////////////////////////
     ////    Inducer instructions        ////
     ////////////////////////////////////////
@@ -732,8 +867,8 @@ for(let exp_block = 0; exp_block < number_of_inducers; exp_block++){ // less tha
             inducer_trial: true,                    // This is an inducer trial
             trial_info: "Inducer trial",            // General trial info 
             correct_inducer_response_side: () => { // Required inducer response side
-                if(rnd_inducer_stimulus == run_stimuli[0])  { return rnd_inducer_response_sides[0] }
-                else                                        { return rnd_inducer_response_sides[1] }
+                if( rnd_inducer_stimulus == run_stimuli[0] )  { return rnd_inducer_response_sides[0] }
+                else                                          { return rnd_inducer_response_sides[1] }
             },
         },
         on_finish: (data) => {
@@ -783,42 +918,6 @@ const experiment_feedback  = {
     required_question_label: "*",
     pages:() => {
         return [
-            [
-                {
-                    type:"html",
-                    prompt: `You have now completed the central part of the experiment.<br>\n
-                    To complete the study, please respond to the preceding question.`
-                }
-            ],
-            [  /// Distracted ? (Likert scale may be weird)
-                {
-                    type: "html",
-                    prompt: `You have now completed the central part of the experiment.<br>\n
-                    To complete the study, please answer the following questions:<br><br>`
-                },
-                {
-                    type:"html",
-                    prompt: `People are distracted to various degrees for various reasons. \n 
-                    There is nothing wrong with being distracted and we kindly ask that you answer truthfully.<br>
-                    (The number will be highlighted when you click it)` 
-                },
-                {
-                    type: "likert",
-                    prompt: `Click the number that you believe reflect the degree to which you were distracted during the task.`,
-                    name: "distraction", 
-                    likert_scale_max: 7,
-                    likert_scale_min_label: "Not at all distracted  -  ",
-                    likert_scale_max_label: "  -  Very distracted",
-                    required: true, 
-                },
-                {
-                    type: "text",
-                    prompt: "Is there anything you want to add in relation to the distraction question (above)?",
-                    name: 'distaction_feedback',
-                    textbox_columns: 50,
-                    textbox_rows: 3,
-                }
-            ], 
             [ /// General feedback
                 {
                     type: "text",
@@ -841,22 +940,33 @@ const experiment_feedback  = {
         data.height = window.innerHeight
         data.width = window.innerWidth
 
-        // feedback
-        data.motivation_feedback = data.response.motivation_feedback
-        data.distraction = data.response.distraction
-        data.distraction_feedback = data.response.distraction_feedback
         data.open_feedback = data.response.open_feedback
 
         // save interactive data
         data.interactive = jsPsych.data.getInteractionData()["trials"]
 
-        // Save the data
+        // If local save is enabled save it as a csv 
         if(save_local_data) { jsPsych.data.get().localSave('csv','mydata.csv') }
 
+        // POST data to server as: 
         saveData( "data_" + start_dateTime + "_" + ID + ".csv", jsPsych.data.get().csv() )
     }
 }
 timeline.push(experiment_feedback)
+
+
+// fix this.
+// fix this.
+// fix this.
+// fix this.
+// fix this.
+// fix this.
+// fix this.
+// fix this.
+// fix this.
+// fix this.
+// fix this.
+
 
 // Exit fullscreen and end experiment. 
 timeline.push({
@@ -866,6 +976,16 @@ timeline.push({
     fullscreen_mode: false,
     on_finish: () => {
         window.location = "https://app.prolific.com/submissions/complete?cc=C1BHSUPK"
+        
+        
+        // INSERT THE PROPER SUBMISSION COMPLETION LINK!! 
+
+        
+        // INSERT THE PROPER SUBMISSION COMPLETION LINK!! 
+        // INSERT THE PROPER SUBMISSION COMPLETION LINK!! 
+        // INSERT THE PROPER SUBMISSION COMPLETION LINK!! 
+        // INSERT THE PROPER SUBMISSION COMPLETION LINK!! 
+        // INSERT THE PROPER SUBMISSION COMPLETION LINK!! 
     }
 }); 
 
