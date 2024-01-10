@@ -443,7 +443,7 @@ let diagnostic_task_instruction_description = {
 
             You will be presented with two instructions of the relationship between targets and responses. \n
             The instructions relate to certain features of the targets. \n
-            The targets will be 3-letter none-wrods, and the responses will either be a left (corresponding the the F key) \n
+            The targets will be 3-letter none-words, and the responses will either be a left (corresponding the the F key) \n
             or right (corresponding to the J key) press. \n
 
             </div> `,
@@ -459,7 +459,7 @@ let diagnostic_task_instruction_description = {
             For instance:  'If <i>italic</i> press left' and 'If upright press right'.
             <br><br>
             
-            The other instruction will change throughout the experiment and will only be executed once at the end of each block. \n
+            The other instruction will change throughout the experiment and will only be executed once at the end of each round. \n
             This instruction only relates to targets appearing in \n
             <span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour.toLowerCase() + " colour"} </span>. \n
             A new block started by presenting two new targets and their relation to the responses. \n 
@@ -476,6 +476,10 @@ let diagnostic_task_instruction_description = {
             <span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour.toLowerCase() + " colour"} </span>\n
             will be presented. \n
             </div>`,
+
+            ///
+            /// BLOCK
+            ///
 
             /// PAGE
             `<div style="font-size:${instruction_font_size}">
@@ -603,7 +607,7 @@ if(diagnostic_rounds > 0){ // & skip_instructions === false
                 trial_duration: trial_duration,
                 data: {
                     stimulus: rnd_diag_stim,         // Stimulus
-                    inducer_run: 0,                   // Inducer run number (i.e., block)
+                    inducer_run: "prac",                   // Inducer run number (i.e., block)
                     diagnostic_run: pi,                 // Diagnostic trial number //start with 1
                     inducer_trial: false,                   // Not an inducer trial
                     italic: run_rnd_italic,             // Whether the run is ITALIC or not
@@ -656,7 +660,7 @@ if(diagnostic_rounds > 0){ // & skip_instructions === false
                     stimulus: rnd_inducer_stimulus,     // Stimulus
                     inducer_run: "practice",                // Inducer run number
                     inducer_trial: true,                    // This is an inducer trial
-                    trial_info: "Inducer trial",            // General trial info 
+                    trial_info: "practice inducer",            // General trial info 
                     correct_inducer_response_side: () => {  // Required inducer response side
                         if(rnd_inducer_stimulus == prac_stim[0])  { return rnd_inducer_response_sides[0] }
                         else                                      { return rnd_inducer_response_sides[1] }
