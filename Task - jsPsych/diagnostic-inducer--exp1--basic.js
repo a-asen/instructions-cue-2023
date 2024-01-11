@@ -3,7 +3,7 @@
 
 // CHANGE THESE BEFORE EXPERIMENT!
 const debug = true              // Show some console information
-const skip_instructions = true  // Skip intro? (to test trials)
+const skip_instructions = false  // Skip intro? (to test trials)
 const save_local_data = false    // Save a local file (test analysis)
 
 
@@ -63,12 +63,10 @@ const max_diagnostic_trials = 80     // Total max diagnostic trials
     // max/2 * number_of_inducers
 
 ////    Practice parameters     ////
-const diagnostic_rounds = 10                       // Number of diagnostic practice rounds
+const prac_diagnostic_rounds = 15                       // Number of diagnostic practice rounds
     // Set to 0 if no practice rounds should occur.
-const prac_include_inducer = true
-    // Include inducer?
-const prac_rounds = 1
-    // To include an inducer, prac round must be 2
+const prac_inducer_rounds = 4
+    // NB: Max 64 rounds of new stimuli (prac_inducer_rounds + number_of_inducer > 64)
 
 
 // Not used 
@@ -88,7 +86,7 @@ const stimuli = ["gwn", "eug", "sht", "cjm", "svs", "orp", "scy", "rve", "wjb", 
     "bsl", "vvm", "umf", "dba", "aip", "dts", "w&d", "avc", "dv6", "j&j", "sdc", "atr", 
     "spm", "alh", "ows", "idd", "abv", "cml", "lpo", "r22", "z28", "eyt"]
     // Randomly selected stimuli that should not overlapp by more than 1 character 
-
+    // Enough stimuli for 64 rounds. 
 
 ////////////////////////////
 ////                    ////
@@ -364,7 +362,7 @@ const about_the_experiment_and_consent = {
         In this experiment, you will be presented with targets that require either a left or right response. \n
         These correspond to the F and J keys on the keyboard. \n
         <br>
-        Your task will be to respond as <b> fast and accurately </b> to the current target as possible. \n
+        Your task will be to respond as <b> fast and accurately </b> to the current condition as possible. \n
         <br><br>
         At the end of the experiment, you will receive the opportunity to provide feedback. 
         </div>`,
@@ -439,68 +437,27 @@ let diagnostic_task_instruction_description = {
         return [
             // FIRST, what keys will be used in this experiment? 
             `<div style="font-size:${instruction_font_size}">
-            <h3> Responding to the task </h3>
-
-            You will be presented with two instructions of the relationship between targets and responses. \n
-            The instructions relate to certain features of the targets. \n
-            The targets will be 3-letter none-words, and the responses will either be a left (corresponding the the F key) \n
-            or right (corresponding to the J key) press. \n
-
+            
+            The task will present 3-letter none-words that requires either a left or right response. <br>
+            The response is based on a specific feature of the 3-letter none-word. <br>
+            The task will present two instructions, relating to two different features of the 3-letter none-word. <br>
+            This task will use the responses F (corresponding to a LEFT response) and the response J (corresponding to a RIGHT response). <br>
+            You will receive a maximum of 20 seconds reading the instructions (which is plenty of time). 
+            <br><br>
+            The task will be difficult, but feedback will be provided. 
+            
             </div> `,
 
             // About the first task
             `<div style="font-size:${instruction_font_size}">
-            <h3> The task </h3>
-            
-            The first instruciton will only be shown once and remain the same throughout the experiment. \n
-            This instruction relates to targets appearing in black colour. \n
-            The instruction will relate the responses (left and right) to whether the target (none-word) appears in either <i> italic </i> or upright font. \n
-            <br>
-            For instance:  'If <i>italic</i> press left' and 'If upright press right'.
-            <br><br>
-            
-            The other instruction will change throughout the experiment and will only be executed once at the end of each round. \n
-            This instruction only relates to targets appearing in \n
-            <span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour.toLowerCase() + " colour"} </span>. \n
-            A new block started by presenting two new targets and their relation to the responses. \n 
-            <br>
-            For instance:  'If house press left' and 'if mouse press right'.
-            <br><br>
 
-            There will be multiple blocks in this experiment. \n
-            Each block will have two new targets. \n 
-            <br>
-            Each block starts with the instructions of the relation between the new targets and the responses. \n
-            Then some black targets will be presented. \n
-            At the end of the block, a target appearing in
-            <span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour.toLowerCase() + " colour"} </span>\n
-            will be presented. \n
-            </div>`,
-
-            ///
-            /// BLOCK
-            ///
-
-            /// PAGE
-            `<div style="font-size:${instruction_font_size}">
-
-            You will receive a maximum of 20 seconds reading each of the instructions (which is plenty of time). \n
-            <br><br>
-
-            In the next screen the instructions that do not change throughout the experiment will be presented. \n
-            It will be followed by a practice round. \n
-            <br><br>
-
-            Thereafter, a full block will be presented. \n
-            The block starts with the instructions of two new targets that must be remembered till the end of the block. \n
-            The end of the block will be indicated by the 
-            <span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour.toLowerCase() + " colour"} </span> \n
-            of the target.
-            
+            In the next screen, the first instructions will be presented. <br>
+            This instruction will remain the same throughout the task.  <br>
+            A couple of practice rounds will be provided. 
             <br><br><br>
+            The practice starts when you click NEXT.
 
-            The experiment starts immediately when you click NEXT.
-            </div>`
+            </div>`,
         ]
     },
     allow_keys: false, 
@@ -526,7 +483,7 @@ let diagnostic_task_instruction = {
         `<p style="font-size: ${general_font_size};"> If <i> italic </i> press ${rnd_diagnostic_response_sides[0]}`+
         `<p style="font-size: ${general_font_size};"> If upright press ${rnd_diagnostic_response_sides[1]}`]
     }, 
-    prompt: "Press any SPACE to continue",
+    prompt: "Press SPACE to continue",
     choices: " ", 
     trial_duration: instruction_delay,
     data: {
@@ -546,161 +503,186 @@ timeline.push( short_fixation )
 
 
 /////////  PRAC ROUND    ////// 
-if(diagnostic_rounds > 0){ // & skip_instructions === false
+if(prac_diagnostic_rounds > 0 && !skip_instructions){ // & skip_instructions === false
 
     // This first get the number of different inducers
     let prac_stim = [rnd_stimuli[0], rnd_stimuli[1]] // Get new stimuli
     rnd_stimuli.splice(0, 2) // Remove those stimuli from the list
     
-    for(let exp_block = 0; exp_block < prac_rounds + 1; exp_block++){ // less than, since we start at 0
-
-        //// Inducer instructions ////
-        if(prac_include_inducer & exp_block > 0){
-                // randomize left/right response for the inducer 
-
-            let inducer_instruction = { 
-                type: jsPsychHtmlKeyboardResponse,
-                stimulus: () => {   
-                    return  `<p style="font-size: ${general_font_size};"> If ${prac_stim[0]} press ${response_sides[0]}`+
-                            `<p style="font-size: ${general_font_size};"> If ${prac_stim[1]} press ${response_sides[1]}`; 
-                }, 
-                prompt: "Press any SPACE to continue",
-                choices: " ", 
-                data: {
-                    inducer_run: exp_block,     // Inducer run number
-                    stimulus: `If ${prac_stim[0]} press ${response_sides[0]} | If ${prac_stim[1]} press ${response_sides[1]}`,
-                    trial_info: "Inducer instructions"
-                },
-                trial_duration: instruction_delay, 
-                on_finish: (data) => { 
-                    // Current window size
-                    data.width = window.innerWidth
-                    data.height = window.innerHeight
-                    if(debug){ console.log(data) } 
+    //// PRAC: Diagnostic task ////
+    for(let pi = 0; pi < prac_diagnostic_rounds; pi++){
+        let rnd_diag_stim = jsPsych.randomization.sampleWithReplacement(prac_stim, 1)[0]
+        let run_rnd_italic = jsPsych.randomization.sampleWithReplacement([true,false], 1, run_italic_bias)[0]
+    
+        let diagnostic_run = { 
+            type: jsPsychHtmlKeyboardResponse,
+            stimulus: () => {   
+                if(run_rnd_italic) {
+                    return `<p style="font-size: ${general_font_size};"><i>${rnd_diag_stim}</i>`
+                } else {
+                    return `<p style="font-size: ${general_font_size};">${rnd_diag_stim}`
                 }
-            }
-            timeline.push(inducer_instruction)
-            ////     Feedback   ////
-            timeline.push(too_slow_trial)
-            timeline.push(wrong_response_trial)
-        
-            // Fixation
-            timeline.push(short_fixation)
-        }
-        
-        //// Diagnostic task ////
-        for(let pi = 0; pi < diagnostic_rounds; pi++){
-            let rnd_diag_stim = jsPsych.randomization.sampleWithReplacement(prac_stim, 1)[0]
-            let run_rnd_italic = jsPsych.randomization.sampleWithReplacement([true,false], 1, run_italic_bias)[0]
-        
-            let diagnostic_run = { 
-                type: jsPsychHtmlKeyboardResponse,
-                stimulus: () => {   
-                    if(run_rnd_italic) {
-                        return `<p style="font-size: ${general_font_size};"><i>${rnd_diag_stim}</i>`
-                    } else {
-                        return `<p style="font-size: ${general_font_size};">${rnd_diag_stim}`
-                    }
-                }, 
-                choices: allowed_responses,
-                trial_duration: trial_duration,
-                data: {
-                    stimulus: rnd_diag_stim,         // Stimulus
-                    inducer_run: "prac",                   // Inducer run number (i.e., block)
-                    diagnostic_run: pi,                 // Diagnostic trial number //start with 1
-                    inducer_trial: false,                   // Not an inducer trial
-                    italic: run_rnd_italic,             // Whether the run is ITALIC or not
-                    trial_info: "practice",         // This is a diagnostic trial
-                    correct_diag_response_side: () => {     // Required response side for the diagnostic task
-                        if (run_rnd_italic) { return rnd_diagnostic_response_sides[0] } 
-                        else                { return rnd_diagnostic_response_sides[1] } 
-                    },
+            }, 
+            choices: allowed_responses,
+            trial_duration: trial_duration,
+            data: {
+                stimulus: rnd_diag_stim,         // Stimulus
+                inducer_run: "practice",                   // Inducer run number (i.e., block)
+                diagnostic_run: pi,                 // Diagnostic trial number //start with 1
+                inducer_trial: false,                   // Not an inducer trial
+                italic: run_rnd_italic,             // Whether the run is ITALIC or not
+                trial_info: "Practice diganostic trial",         // This is a diagnostic trial
+                correct_diag_response_side: () => {     // Required response side for the diagnostic task
+                    if (run_rnd_italic) { return rnd_diagnostic_response_sides[0] } 
+                    else                { return rnd_diagnostic_response_sides[1] } 
                 },
-                on_finish: (data) => {
-                    // Current window size
-                    data.width = window.innerWidth
-                    data.height = window.innerHeight
-        
-                    // Required diagnostic response key 
-                    if(data.correct_diag_response_side == response_sides[0]) 
-                            { data.correct_response_key = allowed_responses[0] }
-                    else    { data.correct_response_key = allowed_responses[1] }
-                    
-                    // Correct response
-                    if(data.response == null){  data.correct_response = NaN  } 
-                    else {
-                        // If response equals correct_response_key
-                        if(data.correct_response_key == data.response)    { data.correct_response = 1 }
-                        else                                              { data.correct_response = 0 }
-                    }
-                    if(debug){ console.log(data) } // debg
+            },
+            on_finish: (data) => {
+                // Current window size
+                data.width = window.innerWidth
+                data.height = window.innerHeight
+    
+                // Required diagnostic response key 
+                if(data.correct_diag_response_side == response_sides[0]) 
+                        { data.correct_response_key = allowed_responses[0] }
+                else    { data.correct_response_key = allowed_responses[1] }
+                
+                // Correct response
+                if(data.response == null){  data.correct_response = NaN  } 
+                else {
+                    // If response equals correct_response_key
+                    if(data.correct_response_key == data.response)    { data.correct_response = 1 }
+                    else                                              { data.correct_response = 0 }
                 }
-            }
-            timeline.push(diagnostic_run)
-            ////     Feedback   ////
-            timeline.push(too_slow_trial)
-            timeline.push(wrong_response_trial)
-        
-            // Fixation
-            timeline.push(short_fixation)
-        }
 
-        ////        INDUCER TASK        ////
-        if(prac_include_inducer & exp_block > 0){
-            let rnd_inducer_stimulus = jsPsych.randomization.sampleWithReplacement(prac_stim, 1)[0]
-            // Randomly select inducer stimulus
-
-            let inducer_task = {
-                type: jsPsychHtmlKeyboardResponse,
-                stimulus: () => { return `<p style="font-size: ${general_font_size}; color:${rnd_inducer_colour}">${rnd_inducer_stimulus}` },
-                choices: allowed_responses,
-                trial_duration: trial_duration,
-                data: {
-                    stimulus: rnd_inducer_stimulus,     // Stimulus
-                    inducer_run: "practice",                // Inducer run number
-                    inducer_trial: true,                    // This is an inducer trial
-                    trial_info: "practice inducer",            // General trial info 
-                    
-                },
-                on_finish: (data) => {
-                    // Current window size
-                    data.width = window.innerWidth
-                    data.height = window.innerHeight
-                    
-                    // Find correct response key 
-                    if( (rnd_inducer_stimulus == prac_stim[0] && data.response == allowed_responses[0]) || (rnd_inducer_stimulus == prac_stim[1] && data.response == allowed_responses[1]) ){ 
-                        data.correct_response = 1 }
-                    else { data.correct_response = 0 }
-
-                    if(debug){ console.log(data) }
-                }
-            }
-            timeline.push(inducer_task)
-
-            ////     Feedback   ////
-            // If participants responded to slow or wrong give feedback
-            timeline.push(too_slow_trial)
-            timeline.push(wrong_response_trial)
-            
-            // Fixation 
-                //IF another inducer round
-            if( exp_block < prac_rounds ){
-                timeline.push(long_fixation)
+                if(debug){ console.log(data) } // debg
             }
         }
+        timeline.push(diagnostic_run)
+        ////     Feedback   ////
+        timeline.push(too_slow_trial)
+        timeline.push(wrong_response_trial)
+    
+        // Fixation
+        timeline.push(short_fixation)
     }
 
+    //// PRAC: Inducer explanation  /////
+    if( prac_inducer_rounds > 0 ){
+        ////    GENERAL DIAGNOSTIC INSTRUCTIONS   ////
+        let inducer_task_instruction_description = {
+            type: jsPsychInstructions,
+            pages: () => { 
+                return [
+                    // FIRST, what keys will be used in this experiment? 
+                    `<div style="font-size:${instruction_font_size}">
+                    
+                    In the next screen the second instructions will be presented. <br>
+                    This instruction changes throughout the task, and relates to the 3-letter none-words that appear in 
+                    <span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour.toLowerCase() + " colour"}</span>.\n
+                    <br>
+                    A couple of practice trials will be presented.
+                    <br><br><br>
+                    The practice round starts when you click NEXT.
+                    </div>`,
+                ]
+            },
+            allow_keys: false, 
+            show_clickable_nav: true,
+            post_trial_gap: 1500,
+            data: { stimulus: "Instructions", trial_info: "Final experiment explanation" },
+            on_finish: (data) => {
+                // Current window size
+                data.width = window.innerWidth
+                data.height = window.innerHeight
+
+                skip_instructions ? null : console.log(data) 
+            }
+        }
+        timeline.push( inducer_task_instruction_description )
+    }
+
+    ///// PRAC: Inducer task /////
+    for( let pi2 = 0; pi2 < prac_inducer_rounds; pi2++){
+
+        // stim
+        let prac_stim = [rnd_stimuli[0], rnd_stimuli[1]] // Get new stimuli
+        rnd_stimuli.splice(0, 2) // Remove those stimuli from the list
+    
+        let inducer_instruction = { 
+            type: jsPsychHtmlKeyboardResponse,
+            stimulus: () => {   
+                return  `<p style="font-size: ${general_font_size};"> If ${prac_stim[0]} press ${response_sides[0]}`+
+                        `<p style="font-size: ${general_font_size};"> If ${prac_stim[1]} press ${response_sides[1]}`; 
+            }, 
+            prompt: "Press SPACE to continue",
+            choices: " ", 
+            data: {
+                stimulus: `If ${prac_stim[0]} press ${response_sides[0]} | If ${prac_stim[1]} press ${response_sides[1]}`,
+                trial_info: "Practice inducer instructions",
+                inducer_run: "practice",
+            },
+            trial_duration: instruction_delay, 
+            on_finish: (data) => { 
+                // Current window size
+                data.width = window.innerWidth
+                data.height = window.innerHeight
+                if(debug){ console.log(data) } 
+            }
+        }
+        timeline.push(inducer_instruction)
+
+        let rnd_inducer_stimulus = jsPsych.randomization.sampleWithReplacement(prac_stim, 1)[0]
+            // Randomly select inducer stimulus
+
+        let inducer_task = {
+            type: jsPsychHtmlKeyboardResponse,
+            stimulus: () => { return `<p style="font-size: ${general_font_size}; color:${rnd_inducer_colour}">${rnd_inducer_stimulus}` },
+            choices: allowed_responses,
+            trial_duration: trial_duration,
+            data: {
+                stimulus: rnd_inducer_stimulus,     // Stimulus
+                inducer_run: "practice",                // Inducer run number
+                inducer_trial: true,                    // This is an inducer trial
+                trial_info: "Practice inducer trial",            // General trial info 
+                
+            },
+            on_finish: (data) => {
+                // Current window size
+                data.width = window.innerWidth
+                data.height = window.innerHeight
+                
+                // Find correct response key 
+                if( (rnd_inducer_stimulus == prac_stim[0] && data.response == allowed_responses[0]) || (rnd_inducer_stimulus == prac_stim[1] && data.response == allowed_responses[1]) ){ 
+                    data.correct_response = 1 }
+                else { data.correct_response = 0 }
+
+                if(debug){ console.log(data) }
+            }
+        }
+        timeline.push(inducer_task)
+
+        ////     Feedback   ////
+        // If participants responded to slow or wrong give feedback
+        timeline.push(too_slow_trial)
+        timeline.push(wrong_response_trial)
+        
+        // Fixation
+        timeline.push(short_fixation)
+    }
+
+    //// START feedback 
     let proper_task_start = {
         type: jsPsychHtmlKeyboardResponse,
         stimulus: function(){   
             return `<div style="font-size:${instruction_font_size}">
             You have now completed the practice round. \n
-            <br>
-            The task proper will start when you press SPACE.\n
-            The descriptions  
+            <br><br>
+            The 3-letter none-word colour represents the current instruction to follow. 
             </div>`
+            //  
         }, 
-        prompt: "Press any SPACE to continue",
+        prompt: "Press SPACE to start",
         choices: " ", 
         trial_duration: instruction_delay,
         data: {
@@ -711,14 +693,13 @@ if(diagnostic_rounds > 0){ // & skip_instructions === false
             // Current window size
             data.width = window.innerWidth
             data.height = window.innerHeight
-    
+
             if( debug ){ console.log(data) }
         }
     }
     timeline.push( proper_task_start )
-    timeline.push( short_fixation )
+    timeline.push( long_fixation )
 }
-
 
 
 
@@ -745,7 +726,7 @@ for(let exp_block = 0; exp_block < number_of_inducers; exp_block++){ // less tha
             return  `<p style="font-size: ${general_font_size};"> If ${run_stimuli[0]} press ${response_sides[0]}`+
                     `<p style="font-size: ${general_font_size};"> If ${run_stimuli[1]} press ${response_sides[1]}`; 
         }, 
-        prompt: "Press any SPACE to continue",
+        prompt: "Press SPACE to continue",
         choices: " ", 
         data: {
             inducer_run: exp_block,     // Inducer run number
