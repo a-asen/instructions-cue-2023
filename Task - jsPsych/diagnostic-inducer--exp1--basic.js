@@ -3,7 +3,7 @@
 
 // CHANGE THESE BEFORE EXPERIMENT!
 const debug = true              // Show some console information
-const skip_instructions = false  // Skip intro? (to test trials)
+const skip_instructions = true  // Skip intro? (to test trials)
 const save_local_data = false    // Save a local file (test analysis)
 
 
@@ -523,8 +523,8 @@ let diagnostic_task_instruction = {
     type: jsPsychHtmlKeyboardResponse,
     stimulus: function(){   
         return [ 
-        `<p style="font-size: ${general_font_size};"> If a target appears <i> italic </i> press ${rnd_diagnostic_response_sides[0]}`+
-        `<p style="font-size: ${general_font_size};"> If a target appears upright press ${rnd_diagnostic_response_sides[1]}`]
+        `<p style="font-size: ${general_font_size};"> If <i> italic </i> press ${rnd_diagnostic_response_sides[0]}`+
+        `<p style="font-size: ${general_font_size};"> If upright press ${rnd_diagnostic_response_sides[1]}`]
     }, 
     prompt: "Press any SPACE to continue",
     choices: " ", 
@@ -554,7 +554,6 @@ if(diagnostic_rounds > 0){ // & skip_instructions === false
     
     for(let exp_block = 0; exp_block < prac_rounds + 1; exp_block++){ // less than, since we start at 0
 
-        let rnd_inducer_response_sides = jsPsych.randomization.shuffle(response_sides)
         //// Inducer instructions ////
         if(prac_include_inducer & exp_block > 0){
                 // randomize left/right response for the inducer 
@@ -562,14 +561,14 @@ if(diagnostic_rounds > 0){ // & skip_instructions === false
             let inducer_instruction = { 
                 type: jsPsychHtmlKeyboardResponse,
                 stimulus: () => {   
-                    return  `<p style="font-size: ${general_font_size};"> If ${prac_stim[0]} press ${rnd_inducer_response_sides[0]}`+
-                            `<p style="font-size: ${general_font_size};"> If ${prac_stim[1]} press ${rnd_inducer_response_sides[1]}`; 
+                    return  `<p style="font-size: ${general_font_size};"> If ${prac_stim[0]} press ${response_sides[0]}`+
+                            `<p style="font-size: ${general_font_size};"> If ${prac_stim[1]} press ${response_sides[1]}`; 
                 }, 
                 prompt: "Press any SPACE to continue",
                 choices: " ", 
                 data: {
                     inducer_run: exp_block,     // Inducer run number
-                    stimulus: `If ${prac_stim[0]} press ${rnd_inducer_response_sides[0]} | If ${prac_stim[1]} press ${rnd_inducer_response_sides[1]}`,
+                    stimulus: `If ${prac_stim[0]} press ${response_sides[0]} | If ${prac_stim[1]} press ${response_sides[1]}`,
                     trial_info: "Inducer instructions"
                 },
                 trial_duration: instruction_delay, 
@@ -661,10 +660,7 @@ if(diagnostic_rounds > 0){ // & skip_instructions === false
                     inducer_run: "practice",                // Inducer run number
                     inducer_trial: true,                    // This is an inducer trial
                     trial_info: "practice inducer",            // General trial info 
-                    correct_inducer_response_side: () => {  // Required inducer response side
-                        if(rnd_inducer_stimulus == prac_stim[0])  { return rnd_inducer_response_sides[0] }
-                        else                                      { return rnd_inducer_response_sides[1] }
-                    },
+                    
                 },
                 on_finish: (data) => {
                     // Current window size
@@ -672,13 +668,10 @@ if(diagnostic_rounds > 0){ // & skip_instructions === false
                     data.height = window.innerHeight
                     
                     // Find correct response key 
-                    if(data.correct_inducer_response_side == response_sides[0]){
-                        data.correct_response_key = allowed_responses[0] 
-                    } else { 
-                        data.correct_response_key = allowed_responses[1] }
-                        // Correct response (according to the active trial)
-                        if(data.response == data.correct_response_key) { data.correct_response = 1 }
-                        else                                           { data.correct_response = 0 }
+                    if( (rnd_inducer_stimulus == prac_stim[0] && data.response == allowed_responses[0]) || (rnd_inducer_stimulus == prac_stim[1] && data.response == allowed_responses[1]) ){ 
+                        data.correct_response = 1 }
+                    else { data.correct_response = 0 }
+
                     if(debug){ console.log(data) }
                 }
             }
@@ -744,21 +737,19 @@ for(let exp_block = 0; exp_block < number_of_inducers; exp_block++){ // less tha
 
     let run_diagnostic_length = rnd_diagnostic_length[exp_block] 
         // Get the curret diagnostic length from the pre-generated list
-    let rnd_inducer_response_sides = jsPsych.randomization.shuffle(response_sides)
-        // randomize left/right response for the inducer 
 
     ////        Inducer instruction         ////
     let inducer_instruction = { 
         type: jsPsychHtmlKeyboardResponse,
         stimulus: () => {   
-            return  `<p style="font-size: ${general_font_size};"> If ${run_stimuli[0]} press ${rnd_inducer_response_sides[0]}`+
-                    `<p style="font-size: ${general_font_size};"> If ${run_stimuli[1]} press ${rnd_inducer_response_sides[1]}`; 
+            return  `<p style="font-size: ${general_font_size};"> If ${run_stimuli[0]} press ${response_sides[0]}`+
+                    `<p style="font-size: ${general_font_size};"> If ${run_stimuli[1]} press ${response_sides[1]}`; 
         }, 
         prompt: "Press any SPACE to continue",
         choices: " ", 
         data: {
             inducer_run: exp_block,     // Inducer run number
-            stimulus: `If ${run_stimuli[0]} press ${rnd_inducer_response_sides[0]} | If ${run_stimuli[1]} press ${rnd_inducer_response_sides[1]}`,
+            stimulus: `If ${run_stimuli[0]} press ${response_sides[0]} | If ${run_stimuli[1]} press ${response_sides[1]}`,
             trial_info: "Inducer instructions"
         },
         trial_duration: instruction_delay, 
@@ -806,8 +797,8 @@ for(let exp_block = 0; exp_block < number_of_inducers; exp_block++){ // less tha
                 italic: run_rnd_italic,             // Whether the run is ITALIC or not
                 trial_info: "Diagnostic trial",         // This is a diagnostic trial
                 correct_inducer_response_side: () => { // Required response side for the inducer task
-                    if(rnd_diag_stimulus == run_stimuli[0]) { return rnd_inducer_response_sides[0] }
-                    else                                    { return rnd_inducer_response_sides[1] }
+                    if( rnd_diag_stimulus == run_stimuli[0] ) { return response_sides[0] }
+                    else                                      { return response_sides[1] }
                 },
                 correct_diag_response_side: () => {     // Required response side for the diagnostic task
                     if (run_rnd_italic) { return rnd_diagnostic_response_sides[0] } 
@@ -870,24 +861,16 @@ for(let exp_block = 0; exp_block < number_of_inducers; exp_block++){ // less tha
             inducer_run: exp_block,                     // Inducer run number
             inducer_trial: true,                    // This is an inducer trial
             trial_info: "Inducer trial",            // General trial info 
-            correct_inducer_response_side: () => { // Required inducer response side
-                if( rnd_inducer_stimulus == run_stimuli[0] )  { return rnd_inducer_response_sides[0] }
-                else                                          { return rnd_inducer_response_sides[1] }
-            },
         },
         on_finish: (data) => {
             // Current window size
             data.width = window.innerWidth
             data.height = window.innerHeight
             
-            // Find correct response key 
-            if(data.correct_inducer_response_side == response_sides[0]){
-                data.correct_response_key = allowed_responses[0] 
-            } else { 
-                data.correct_response_key = allowed_responses[1] }
-                // Correct response (according to the active trial)
-                if(data.response == data.correct_response_key) { data.correct_response = 1 }
-                else                                           { data.correct_response = 0 }
+            if( (rnd_inducer_stimulus == run_stimuli[0] && data.response == allowed_responses[0]) || (rnd_inducer_stimulus == run_stimuli[1] && data.response == allowed_responses[1]) ){ 
+                data.correct_response = 1 }
+            else { data.correct_response = 0 }
+            
             if(debug){ console.log(data) }
         }
     }
