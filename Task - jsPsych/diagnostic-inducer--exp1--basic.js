@@ -12,8 +12,6 @@ const save_local_data = false    // Save a local file (test analysis)
 
 
 
-
-
 ////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////
 
@@ -63,7 +61,7 @@ const max_diagnostic_trials = 80     // Total max diagnostic trials
     // max/2 * number_of_inducers
 
 ////    Practice parameters     ////
-const prac_diagnostic_rounds = 15                       // Number of diagnostic practice rounds
+const prac_diagnostic_rounds = 15                    // Number of diagnostic practice rounds
     // Set to 0 if no practice rounds should occur.
 const prac_inducer_rounds = 4
     // NB: Max 64 rounds of new stimuli (prac_inducer_rounds + number_of_inducer > 64)
@@ -612,8 +610,8 @@ if(prac_diagnostic_rounds > 0 && !skip_instructions){ // & skip_instructions ===
         let inducer_instruction = { 
             type: jsPsychHtmlKeyboardResponse,
             stimulus: () => {   
-                return  `<p style="font-size: ${general_font_size};"> If ${prac_stim[0]} press ${response_sides[0]}`+
-                        `<p style="font-size: ${general_font_size};"> If ${prac_stim[1]} press ${response_sides[1]}`; 
+                return  `<p style="font-size: ${general_font_size}"> If <span style="color: ${rnd_inducer_colour}">${prac_stim[0]}</span> press ${response_sides[0]}`+
+                        `<p style="font-size: ${general_font_size}"> If <span style="color: ${rnd_inducer_colour}">${prac_stim[1]}</span> press ${response_sides[1]}`; 
             }, 
             prompt: "Press SPACE to continue",
             choices: " ", 
@@ -641,10 +639,10 @@ if(prac_diagnostic_rounds > 0 && !skip_instructions){ // & skip_instructions ===
             choices: allowed_responses,
             trial_duration: trial_duration,
             data: {
-                stimulus: rnd_inducer_stimulus,     // Stimulus
+                stimulus: rnd_inducer_stimulus,         // Stimulus
                 inducer_run: "practice",                // Inducer run number
                 inducer_trial: true,                    // This is an inducer trial
-                trial_info: "Practice inducer trial",            // General trial info 
+                trial_info: "Practice inducer trial",   // General trial info 
                 
             },
             on_finish: (data) => {
@@ -676,13 +674,11 @@ if(prac_diagnostic_rounds > 0 && !skip_instructions){ // & skip_instructions ===
         type: jsPsychHtmlKeyboardResponse,
         stimulus: function(){   
             return `<div style="font-size:${instruction_font_size}">
-            You have now completed the practice round. \n
-            <br><br>
-            The 3-letter none-word colour represents the current instruction to follow. 
+            You have now completed the practice. The main task will be presented by pressing SPACE.<br>
             </div>`
             //  
         }, 
-        prompt: "Press SPACE to start",
+        prompt: "Press SPACE to start the task",
         choices: " ", 
         trial_duration: instruction_delay,
         data: {
@@ -723,8 +719,8 @@ for(let exp_block = 0; exp_block < number_of_inducers; exp_block++){ // less tha
     let inducer_instruction = { 
         type: jsPsychHtmlKeyboardResponse,
         stimulus: () => {   
-            return  `<p style="font-size: ${general_font_size};"> If ${run_stimuli[0]} press ${response_sides[0]}`+
-                    `<p style="font-size: ${general_font_size};"> If ${run_stimuli[1]} press ${response_sides[1]}`; 
+            return  `<p style="font-size: ${general_font_size}"> If <span style="color: ${rnd_inducer_colour}">${run_stimuli[0]}</span> press ${response_sides[0]}`+
+                    `<p style="font-size: ${general_font_size}"> If <span style="color: ${rnd_inducer_colour}">${run_stimuli[1]}</span> press ${response_sides[1]}`; 
         }, 
         prompt: "Press SPACE to continue",
         choices: " ", 
@@ -741,7 +737,6 @@ for(let exp_block = 0; exp_block < number_of_inducers; exp_block++){ // less tha
             if(debug){ console.log(data) } 
         }
     }
-
     timeline.push(inducer_instruction)
     timeline.push(short_fixation)
 
@@ -763,9 +758,9 @@ for(let exp_block = 0; exp_block < number_of_inducers; exp_block++){ // less tha
             type: jsPsychHtmlKeyboardResponse,
             stimulus: () => {   
                 if(run_rnd_italic) {
-                    return `<p style="font-size: ${general_font_size};"><i>${rnd_diag_stimulus}</i>`
+                    return `<p style="font-size: ${general_font_size}"><i>${rnd_diag_stimulus}</i>`
                 } else {
-                    return `<p style="font-size: ${general_font_size};">${rnd_diag_stimulus}`
+                    return `<p style="font-size: ${general_font_size}">${rnd_diag_stimulus}`
                 }
             }, 
             choices: allowed_responses,
@@ -774,7 +769,7 @@ for(let exp_block = 0; exp_block < number_of_inducers; exp_block++){ // less tha
                 stimulus: rnd_diag_stimulus,         // Stimulus
                 inducer_run: exp_block,                   // Inducer run number (i.e., block)
                 diagnostic_run: exp_diag,                 // Diagnostic trial number //start with 1
-                inducer_trial: false,                   // Not an inducer trial
+                inducer_trial: false,                     // Not an inducer trial
                 italic: run_rnd_italic,             // Whether the run is ITALIC or not
                 trial_info: "Diagnostic trial",         // This is a diagnostic trial
                 correct_inducer_response_side: () => { // Required response side for the inducer task
@@ -881,7 +876,7 @@ timeline.push(white_bk)
 
 const experiment_feedback  = {
     type: jsPsychSurvey,
-    button_label_finish: "Next",
+    button_label_finish: "End experiment",
     required_error: `Please check whether you responded to (all) the question(s)`,
     required_question_label: "*",
     pages:() => {
@@ -889,8 +884,7 @@ const experiment_feedback  = {
             [ /// General feedback
                 {
                     type: "text",
-                    prompt: `Do you have any other comments, thoughts, or remarks in relation to the experiment? \n
-                    (Your feedback is highly appreciated!)`,
+                    prompt: `You feedback is welcome! Do you have any comments, thoughts, or remarks in relation to the experiment?`,
                     name: 'open_feedback',
                     textbox_columns: 100,
                     textbox_rows: 5,
@@ -898,7 +892,7 @@ const experiment_feedback  = {
             ]
         ]
     },
-    data: { stimulus: "distraction-feedback", trial_info: "Distraction and feedback" },
+    data: { stimulus: "feedback", trial_info: "Feedback" },
     on_finish: (data) => {
         // Add ID to all entries: 
         jsPsych.data.get().addToAll({ id:                   ID });
@@ -923,38 +917,18 @@ const experiment_feedback  = {
 timeline.push(experiment_feedback)
 
 
-// fix this.
-// fix this.
-// fix this.
-// fix this.
-// fix this.
-// fix this.
-// fix this.
-// fix this.
-// fix this.
-// fix this.
-// fix this.
-
-
 // Exit fullscreen and end experiment. 
 timeline.push({
     type: jsPsychFullscreen,
-    message: "Thank you for participating in this study! <br><br>", 
+    message: `Redirecting...<br><br>\n
+    If you finished and is still on this page, follow this link: https://app.prolific.com/submissions/complete?cc=C1BHSUPK`,
     button_label: "End experiment", 
-    fullscreen_mode: false,
+    fullscreen_mode: false,    
     on_finish: () => {
         window.location = "https://app.prolific.com/submissions/complete?cc=C1BHSUPK"
-        
-        
-        // INSERT THE PROPER SUBMISSION COMPLETION LINK!! 
-
-        
-        // INSERT THE PROPER SUBMISSION COMPLETION LINK!! 
-        // INSERT THE PROPER SUBMISSION COMPLETION LINK!! 
-        // INSERT THE PROPER SUBMISSION COMPLETION LINK!! 
-        // INSERT THE PROPER SUBMISSION COMPLETION LINK!! 
-        // INSERT THE PROPER SUBMISSION COMPLETION LINK!! 
+        console.log("")
     }
 }); 
+
 
 jsPsych.run(timeline)
