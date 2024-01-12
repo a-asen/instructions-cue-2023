@@ -124,11 +124,11 @@ d2 |>
     sd_incongruent = sd(rt_FALSE),
     m_congruent = mean(rt_TRUE),
     sd_congruent = sd(rt_TRUE),
-    diff = mean(rt_FALSE - rt_TRUE),
-    t = t.test( rt_FALSE, rt_TRUE, paired = TRUE, alternative = "greater" )[["statistic"]],
-    df = t.test( rt_FALSE, rt_TRUE, paired = TRUE, alternative = "greater"  )[["parameter"]],
-    p = t.test( rt_FALSE, rt_TRUE, paired = TRUE, alternative = "greater"  )[["p.value"]],
-    )# -> d_rt
+    Mdiff = mean( rt_FALSE - rt_TRUE),
+    t = t.test(  rt_FALSE, rt_TRUE, paired = TRUE, alternative = "greater" )[["statistic"]],
+    df = t.test( rt_FALSE, rt_TRUE, paired = TRUE, alternative = "greater" )[["parameter"]],
+    p = t.test(  rt_FALSE, rt_TRUE, paired = TRUE, alternative = "greater" )[["p.value"]],
+    ) -> d_rt
 
 d2 |>
   pivot_wider( names_from = congruent, values_from = c( rt, pct ) ) |>
@@ -139,14 +139,14 @@ d2 |>
     sd_incongruent = sd( pct_FALSE ),
     m_congruent = mean( pct_TRUE ),
     sd_congruent = mean( pct_TRUE ),
-    diff = mean( pct_FALSE - pct_TRUE ),
-    t = t.test( pct_FALSE, pct_TRUE, paired = TRUE )[["statistic"]],
+    Mdiff = mean( pct_FALSE - pct_TRUE ),
+    t = t.test(  pct_FALSE, pct_TRUE, paired = TRUE )[["statistic"]],
     df = t.test( pct_FALSE, pct_TRUE, paired = TRUE )[["parameter"]],
-    p = t.test( pct_FALSE, pct_TRUE, paired = TRUE )[["p.value"]],
+    p = t.test(  pct_FALSE, pct_TRUE, paired = TRUE )[["p.value"]],
   ) -> d_pct
 
 rbind(d_rt, d_pct) |>
-  mutate(p.val.cor = p.adjust(p, "bonferroni"),
+  mutate(p.cor = p.adjust(p, "bonferroni"),
          ps = case_when(p < .05 ~ "*", p < 0.01 ~ "**", p < 0.001 ~ "***", T ~ "")) |>
   gt() |> 
   fmt_number() |>
@@ -163,7 +163,12 @@ rbind(d_rt, d_pct) |>
     m_congruent = "M",
     sd_congruent = "SD" ) |>
   tab_footnote("*p < 0.05, **p < 0.01, ***p < 0.001") |>
-  tab_footnote("P's are Bonferroni corrected for 2 tests") 
+  tab_footnote("P's are Bonferroni corrected for 2 tests") |> 
+  tab_spanner(
+    "Test",
+    c(t, df, p.cor))
+    
+    
   
 
 ```
