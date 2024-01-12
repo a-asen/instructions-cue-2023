@@ -54,10 +54,10 @@ const inducer_colours = ["red", "yellow", "blue"]      // Inducer colour randomi
     // This is also what is DISPLAYED to participants. Should therefore be a readable name. 
 
 ////    Diagnostic parameters   ////
-const number_of_inducers = 10;       // Number of inducers 
+const number_of_inducers = 11;       // Number of inducers 
 const diagnostic_min_length = 4         // Min run length
 const diagnostic_max_length = 16     // Max run length
-const max_diagnostic_trials = 80     // Total max diagnostic trials
+const max_diagnostic_trials = 100     // Total max diagnostic trials
     // max/2 * number_of_inducers
 
 ////    Practice parameters     ////
@@ -321,10 +321,10 @@ const check_browser = {
         if(data.mobile){
             return '<p>You must use a desktop/laptop computer to participate in this experiment.</p>';
         } else if(data.fullscreen){
-            return `<p>We have detected that your browser cannot use fullscreen. \n
-            Try to use a different browser that supports fullscreen.`
+            return `<p>We have detected that your browser cannot use full screen. \n
+            Try to use a different browser that supports full screen.`
         } else if(data.browser) {
-            return `<p>We have detected that you are using Safari, which is not able to run the experiment properly. \n
+            return `<p>We have detected that you are using Safari, which is not properly able to run the experiment. \n
             Please run the experiment in a different browser.</p>`
         } else {
             return `We failed to parse your browser information... Try using a different browser.`
@@ -386,10 +386,6 @@ const about_the_experiment_and_consent = {
     show_clickable_nav: ["Next"],
     data: { stimulus: "The experiment and consent", trial_info: "The experiment and consent" },
     on_finish: (data) => {
-        data.page_index1 = data.view_history[0].viewing_time
-        data.page_index2 = data.view_history[1].viewing_time
-        data.page_index3 = data.view_history[2].viewing_time
-        
         if(debug){ console.log(data) }
     }
 }
@@ -461,7 +457,7 @@ let diagnostic_task_instruction_description = {
     allow_keys: false, 
     show_clickable_nav: true,
     post_trial_gap: 1500,
-    data: { stimulus: "Instructions", trial_info: "Final experiment explanation" },
+    data: { stimulus: "Instructions", trial_info: "Basic overview explanation" },
     on_finish: (data) => {
         // Current window size
         data.width = window.innerWidth
@@ -680,7 +676,6 @@ if(prac_diagnostic_rounds > 0 && !skip_instructions){ // & skip_instructions ===
         }, 
         prompt: "Press SPACE to start the task",
         choices: " ", 
-        trial_duration: instruction_delay,
         data: {
             stimulus: `End practice`,
             trial_info: "End of practice",
@@ -696,7 +691,6 @@ if(prac_diagnostic_rounds > 0 && !skip_instructions){ // & skip_instructions ===
     timeline.push( proper_task_start )
     timeline.push( long_fixation )
 }
-
 
 
 ////////////////////////////////
@@ -796,7 +790,7 @@ for(let exp_block = 0; exp_block < number_of_inducers; exp_block++){ // less tha
                 else {
                     // If response equals correct_response_key
                     if(data.correct_response_key == data.response)    { data.correct_response = 1 }
-                    else                                                    { data.correct_response = 0 }
+                    else                                              { data.correct_response = 0 }
                 }
 
                 ////    GONGUENCEY      ////
