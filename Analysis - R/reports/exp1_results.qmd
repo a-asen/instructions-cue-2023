@@ -8,17 +8,21 @@ editor:
 ---
 
 ```{r libraries }
+#| include: FALSE
 library(tidyverse)
 library(ggpp)
 library(gt)
+library(patchwork)
 ```
 
-```{r load data}
+```{r load data }
+#| include: FALSE
 # list.files("../data/raw/experiment1", pattern = "*.csv", full.names = T) -> fnames
   # exp 1 
 list.files("../data/raw/pilot", pattern = "*.csv", full.names = T) -> fnames
-  
-fnames2 <- fnames[4:7]
+
+
+fnames2 <- fnames[str_detect(fnames, "2024")]
 map_df(fnames2, \(x){
   read_csv(x)
 }) -> data
@@ -26,6 +30,7 @@ map_df(fnames2, \(x){
 
 
 ```{r transformation}
+#| include: FALSE
 # Pre-transformation
 data |>
   mutate(rt = as.integer(ifelse( rt == "null", NA, rt ))) -> data
@@ -40,8 +45,8 @@ data |>
 ```
 
 
-##   Exclusion       =====
-```{r due to accuracy}
+```{r exclusion start - accuracy}
+#| include: FALSE
 loss <- list()
 loss$data_trials <- nrow(d)
 
@@ -57,14 +62,15 @@ d |>
   pull( id ) -> loss$exclude_par
 
 loss[["exclude_par_trials"]] <- length( d$rt[d$id == loss$exclude_par] )
-loss[["exclude_par_pct"]] <- length( d$rt[d$id == loss$exclude_par] ) / length(d$rt) * 100
+loss[["exclude_par_pct"]] <- length( d$rt[d$id == loss$exclude_par] ) / loss$data_trials * 100
 
 d |> filter( !(id %in% loss$exclude_par) ) -> d
 ``` 
 
-In total, `r length(loss[["exclude_par"]])` `r if(length(loss[["data_trials"]])>1, "participants", "participant"` where excluded due to low accuracy (> 70%). Resulting in a loss of `r loss[["exclude_par_pct"]]` percent of the data.
+In total, `r length(loss[["exclude_par"]])` `r ifelse(length(loss[["data_trials"]]) > 1, "participants", "participant")` where excluded due to low accuracy (> 70%). Resulting in a loss of `r loss[["exclude_par_pct"]]` percent of the data.
 
-```{r due to high SD & NA responses include=FALSE}
+```{r due to high SD & NA responses }
+#| include: FALSE
 # Removing trials more than 2.5 SD (from individual mean) & NA RT 
 d |>
   group_by(id) |>
@@ -78,16 +84,17 @@ d |>
              is.na(rt) & trial_info == "Diagnostic trial",
                              0, 1 ) ) -> d
 
-sum(d$rt_retain == 0) / nrow(d) -> loss[["rt_sd_trials"]]
-sum(d$rt_retain == 0) / nrow(d) * 100 -> loss[["rt_sd_pct"]]
+sum(d$retain_trials == 0) -> loss[["rt_sd_trials"]]
+sum(d$retain_trials == 0) / loss$data_trials * 100 -> loss[["rt_sd_pct"]]
 
 d |> 
   filter( retain_trials == 1 ) -> d
 ```
 
-Furthermore, `r loss[["rt_sd_trials"]]` trials were lost due to deviating (2.5 SD) response times and none response(s). Representing a loss of `r loss[["rt_sd_pct"]]` percent of the data. 
+Furthermore, `r loss[["rt_sd_trials"]]` trials were lost due to deviating (2.5 SD) response times and none response(s). Representing a loss of `r round(loss[["rt_sd_pct"]], 2)` percent of the data. 
 
 ```{r only correct inducers}
+#| include: FALSE
 d |>
   mutate( valid_trials = case_when( trial_info=="Inducer trial" & correct_response==1 ~ 1,
                                     trial_info=="Inducer trial" & correct_response==0 ~ 0,
@@ -95,17 +102,18 @@ d |>
   fill(valid_trials, .direction = "up") -> d
 
 sum(d$valid_trials==0) -> loss[["inducer_fail_trials"]]
-sum(d$valid_trials==0) / length(d$valid_trials) * 100 -> loss[["inducer_fail_pct"]]
-
+sum(d$valid_trials==0) / loss$data_trials * 100 -> loss[["inducer_fail_pct"]]
+loss
 d |> filter( valid_trials == 1 ) -> d
 ```
 
-Lastly, `r loss[["inducer_fail_trials"]]` trials were removed due to a wrong response on the inducer trial. Representing a loss of `r loss[["inducer_fail_pct"]]` percent of the data. 
+Lastly, `r round(loss[["inducer_fail_trials"]], 2)` trials were removed due to a wrong response on the inducer trial. Representing a loss of `r round(loss[["inducer_fail_pct"]], 2)` percent of the data. 
 
-A total of `r loss$exclude_par_trials + loss$rt_sd_trials + inducer_fail_trials` trials were lost. Representing a loss of `r loss$exclude_par_trials + loss$rt_sd_trials + inducer_fail_trials / loss$data_trials * 100` percent of the data. 
+A total of `r loss$exclude_par_trials + loss$rt_sd_trials + loss$inducer_fail_trials` trials were lost. Representing a loss of `r round(loss$exclude_par_pct + loss$rt_sd_pct + loss$inducer_fail_pct, 2)` percent of the data. 
 
 
 ```{r}
+#| include: FALSE
 # data summary
 d |>
   filter(trial_info=="Diagnostic trial") |>
@@ -114,7 +122,8 @@ d |>
             pct = sum(correct_response==1) / length(correct_response)) -> d2
 ```
 
-```{r RT }
+```{r RT tables }
+#| echo: false
 d2 |>
   pivot_wider( names_from = congruent, values_from = c(rt, pct) ) |>
   ungroup() |>
@@ -144,38 +153,36 @@ d2 |>
     df = t.test( pct_FALSE, pct_TRUE, paired = TRUE )[["parameter"]],
     p = t.test(  pct_FALSE, pct_TRUE, paired = TRUE )[["p.value"]],
   ) -> d_pct
-
-rbind(d_rt, d_pct) |>
-  mutate(p.cor = p.adjust(p, "bonferroni"),
-         ps = case_when(p < .05 ~ "*", p < 0.01 ~ "**", p < 0.001 ~ "***", T ~ "")) |>
-  gt() |> 
-  fmt_number() |>
- # cols_label(name = "") |>
-  tab_spanner(
-    "Incongruent",
-    c(m_incongruent, sd_incongruent) ) |>
-  cols_label(m_incongruent = "M",
-             sd_incongruent = "SD") |>
-  tab_spanner(
-    "Congruent",
-    c(m_congruent, sd_congruent) ) |> 
-  cols_label(
-    m_congruent = "M",
-    sd_congruent = "SD" ) |>
-  tab_footnote("*p < 0.05, **p < 0.01, ***p < 0.001") |>
-  tab_footnote("P's are Bonferroni corrected for 2 tests") |> 
-  tab_spanner(
-    "Test",
-    c(t, df, p.cor))
-    
-    
-  
-
 ```
 
 
-###   Plots          =====
-```{r}
+```{r this should be good enough }
+#| echo: false
+
+rbind(d_rt, d_pct) |>
+  mutate(p.cor = p.adjust(p, "bonferroni"),
+         ps = case_when(p < .05 ~ "*", p < 0.01 ~ "**", p < 0.001 ~ "***", T ~ ""),
+         em1 = "", em2="") |>
+  gt() |>
+  tab_spanner(  "Incongruent", c(m_incongruent, sd_incongruent) ) |>
+  cols_label(   m_incongruent = "M", sd_incongruent = "SD" ) |>
+  tab_spanner(  "Congruent", c(m_congruent, sd_congruent) ) |>
+  cols_label(   m_congruent = "M",  sd_congruent = "SD" ) |>
+  tab_spanner(  "Test", c(t, df, p.cor, ps) ) |>
+  cols_move(    "em1", sd_incongruent) |>
+  cols_move(    "em2", Mdiff) |>
+  cols_label(   ps = "", em1="",em2="", t = md("*t*"), p.cor = md("*p*")) |>
+  cols_hide( "p") |>
+  #fmt_markdown() |>
+  fmt_number()
+  # These do not work, for some reason.
+  # tab_footnote( "*p < 0.05, **p < 0.01, ***p < 0.001" ) |>
+  # tab_footnote( "P's are Bonferroni corrected for 2 tests", placement="left" ) |>
+```
+
+
+```{r plots}
+#| echo: false
 #| fig-dpi: 300
 d2 |>
   mutate(congruent = ifelse(str_detect(congruent, "TRUE"), "Congruent", "Incongruent")) |>
@@ -191,7 +198,7 @@ d2 |>
   geom_point(position = position_dodgenudge(.05, x = .05), alpha = .35)+
   geom_line(aes(group = id), position = position_dodgenudge(.05, x=.05), alpha = .4)+
   stat_summary(fun.data = mean_se, col = "red")+
-  labs(x = "", y = "Response time") -> p2
+  labs(x = "", y = "Response error") -> p2
 
 p1+p2
 ```
