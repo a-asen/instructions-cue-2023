@@ -17,9 +17,10 @@ library(patchwork)
 
 ```{r load data }
 #| include: FALSE
-list.files("../data/raw/experiment1", pattern = "*.csv", full.names = T) -> fnames
+list.files("../data/raw/pilot", pattern = "*.csv", full.names = T) -> fnames
 
-map_df(fnames, \(x){
+fnames2 <- fnames[str_detect(fnames, "2024")][1:4]
+map_df(fnames2, \(x){
   read_csv(x)
 }) -> data
 ```
@@ -35,17 +36,21 @@ data |>
 data |>
   select(id, trial_info, inducer_run, correct_response, rt, congruent) |>
   filter(trial_info == "Diagnostic trial" | trial_info == "Inducer trial") -> d
+
+# d |> filter(!inducer_run=="practice" ) -> d
+  # pilot removing
 ```
 
 
-```{r exclusion--}
+```{r exclusion start - accuracy}
 #| include: FALSE
 loss <- list()
 loss$data_trials <- nrow(d)
-```
 
-```{r exclusion- accuracy less 70 percent }
-#| include: FALSE
+# d |> filter(inducer_run > 0) -> d
+  # Pilot removing
+
+### Overall accuracy      ====
 d |>
   filter( trial_info == "Diagnostic trial" | trial_info == "Inducer trial" ) |>
   group_by( id ) |>
@@ -61,9 +66,8 @@ d |> filter( !(id %in% loss$exclude_par) ) -> d
 
 In total, `r length(loss[["exclude_par"]])` `r ifelse(length(loss[["data_trials"]]) > 1, "participants", "participant")` where excluded due to low accuracy (> 70%). Resulting in a loss of `r loss[["exclude_par_pct"]]` percent of the data.
 
-```{r exclusion- due to high SD & NA responses}
+```{r due to high SD & NA responses }
 #| include: FALSE
-
 # Removing trials more than 2.5 SD (from individual mean) & NA RT 
 d |>
   group_by(id) |>
@@ -86,7 +90,7 @@ d |>
 
 Furthermore, `r loss[["rt_sd_trials"]]` trials were lost due to deviating (2.5 SD) response times and none response(s). Representing a loss of `r round(loss[["rt_sd_pct"]], 2)` percent of the data. 
 
-```{r exclusion- only diag-trials followed by a correct inducer-trial}
+```{r only correct inducers}
 #| include: FALSE
 d |>
   mutate( valid_trials = case_when( trial_info=="Inducer trial" & correct_response==1 ~ 1,
@@ -96,7 +100,7 @@ d |>
 
 sum(d$valid_trials==0) -> loss[["inducer_fail_trials"]]
 sum(d$valid_trials==0) / loss$data_trials * 100 -> loss[["inducer_fail_pct"]]
-
+loss
 d |> filter( valid_trials == 1 ) -> d
 ```
 
@@ -105,9 +109,9 @@ Lastly, `r round(loss[["inducer_fail_trials"]], 2)` trials were removed due to a
 A total of `r loss$exclude_par_trials + loss$rt_sd_trials + loss$inducer_fail_trials` trials were lost. Representing a loss of `r round(loss$exclude_par_pct + loss$rt_sd_pct + loss$inducer_fail_pct, 2)` percent of the data. 
 
 
-```{r data summary}
+```{r}
 #| include: FALSE
-
+# data summary
 d |>
   filter(trial_info=="Diagnostic trial") |>
   group_by(id, congruent) |>
@@ -134,9 +138,14 @@ d2 |>
     df = t.test( rt_FALSE, rt_TRUE, paired = TRUE, alternative = "greater" )[["parameter"]],
     p = t.test(  rt_FALSE, rt_TRUE, paired = TRUE, alternative = "greater" )[["p.value"]],
     p.cor = p.adjust(p, "bonferroni", n=2),
-    )  -> d_rt
-  # incong is greater than cong.
+    d = Mdiff / sqrt(
+      ( (length(rt_FALSE)-1) * sd_incongruent^2 + (length(rt_TRUE)-1) * sd_congruent^2 ) / 
+        ( length(rt_FALSE) + length(rt_TRUE) - 2 )),
+    ) # -> d_rt
 
+
+d2 |> 
+  mutate( diff = pct_FALSE-pct_TRUE)  
 ## proportion correct trials
 d2 |>
   summarise(
@@ -146,29 +155,55 @@ d2 |>
     m_congruent = mean( pct_TRUE ),
     sd_congruent = mean( pct_TRUE ),
     Mdiff = mean( pct_FALSE - pct_TRUE ),
+    conf = t.test(  pct_FALSE, pct_TRUE, paired = TRUE, alternative = "less" )[["conf.int"]] |> pull(),
+
     t = t.test(  pct_FALSE, pct_TRUE, paired = TRUE, alternative = "less" )[["statistic"]],
     df = t.test( pct_FALSE, pct_TRUE, paired = TRUE, alternative = "less" )[["parameter"]],
     p = t.test(  pct_FALSE, pct_TRUE, paired = TRUE, alternative = "less" )[["p.value"]], 
     p.cor = p.adjust(p, "bonferroni", n=2),
-  ) -> d_pct
-  # incong has less correct trials than cong. 
+    d = Mdiff / sqrt(
+      ( (length(rt_FALSE)-1) * sd_incongruent^2 + (length(rt_TRUE)-1) * sd_congruent^2 ) / 
+        ( length(rt_FALSE) + length(rt_TRUE) - 2 )),
+  ) #-> d_pct
 
+#https://chat.openai.com/c/2f8ccce2-3396-4f85-b17a-d73fdaf4b34e
 
-# add bayesian row? 
+t.test(d2$rt_FALSE, d2$rt_TRUE)$conf.int |> as.character() |> str_remove(pattern = " ")#str_trim()#gsub(pattern = "", replacement="")
+
+str_sub(
+  
+)
+str_
+
+attributes(t.test(d2$rt_FALSE, d2$rt_TRUE)$conf.int)
+sloop::ftype()
+test$conf.int
+test$stderr
+test$estimate
+# bayesian
+
+d2 |> 
+  pivot_wider(names_from = congruent, values_from = c(rt, pct)) ->
+  d3 
+BayesFactor::ttestBF(d3$rt_FALSE, d3$rt_TRUE, paired = T, iterations = 10000, ) -> test
+
+# S4 object has @ access (instead of $)
+test@bayesFactor
+test@numerator
 
 ```
 
 
 ```{r stat table}
 #| echo: false
+rbind(d_rt, d_pct) |> summarize(x=sum(df)/length(df)) |> pull() -> d2_df
+if(d2_df == floor(d2_df)) "NOT SIMILAR, CHECK DF"
+  # degrees of freedom
 
 rbind(d_rt, d_pct) |>
-  mutate(p.cor = p.adjust(p, "bonferroni"),
-           # p correction
-         ps = case_when(p < .05 ~ "*", p < 0.01 ~ "**", p < 0.001 ~ "***", T ~ ""),
-           # Sig. indicator 
+  # add bayes row? 
+  mutate(ps = case_when(p.cor < .05 ~ "*", p < 0.01 ~ "**", p < 0.001 ~ "***", T ~ ""),
          em1 = "", em2="") |>
-          # empty  spacers
   gt() |>
   tab_spanner(  "Incongruent", c(m_incongruent, sd_incongruent) ) |>
   cols_label(   m_incongruent = "M", sd_incongruent = "SD" ) |>
@@ -178,40 +213,73 @@ rbind(d_rt, d_pct) |>
   cols_move(    "em1", sd_incongruent) |>
   cols_move(    "em2", Mdiff) |>
   cols_label(   ps = "", em1="",em2="", t = md("*t*"), p.cor = md("*p*")) |>
-  cols_hide(    "p") |>
+  cols_hide( "p") |>
+# bayes row?   
+  
   #fmt_markdown() |>
     # Doesnt play nice with .docx (?)
   fmt_number()
+
   # These do not work, for some reason.
   # tab_footnote( "*p < 0.05, **p < 0.01, ***p < 0.001" ) |>
   # tab_footnote( "P's are Bonferroni corrected for 2 tests", placement="left" ) |>
 ```
+`r cat("*p < .05, **p < .01, ***p < .001")`
+M = Mean, SD = standard deviation, df = `r  d2_df``.
+*Note.* P's are Bonferroni corrected for 2 tests.
+
 
 
 ```{r rt and percent plot}
 #| echo: false
 #| fig-dpi: 300
 
-d2 |>
-  mutate(congruent = ifelse(str_detect(congruent, "TRUE"), "Congruent", "Incongruent")) |>
-  ggplot(aes(x = congruent, y = rt))+
-  geom_point(position = position_dodgenudge(.05, x = .05), alpha = .35)+
-  geom_line(aes(group = id), position = position_dodgenudge(.05, x=.05), alpha = .4)+
-  stat_summary(fun.data = mean_se, col = "red")+
-  labs(x = "", y = "Response time (ms)") -> p1
+# d2 |>
+#   mutate(congruent = ifelse(str_detect(congruent, "TRUE"), "Congruent", "Incongruent")) |>
+#   ggplot(aes(x = congruent, y = rt))+
+#   geom_point(position = position_dodgenudge(.05, x = .05), alpha = .35)+
+#   geom_line(aes(group = id), position = position_dodgenudge(.05, x=.05), alpha = .4)+
+#   stat_summary(fun.data = mean_se, col = "red")+
+#   labs(x = "", y = "Response time (ms)") -> p1
+# 
+# d2 |>
+#   mutate(congruent = ifelse(str_detect(congruent, "TRUE"), "Congruent", "Incongruent")) |>
+#   ggplot(aes(x = congruent, y = pct))+
+#   geom_point(position = position_dodgenudge(.05, x = .05), alpha = .35)+
+#   geom_line(aes(group = id), position = position_dodgenudge(.05, x=.05), alpha = .4)+
+#   stat_summary(fun.data = mean_se, col = "red")+
+#   scale_y_continuous(breaks = seq(0,1,.05), limits = c(.68,1))+
+#   labs(x = "", y = "Proportion of correct ") -> p2
+# 
+# p1+p2
+  # Visualize the difference, not the sum (paired test). 
 
 d2 |>
-  mutate(congruent = ifelse(str_detect(congruent, "TRUE"), "Congruent", "Incongruent")) |>
-  ggplot(aes(x = congruent, y = pct))+
-  geom_point(position = position_dodgenudge(.05, x = .05), alpha = .35)+
-  geom_line(aes(group = id), position = position_dodgenudge(.05, x=.05), alpha = .4)+
-  stat_summary(fun.data = mean_se, col = "red")+
-  scale_y_continuous(breaks = seq(0,1, .05), limits = c(.68, 1))+
-  labs(x = "", y = "Proportion of correct ") -> p2
+  mutate(rt_diff = rt_FALSE-rt_TRUE,
+         pct_diff = pct_FALSE-pct_TRUE) -> d3
+
+d3 |>
+  mutate(across( where(is.numeric), scale)) |>
+    # normalize
+  ggplot(aes(rt_diff))+
+  stat_function(aes(x,), tibble(x=c(-3,3)), fun=dnorm, col="red", linewidth=2, alpha=.3)+
+  geom_density()+
+  scale_x_continuous(breaks=seq(-3,3,1))+
+  labs(x="Standardized difference") -> p1
+    # Theoretical normal distribution over 0
+
+d3 |>
+  mutate(across( where(is.numeric), scale)) |>
+    # normalize
+  ggplot(aes(pct_diff))+
+  stat_function(aes(x,), tibble(x=c(-3,3)), fun=dnorm, col="red", linewidth=2, alpha=.3)+
+  geom_density()+
+  scale_x_continuous(breaks=seq(-3,3,1))+
+  labs(x="Standardized difference", y="") -> p2
+    # Theoretical normal distribution over 0
 
 p1+p2
 ```
-
 
 
 
