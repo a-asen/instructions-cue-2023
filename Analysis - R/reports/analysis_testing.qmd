@@ -126,6 +126,7 @@ d |>
 
 # Freq:
 ## response times
+rt_test <- t.test( d2$rt_FALSE, d2$rt_TRUE, paired = TRUE, alternative = "greater" )
 d2 |>
   summarise(
     name = "RT",
@@ -134,19 +135,19 @@ d2 |>
     m_congruent = mean(rt_TRUE),
     sd_congruent = sd(rt_TRUE),
     Mdiff = mean( rt_FALSE - rt_TRUE),
-    t = t.test(  rt_FALSE, rt_TRUE, paired = TRUE, alternative = "greater" )[["statistic"]],
-    df = t.test( rt_FALSE, rt_TRUE, paired = TRUE, alternative = "greater" )[["parameter"]],
-    p = t.test(  rt_FALSE, rt_TRUE, paired = TRUE, alternative = "greater" )[["p.value"]],
+    t = rt_test$statistic,
+    df = rt_test$parameter,
+    p = rt_test$p.value,
+    conf.l = rt_test$conf.int[1],
+    conf.h = rt_test$conf.int[2],
     p.cor = p.adjust(p, "bonferroni", n=2),
     d = Mdiff / sqrt(
       ( (length(rt_FALSE)-1) * sd_incongruent^2 + (length(rt_TRUE)-1) * sd_congruent^2 ) / 
         ( length(rt_FALSE) + length(rt_TRUE) - 2 )),
-    ) # -> d_rt
+    )  -> d_rt
 
-
-d2 |> 
-  mutate( diff = pct_FALSE-pct_TRUE)  
 ## proportion correct trials
+pct_test <- t.test(  d2$pct_FALSE, d2$pct_TRUE, paired = TRUE, alternative = "less" )
 d2 |>
   summarise(
     name = "PCT",
@@ -155,38 +156,41 @@ d2 |>
     m_congruent = mean( pct_TRUE ),
     sd_congruent = mean( pct_TRUE ),
     Mdiff = mean( pct_FALSE - pct_TRUE ),
-    conf = t.test(  pct_FALSE, pct_TRUE, paired = TRUE, alternative = "less" )[["conf.int"]] |> pull(),
-
-    t = t.test(  pct_FALSE, pct_TRUE, paired = TRUE, alternative = "less" )[["statistic"]],
-    df = t.test( pct_FALSE, pct_TRUE, paired = TRUE, alternative = "less" )[["parameter"]],
-    p = t.test(  pct_FALSE, pct_TRUE, paired = TRUE, alternative = "less" )[["p.value"]], 
+    t = pct_test$statistic,
+    df = pct_test$parameter,
+    p = pct_test$p.value,
     p.cor = p.adjust(p, "bonferroni", n=2),
+    conf.l = pct_test$conf.int[1],
+    conf.h = pct_test$conf.int[2],
     d = Mdiff / sqrt(
       ( (length(rt_FALSE)-1) * sd_incongruent^2 + (length(rt_TRUE)-1) * sd_congruent^2 ) / 
         ( length(rt_FALSE) + length(rt_TRUE) - 2 )),
-  ) #-> d_pct
+  ) -> d_pct
 
 #https://chat.openai.com/c/2f8ccce2-3396-4f85-b17a-d73fdaf4b34e
 
-t.test(d2$rt_FALSE, d2$rt_TRUE)$conf.int |> as.character() |> str_remove(pattern = " ")#str_trim()#gsub(pattern = "", replacement="")
 
-str_sub(
-  
-)
-str_
+library(BayesFactor)
+BayesFactor
+bayestestR::hdi(test) -> test2
 
-attributes(t.test(d2$rt_FALSE, d2$rt_TRUE)$conf.int)
-sloop::ftype()
+test2$CI_high
+
+test@
+test2[1,c("CI_low", "CI_high")]
+
+as.data.frame(test[,1:4]) |>
+  summarize(t = mean(mu))
+
+sloop::otype(test2)
 test$conf.int
 test$stderr
 test$estimate
 # bayesian
 
-d2 |> 
-  pivot_wider(names_from = congruent, values_from = c(rt, pct)) ->
-  d3 
-BayesFactor::ttestBF(d3$rt_FALSE, d3$rt_TRUE, paired = T, iterations = 10000, ) -> test
-
+BayesFactor::ttestBF(d2$rt_FALSE, d2$rt_TRUE, paired = T, iterations = 10000, posterior = T) -> test
+mean(test)
+mean(test[,"mu"])
 # S4 object has @ access (instead of $)
 test@bayesFactor
 test@numerator
@@ -197,7 +201,7 @@ test@numerator
 ```{r stat table}
 #| echo: false
 rbind(d_rt, d_pct) |> summarize(x=sum(df)/length(df)) |> pull() -> d2_df
-if(d2_df == floor(d2_df)) "NOT SIMILAR, CHECK DF"
+if(d2_df != floor(d2_df)){warning("NOT SIMILAR, CHECK DF")}
   # degrees of freedom
 
 rbind(d_rt, d_pct) |>
@@ -209,13 +213,17 @@ rbind(d_rt, d_pct) |>
   cols_label(   m_incongruent = "M", sd_incongruent = "SD" ) |>
   tab_spanner(  "Congruent", c(m_congruent, sd_congruent) ) |>
   cols_label(   m_congruent = "M",  sd_congruent = "SD" ) |>
-  tab_spanner(  "Test", c(t, df, p.cor, ps) ) |>
-  cols_move(    "em1", sd_incongruent) |>
-  cols_move(    "em2", Mdiff) |>
-  cols_label(   ps = "", em1="",em2="", t = md("*t*"), p.cor = md("*p*")) |>
-  cols_hide( "p") |>
-# bayes row?   
-  
+  ##
+  cols_move(    "ps", Mdiff ) |> 
+  cols_move(    "em1", sd_incongruent ) |>
+  cols_move(    "em2", ps ) |>
+  tab_spanner(  "Interval", c(conf.l, conf.h)) |> 
+  cols_label(   conf.l="Low", conf.h="High") |>
+  cols_hide(    c(p, t, df, p.cor) ) |> 
+  cols_label(   em1="",em2="", ) |>
+  cols_align(   "center", c(2:6, conf.l, conf.h)) |> 
+  cols_align(   "left", ps) |> 
+  cols_label(   ps = "" )  |>
   #fmt_markdown() |>
     # Doesnt play nice with .docx (?)
   fmt_number()
