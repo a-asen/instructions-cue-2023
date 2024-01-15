@@ -55,6 +55,7 @@ const inducer_colours = ["red", "yellow", "blue"]      // Inducer colour randomi
 
 ////    Diagnostic parameters   ////
 const number_of_inducers = 11;       // Number of inducers 
+    // !!! CHANGE max trials !!! 
 const diagnostic_min_length = 4         // Min run length
 const diagnostic_max_length = 16     // Max run length
 const max_diagnostic_trials = 100     // Total max diagnostic trials
@@ -357,10 +358,9 @@ const about_the_experiment_and_consent = {
         `<div style="font-size:${instruction_font_size}"> 
         
         <h3>About the experiment</h3>                
-        In this experiment, you will be presented with targets that require either a left or right response. \n
-        These correspond to the F and J keys on the keyboard. \n
-        <br>
-        Your task will be to respond as <b> fast and accurately </b> to the current condition as possible. \n
+        In this experiment, you will be presented with 3-letter non-words. <br> 
+        The non-words responded to with either a left (<b>F</b> key) or right (<b>J</b> key) response. <br>
+        Instructions will be provided, describing the relationship between the 3-letter non-word and the responses. <br>
         <br><br>
         At the end of the experiment, you will receive the opportunity to provide feedback. 
         </div>`,
@@ -370,14 +370,14 @@ const about_the_experiment_and_consent = {
         
         <h3> Consent </h3>
         
-        Participation in the study is voluntary. \n
-        All responses to this experiment are collected and stored anonymously.\n
-        That means they cannot be traced back to you. \n
-        The anonymous storage means we cannot provide participants with their responses upon request. \n
-        You can quit the experiment without giving a reason by closing the browser tab. No data will be stored in that case.\n
+        Participation in the study is voluntary. <br> 
+        All responses to this experiment are collected and stored anonymously. \n
+        That means they cannot be traced back to you. <br>
+        The anonymous storage means we cannot provide participants with their responses upon request. <br>
+        You can quit the experiment without giving a reason by closing the browser tab. No data will be stored in that case.
         <br><br> 
         The data will be publicly available for anyone to download. \n
-        By clicking NEXT, you agree to have your data used in this manner.\n
+        By clicking NEXT, you agree to have your data used in this manner. <br>
         <i>Importantly, your data is anonymous and cannot be traced back to you</i>.\n
         </div>`,
 
@@ -397,10 +397,10 @@ if( !skip_instructions ){
         type: jsPsychFullscreen,
         message: `<div style="font-size:${instruction_font_size}">
         
-        The experiment will proceed quickly, without any breaks, \n
-        please ensure that you are in a quiet environment where you are unlikely to be distracted/disrupted.      
-        The experiment lasts for approximately 20 minutes. <br><br>
-
+        The experiment will proceed quickly, without any breaks, <br>
+        please ensure that you are in a quiet environment where you are unlikely to be distracted/disrupted. <br>
+        The experiment lasts for approximately 20 minutes. 
+        <br><br>
         This experiment requires full screen. If you are ready, enable full screen to proceed.
         <br><br>
         </div>`,
@@ -431,13 +431,14 @@ let diagnostic_task_instruction_description = {
         return [
             // FIRST, what keys will be used in this experiment? 
             `<div style="font-size:${instruction_font_size}">
-            
-            The task will present 3-letter none-words that require either a left or right response. <br>
+            <h3> The task </h3><br>
+            The task will present 3-letter non-words that require either a left or right response. <br>
             A left response corresponds to the <b>F</b> key, and a right response corresponds to the <b>J</b> key.
             <br><br>
-            The task consists of two different instructions. <br>
-            The instructions relate specifically to the colour of the 3-letter none-word. <br>
-            One of the instructions remain the same throughout the task, while the other changes throughout the task. <br>
+            The task consists of two instructions: <br>
+            One instruction remains the same throughout the task, and is related to non-words presented in <b>black colour</b>. <br>
+            One instruction changes throughout the task, and is related to non-words presented in <b> \n
+            <span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour.toLowerCase() + " colour"}</span></b>.
             <br><br>
             You will receive a maximum of 20 seconds to read the instructions (which is plenty of time). <br>
             The task will be difficult, but feedback will be provided. 
@@ -447,11 +448,11 @@ let diagnostic_task_instruction_description = {
             // About the first task
             `<div style="font-size:${instruction_font_size}">
 
-            On the next screen, the first instructions will be presented. <br>
-            This instruction will <b>remain the same throughout the task</b>. <br>
-            It is only related to 3-letter none-words presented in <b> black colour</b>.  <br>
+            On the next screen, the instruction that remains the same throughout the task, will be presented. <br>
+            (Related to non-wrods presented in <b> black colour</b>.)  
+            <br><br>
             A couple of practice rounds will be presented. 
-            <br><br><br>
+            <br><br>
             The practice starts by clicking NEXT.
 
             </div>`,
@@ -574,10 +575,11 @@ if(prac_diagnostic_rounds > 0 && !skip_instructions){ // & skip_instructions ===
                     // FIRST, what keys will be used in this experiment? 
                     `<div style="font-size:${instruction_font_size}">
                     
-                    On the next screen, the second instruction will be presented. <br>
-                    It is only related to 3-letter none-words that appear in <b>
-                    <span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour.toLowerCase() + " colour"}</span></b>. <br>
-                    This instruction changes throughout the task, and is only executed once. \n
+                    On the next screen, the instruction that changes throughout the task, will be presented. <br>
+                    (Related to non-words presented in <b> \n
+                    <span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour.toLowerCase() + " colour"}</span></b>.)
+                    <br><br>
+                    The instructions will have the same format, but describe new 3-letter non-words. 
                     <br>
                     A couple of practice trials will be presented.
                     <br><br><br>
@@ -587,6 +589,7 @@ if(prac_diagnostic_rounds > 0 && !skip_instructions){ // & skip_instructions ===
             },
             allow_keys: false, 
             show_clickable_nav: true,
+            button_label_previous: "",
             button_label_next: "Start",
             post_trial_gap: 1500,
             data: { stimulus: "Instructions", trial_info: "Final experiment explanation" },
@@ -677,11 +680,15 @@ if(prac_diagnostic_rounds > 0 && !skip_instructions){ // & skip_instructions ===
             return `<div style="font-size:${instruction_font_size}">
             You have now completed the practice.
             <br><br>
+            Keep in mind:<br>
+            The unchanging instruction relates to 3-letter non-words presented in <b>black colour</b>.
+            The changing instruction relates to 3-letter non-words presented in <b>\n
+            <span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour.toLowerCase() + " colour"}</span></b>.<br><br>
             </div>`
             //  
         }, 
-        prompt: "Press any key to start the task",
-        choices: "ALL_KEYS", 
+        prompt: "Press SPACE to start the task",
+        choices: " ", 
         data: {
             stimulus: `End practice`,
             trial_info: "End of practice",
