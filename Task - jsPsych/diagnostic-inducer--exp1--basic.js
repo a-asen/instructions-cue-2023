@@ -371,12 +371,12 @@ const about_the_experiment_and_consent = {
         <h3> Consent </h3>
         
         Participation in the study is voluntary. \n
-        All responses to this experiment are collected and stored anonymously. That means they cannot be traced back to you. \n
+        All responses to this experiment are collected and stored anonymously.\n
+        That means they cannot be traced back to you. \n
         The anonymous storage means we cannot provide participants with their responses upon request. \n
         You can quit the experiment without giving a reason by closing the browser tab. No data will be stored in that case.\n
         <br><br> 
-        For scientific rigour, we will follow a practice known as "open science". \n
-        In that spirit, we will make the data publicly available for anyone to download. \n
+        The data will be publicly available for anyone to download. \n
         By clicking NEXT, you agree to have your data used in this manner.\n
         <i>Importantly, your data is anonymous and cannot be traced back to you</i>.\n
         </div>`,
@@ -432,12 +432,14 @@ let diagnostic_task_instruction_description = {
             // FIRST, what keys will be used in this experiment? 
             `<div style="font-size:${instruction_font_size}">
             
-            The task will present 3-letter none-words that requires either a left or right response. <br>
-            The response is based on a specific feature of the 3-letter none-word. <br>
-            The task will present two instructions, relating to two different features of the 3-letter none-word. <br>
-            This task will use the responses F (corresponding to a LEFT response) and the response J (corresponding to a RIGHT response). <br>
-            You will receive a maximum of 20 seconds reading the instructions (which is plenty of time). 
+            The task will present 3-letter none-words that require either a left or right response. <br>
+            A left response corresponds to the <b>F</b> key, and a right response corresponds to the <b>J</b> key.
             <br><br>
+            The task consists of two different instructions. <br>
+            The instructions relate specifically to the colour of the 3-letter none-word. <br>
+            One of the instructions remain the same throughout the task, while the other changes throughout the task. <br>
+            <br><br>
+            You will receive a maximum of 20 seconds to read the instructions (which is plenty of time). <br>
             The task will be difficult, but feedback will be provided. 
             
             </div> `,
@@ -445,11 +447,12 @@ let diagnostic_task_instruction_description = {
             // About the first task
             `<div style="font-size:${instruction_font_size}">
 
-            In the next screen, the first instructions will be presented. <br>
-            This instruction will remain the same throughout the task.  <br>
-            A couple of practice rounds will be provided. 
+            On the next screen, the first instructions will be presented. <br>
+            This instruction will <b>remain the same throughout the task</b>. <br>
+            It is only related to 3-letter none-words presented in <b> black colour</b>.  <br>
+            A couple of practice rounds will be presented. 
             <br><br><br>
-            The practice starts when you click NEXT.
+            The practice starts by clicking NEXT.
 
             </div>`,
         ]
@@ -571,18 +574,20 @@ if(prac_diagnostic_rounds > 0 && !skip_instructions){ // & skip_instructions ===
                     // FIRST, what keys will be used in this experiment? 
                     `<div style="font-size:${instruction_font_size}">
                     
-                    In the next screen the second instructions will be presented. <br>
-                    This instruction changes throughout the task, and relates to the 3-letter none-words that appear in 
-                    <span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour.toLowerCase() + " colour"}</span>.\n
+                    On the next screen, the second instruction will be presented. <br>
+                    It is only related to 3-letter none-words that appear in <b>
+                    <span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour.toLowerCase() + " colour"}</span></b>. <br>
+                    This instruction changes throughout the task, and is only executed once. \n
                     <br>
                     A couple of practice trials will be presented.
                     <br><br><br>
-                    The practice round starts when you click NEXT.
+                    The practice round starts when you click "Start".
                     </div>`,
                 ]
             },
             allow_keys: false, 
             show_clickable_nav: true,
+            button_label_next: "Start",
             post_trial_gap: 1500,
             data: { stimulus: "Instructions", trial_info: "Final experiment explanation" },
             on_finish: (data) => {
@@ -670,12 +675,13 @@ if(prac_diagnostic_rounds > 0 && !skip_instructions){ // & skip_instructions ===
         type: jsPsychHtmlKeyboardResponse,
         stimulus: function(){   
             return `<div style="font-size:${instruction_font_size}">
-            You have now completed the practice. The main task will be presented by pressing SPACE.<br>
+            You have now completed the practice.
+            <br><br>
             </div>`
             //  
         }, 
-        prompt: "Press SPACE to start the task",
-        choices: " ", 
+        prompt: "Press any key to start the task",
+        choices: "ALL_KEYS", 
         data: {
             stimulus: `End practice`,
             trial_info: "End of practice",
