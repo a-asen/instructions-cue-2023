@@ -358,9 +358,9 @@ const about_the_experiment_and_consent = {
         `<div style="font-size:${instruction_font_size}"> 
         
         <h3>About the experiment</h3>                
-        In this experiment, you will be presented with 3-letter non-words. <br> 
+        In this experiment, you will be presented with 3-character non-words. <br> 
         The non-words responded to with either a left (<b>F</b> key) or right (<b>J</b> key) response. <br>
-        Instructions will be provided, describing the relationship between the 3-letter non-word and the responses. <br>
+        Instructions will be provided, describing the relationship between the 3-character non-word and the responses. <br>
         <br><br>
         At the end of the experiment, you will receive the opportunity to provide feedback. 
         </div>`,
@@ -376,8 +376,8 @@ const about_the_experiment_and_consent = {
         The anonymous storage means we cannot provide participants with their responses upon request. <br>
         You can quit the experiment without giving a reason by closing the browser tab. No data will be stored in that case.
         <br><br> 
-        The data will be publicly available for anyone to download. \n
-        By clicking NEXT, you agree to have your data used in this manner. <br>
+        The data will be used for scientific purposes. <br> 
+        If you agree to these terms and conditions and want to participate click NEXT. <br>
         <i>Importantly, your data is anonymous and cannot be traced back to you</i>.\n
         </div>`,
 
@@ -432,7 +432,7 @@ let diagnostic_task_instruction_description = {
             // FIRST, what keys will be used in this experiment? 
             `<div style="font-size:${instruction_font_size}">
             <h3> The task </h3><br>
-            The task will present 3-letter non-words that require either a left or right response. <br>
+            The task will present 3-character non-words that require either a left or right response. <br>
             A left response corresponds to the <b>F</b> key, and a right response corresponds to the <b>J</b> key.
             <br><br>
             The task consists of two instructions: <br>
@@ -440,7 +440,7 @@ let diagnostic_task_instruction_description = {
             One instruction changes throughout the task, and is related to non-words presented in <b> \n
             <span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour.toLowerCase() + " colour"}</span></b>.
             <br><br>
-            You will receive a maximum of 20 seconds to read the instructions (which is plenty of time). <br>
+            You will receive a maximum of 20 seconds to read the instructions. <br>
             The task will be difficult, but feedback will be provided. 
             
             </div> `,
@@ -451,7 +451,8 @@ let diagnostic_task_instruction_description = {
             On the next screen, the instruction that remains the same throughout the task, will be presented. <br>
             (Related to non-wrods presented in <b> black colour</b>.)  
             <br><br>
-            A couple of practice rounds will be presented. 
+            A couple of practice rounds will be presented. <br>
+            The practice will have no time limit, but the main task will have a time limit. 
             <br><br>
             The practice starts by clicking NEXT.
 
@@ -522,7 +523,7 @@ if(prac_diagnostic_rounds > 0 && !skip_instructions){ // & skip_instructions ===
                 }
             }, 
             choices: allowed_responses,
-            trial_duration: trial_duration,
+            trial_duration: 0,
             data: {
                 stimulus: rnd_diag_stim,         // Stimulus
                 inducer_run: "practice",                   // Inducer run number (i.e., block)
@@ -579,7 +580,7 @@ if(prac_diagnostic_rounds > 0 && !skip_instructions){ // & skip_instructions ===
                     (Related to non-words presented in <b> \n
                     <span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour.toLowerCase() + " colour"}</span></b>.)
                     <br><br>
-                    The instructions will have the same format, but describe new 3-letter non-words. 
+                    The instructions will have the same format, but describe two new 3-character non-words. 
                     <br>
                     A couple of practice trials will be presented.
                     <br><br><br>
@@ -617,7 +618,7 @@ if(prac_diagnostic_rounds > 0 && !skip_instructions){ // & skip_instructions ===
                 return  `<p style="font-size: ${general_font_size}"> If <span style="color: ${rnd_inducer_colour}">${prac_stim[0]}</span> press ${response_sides[0]}`+
                         `<p style="font-size: ${general_font_size}"> If <span style="color: ${rnd_inducer_colour}">${prac_stim[1]}</span> press ${response_sides[1]}`; 
             }, 
-            prompt: "Press SPACE to continue",
+            prompt: "Put your index fingers on the F and J key. <br> When you are ready, press SPACE to continue.",
             choices: " ", 
             data: {
                 stimulus: `If ${prac_stim[0]} press ${response_sides[0]} | If ${prac_stim[1]} press ${response_sides[1]}`,
@@ -641,7 +642,7 @@ if(prac_diagnostic_rounds > 0 && !skip_instructions){ // & skip_instructions ===
             type: jsPsychHtmlKeyboardResponse,
             stimulus: () => { return `<p style="font-size: ${general_font_size}; color:${rnd_inducer_colour}">${rnd_inducer_stimulus}` },
             choices: allowed_responses,
-            trial_duration: trial_duration,
+            trial_duration: 0,
             data: {
                 stimulus: rnd_inducer_stimulus,         // Stimulus
                 inducer_run: "practice",                // Inducer run number
@@ -681,8 +682,8 @@ if(prac_diagnostic_rounds > 0 && !skip_instructions){ // & skip_instructions ===
             You have now completed the practice.
             <br><br>
             Keep in mind:<br>
-            The unchanging instruction relates to 3-letter non-words presented in <b>black colour</b>.
-            The changing instruction relates to 3-letter non-words presented in <b>\n
+            The unchanging instruction relates to 3-character non-words presented in <b>black colour</b>.
+            The changing instruction relates to 3-character non-words presented in <b>\n
             <span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour.toLowerCase() + " colour"}</span></b>.<br><br>
             </div>`
             //  
