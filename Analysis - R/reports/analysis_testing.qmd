@@ -13,6 +13,8 @@ library(tidyverse)
 library(ggpp)
 library(gt)
 library(patchwork)
+library(BayesFactor)
+library(bayestestR)
 ```
 
 ```{r load data }
@@ -127,6 +129,8 @@ d |>
 # Freq:
 ## response times
 rt_test <- t.test( d2$rt_FALSE, d2$rt_TRUE, paired = TRUE, alternative = "greater" )
+rt_test_b <- ttestBF( d2$rt_FALSE, d2$rt_TRUE, paired = T, iterations = 10000, posterior = F )
+
 d2 |>
   summarise(
     name = "RT",
@@ -138,9 +142,10 @@ d2 |>
     t = rt_test$statistic,
     df = rt_test$parameter,
     p = rt_test$p.value,
-    conf.l = rt_test$conf.int[1],
-    conf.h = rt_test$conf.int[2],
     p.cor = p.adjust(p, "bonferroni", n=2),
+    bf = extractBF(rt_test_b)$bf,
+    hdi.l = hdi(rt_test_b)$CI_low,
+    hdi.h = hdi(rt_test_b)$CI_high,
     d = Mdiff / sqrt(
       ( (length(rt_FALSE)-1) * sd_incongruent^2 + (length(rt_TRUE)-1) * sd_congruent^2 ) / 
         ( length(rt_FALSE) + length(rt_TRUE) - 2 )),
@@ -148,6 +153,8 @@ d2 |>
 
 ## proportion correct trials
 pct_test <- t.test(  d2$pct_FALSE, d2$pct_TRUE, paired = TRUE, alternative = "less" )
+pct_test_b <- ttestBF( d2$pct_FALSE, d2$pct_TRUE, paired = T, iterations = 10000, posterior = F )
+
 d2 |>
   summarise(
     name = "PCT",
@@ -160,40 +167,14 @@ d2 |>
     df = pct_test$parameter,
     p = pct_test$p.value,
     p.cor = p.adjust(p, "bonferroni", n=2),
-    conf.l = pct_test$conf.int[1],
-    conf.h = pct_test$conf.int[2],
+    bf = extractBF(pct_test_b)$bf,
+    hdi.l = hdi(pct_test_b)$CI_low,
+    hdi.h = hdi(pct_test_b)$CI_high,
     d = Mdiff / sqrt(
       ( (length(rt_FALSE)-1) * sd_incongruent^2 + (length(rt_TRUE)-1) * sd_congruent^2 ) / 
         ( length(rt_FALSE) + length(rt_TRUE) - 2 )),
   ) -> d_pct
 
-#https://chat.openai.com/c/2f8ccce2-3396-4f85-b17a-d73fdaf4b34e
-
-
-library(BayesFactor)
-BayesFactor
-bayestestR::hdi(test) -> test2
-
-test2$CI_high
-
-test@
-test2[1,c("CI_low", "CI_high")]
-
-as.data.frame(test[,1:4]) |>
-  summarize(t = mean(mu))
-
-sloop::otype(test2)
-test$conf.int
-test$stderr
-test$estimate
-# bayesian
-
-BayesFactor::ttestBF(d2$rt_FALSE, d2$rt_TRUE, paired = T, iterations = 10000, posterior = T) -> test
-mean(test)
-mean(test[,"mu"])
-# S4 object has @ access (instead of $)
-test@bayesFactor
-test@numerator
 
 ```
 
@@ -210,20 +191,20 @@ rbind(d_rt, d_pct) |>
          em1 = "", em2="") |>
   gt() |>
   tab_spanner(  "Incongruent", c(m_incongruent, sd_incongruent) ) |>
-  cols_label(   m_incongruent = "M", sd_incongruent = "SD" ) |>
+  cols_label(   m_incongruent = md("*M*"), sd_incongruent = md("*SD*" ) ) |>
   tab_spanner(  "Congruent", c(m_congruent, sd_congruent) ) |>
-  cols_label(   m_congruent = "M",  sd_congruent = "SD" ) |>
+  cols_label(   m_congruent = md("*M*"),  sd_congruent = md("*SD*") ) |>
+  tab_spanner(  "Bayes", c(bf, hdi.l, hdi.h)) |>
+  cols_label(   bf = "BF10", hdi.l = "Low", hdi.h="High") |>
   ##
   cols_move(    "ps", Mdiff ) |> 
   cols_move(    "em1", sd_incongruent ) |>
   cols_move(    "em2", ps ) |>
-  tab_spanner(  "Interval", c(conf.l, conf.h)) |> 
-  cols_label(   conf.l="Low", conf.h="High") |>
   cols_hide(    c(p, t, df, p.cor) ) |> 
-  cols_label(   em1="",em2="", ) |>
-  cols_align(   "center", c(2:6, conf.l, conf.h)) |> 
+  cols_label(   em1="",em2="", name = "") |>
+  cols_align(   "center", c(2:15)) |> 
   cols_align(   "left", ps) |> 
-  cols_label(   ps = "" )  |>
+  cols_label(   ps = "", d = md("*d*"))  |>
   #fmt_markdown() |>
     # Doesnt play nice with .docx (?)
   fmt_number()
@@ -238,29 +219,9 @@ M = Mean, SD = standard deviation, df = `r  d2_df``.
 
 
 
-```{r rt and percent plot}
+```{r rt and percent plot - difference to baseline}
 #| echo: false
 #| fig-dpi: 300
-
-# d2 |>
-#   mutate(congruent = ifelse(str_detect(congruent, "TRUE"), "Congruent", "Incongruent")) |>
-#   ggplot(aes(x = congruent, y = rt))+
-#   geom_point(position = position_dodgenudge(.05, x = .05), alpha = .35)+
-#   geom_line(aes(group = id), position = position_dodgenudge(.05, x=.05), alpha = .4)+
-#   stat_summary(fun.data = mean_se, col = "red")+
-#   labs(x = "", y = "Response time (ms)") -> p1
-# 
-# d2 |>
-#   mutate(congruent = ifelse(str_detect(congruent, "TRUE"), "Congruent", "Incongruent")) |>
-#   ggplot(aes(x = congruent, y = pct))+
-#   geom_point(position = position_dodgenudge(.05, x = .05), alpha = .35)+
-#   geom_line(aes(group = id), position = position_dodgenudge(.05, x=.05), alpha = .4)+
-#   stat_summary(fun.data = mean_se, col = "red")+
-#   scale_y_continuous(breaks = seq(0,1,.05), limits = c(.68,1))+
-#   labs(x = "", y = "Proportion of correct ") -> p2
-# 
-# p1+p2
-  # Visualize the difference, not the sum (paired test). 
 
 d2 |>
   mutate(rt_diff = rt_FALSE-rt_TRUE,
@@ -273,7 +234,8 @@ d3 |>
   stat_function(aes(x,), tibble(x=c(-3,3)), fun=dnorm, col="red", linewidth=2, alpha=.3)+
   geom_density()+
   scale_x_continuous(breaks=seq(-3,3,1))+
-  labs(x="Standardized difference") -> p1
+  labs(title = "Response time", x="Standardized difference") + 
+  theme_minimal() -> p1
     # Theoretical normal distribution over 0
 
 d3 |>
@@ -283,11 +245,43 @@ d3 |>
   stat_function(aes(x,), tibble(x=c(-3,3)), fun=dnorm, col="red", linewidth=2, alpha=.3)+
   geom_density()+
   scale_x_continuous(breaks=seq(-3,3,1))+
-  labs(x="Standardized difference", y="") -> p2
+  labs(title = "Proportion correct trials", x="Standardized difference", y="")+
+  theme_minimal() -> p2
     # Theoretical normal distribution over 0
 
 p1+p2
 ```
 
+```{r}
+#| echo: false
+#| fig-dpi: 300
 
+# This way of visualizing is not necessarily the best -- it can illustate each
+# change in data (congruent/incongruent), but summary score should not be used with it
+
+d2 |>
+  pivot_longer(c(rt_FALSE,rt_TRUE)) |>
+  mutate(name = ifelse(name=="rt_FALSE", "Incongruent", "Congruent")) |> 
+  ggplot(aes(x = name, y = value))+
+  geom_point(position = position_dodgenudge(.05, x = .05), alpha = .35)+
+  geom_line(aes(group = id), position = position_dodgenudge(.05, x=.05), alpha = .4)
+  stat_summary(fun.data = mean_se, col = "red")+
+  scale_y_continuous(breaks=seq(0,2000,50), expand = c(.5,.5), minor_breaks = NULL)+
+  labs(title = "Response time", x = "", y = "Response time (ms)")+
+  theme_minimal() #-> p1
+
+d2 |>
+  pivot_longer(c(pct_FALSE,pct_TRUE)) |>
+  mutate(name = ifelse(name=="pct_FALSE", "Incongruent", "Congruent")) |> 
+  ggplot(aes(x = name, y = value))+
+  geom_point(position = position_jitter(width=.05, seed = 1), alpha = .35)+
+  geom_line(aes(group = id), position = position_jitter(width=.05, seed = 1), alpha = .4)+
+  stat_summary(fun.data = mean_se, col = "red") 
+  scale_y_continuous(breaks = seq(0,1,.05), limits = c(.68,1))+
+  labs(title = "Proportion correct trials", x = "", y = "Proportion of correct ")+
+  theme_minimal() -> p2
+
+p1+p2
+# rm summary
+```
 
