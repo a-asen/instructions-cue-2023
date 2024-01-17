@@ -10,7 +10,7 @@ editor:
 ```{r libraries }
 #| include: FALSE
 library(tidyverse)
-library(ggpp)
+# library(ggpp) # not used?
 library(gt)
 library(patchwork)
 ```

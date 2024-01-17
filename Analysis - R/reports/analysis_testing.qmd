@@ -10,23 +10,24 @@ editor:
 ```{r libraries }
 #| include: FALSE
 library(tidyverse)
-library(ggpp)
+#library(ggpp)
 library(gt)
 library(patchwork)
 library(BayesFactor)
 library(bayestestR)
+library(lsr)
+source("../lib/helper_functions.R")
 ```
 
 ```{r load data }
 #| include: FALSE
 list.files("../data/raw/pilot", pattern = "*.csv", full.names = T) -> fnames
 
-fnames2 <- fnames[str_detect(fnames, "2024")][1:4]
+fnames2 <- fnames[str_detect(fnames, "2024")]
 map_df(fnames2, \(x){
   read_csv(x)
 }) -> data
 ```
-
 
 ```{r transformation}
 #| include: FALSE
@@ -42,7 +43,6 @@ data |>
 # d |> filter(!inducer_run=="practice" ) -> d
   # pilot removing
 ```
-
 
 ```{r exclusion start - accuracy}
 #| include: FALSE
@@ -64,9 +64,12 @@ loss[["exclude_par_trials"]] <- length( d$rt[d$id == loss$exclude_par] )
 loss[["exclude_par_pct"]] <- length( d$rt[d$id == loss$exclude_par] ) / loss$data_trials * 100
 
 d |> filter( !(id %in% loss$exclude_par) ) -> d
-``` 
+```
 
-In total, `r length(loss[["exclude_par"]])` `r ifelse(length(loss[["data_trials"]]) > 1, "participants", "participant")` where excluded due to low accuracy (> 70%). Resulting in a loss of `r loss[["exclude_par_pct"]]` percent of the data.
+In total, `r length(loss[["exclude_par"]])`
+`r ifelse(length(loss[["data_trials"]]) > 1, "participants", "participant")`
+where excluded due to low accuracy (\> 70%). Resulting in a
+loss of `r loss[["exclude_par_pct"]]` percent of the data.
 
 ```{r due to high SD & NA responses }
 #| include: FALSE
@@ -90,7 +93,10 @@ d |>
   filter( retain_trials == 1 ) -> d
 ```
 
-Furthermore, `r loss[["rt_sd_trials"]]` trials were lost due to deviating (2.5 SD) response times and none response(s). Representing a loss of `r round(loss[["rt_sd_pct"]], 2)` percent of the data. 
+Furthermore, `r loss[["rt_sd_trials"]]` trials were lost due
+to deviating (2.5 SD) response times and none response(s).
+Representing a loss of `r round(loss[["rt_sd_pct"]], 2)`
+percent of the data.
 
 ```{r only correct inducers}
 #| include: FALSE
@@ -106,10 +112,16 @@ loss
 d |> filter( valid_trials == 1 ) -> d
 ```
 
-Lastly, `r round(loss[["inducer_fail_trials"]], 2)` trials were removed due to a wrong response on the inducer trial. Representing a loss of `r round(loss[["inducer_fail_pct"]], 2)` percent of the data. 
+Lastly, `r round(loss[["inducer_fail_trials"]], 2)` trials
+were removed due to a wrong response on the inducer trial.
+Representing a loss of
+`r round(loss[["inducer_fail_pct"]], 2)` percent of the data.
 
-A total of `r loss$exclude_par_trials + loss$rt_sd_trials + loss$inducer_fail_trials` trials were lost. Representing a loss of `r round(loss$exclude_par_pct + loss$rt_sd_pct + loss$inducer_fail_pct, 2)` percent of the data. 
-
+A total of
+`r loss$exclude_par_trials + loss$rt_sd_trials + loss$inducer_fail_trials`
+trials were lost. Representing a loss of
+`r round(loss$exclude_par_pct + loss$rt_sd_pct + loss$inducer_fail_pct, 2)`
+percent of the data.
 
 ```{r}
 #| include: FALSE
@@ -130,7 +142,9 @@ d |>
 ## response times
 rt_test <- t.test( d2$rt_FALSE, d2$rt_TRUE, paired = TRUE, alternative = "greater" )
 rt_test_b <- ttestBF( d2$rt_FALSE, d2$rt_TRUE, paired = T, iterations = 10000, posterior = F )
-
+rt_test_b2 <- ttestBF( d2$rt_FALSE, d2$rt_TRUE, paired = T, iterations = 10000, posterior = T )
+rt_test_hdi <- hdi(rt_test_b2)
+  # weird if this is how you have to do it
 d2 |>
   summarise(
     name = "RT",
@@ -143,17 +157,18 @@ d2 |>
     df = rt_test$parameter,
     p = rt_test$p.value,
     p.cor = p.adjust(p, "bonferroni", n=2),
+    b.est = mean(rt_test_b2[,"mu"]),
+    hdi = paste0("[", fmt_APA_num(rt_test_hdi$CI_low[1]),", ", fmt_APA_num(rt_test_hdi$CI_high[1]),"]"),
     bf = extractBF(rt_test_b)$bf,
-    hdi.l = hdi(rt_test_b)$CI_low,
-    hdi.h = hdi(rt_test_b)$CI_high,
-    d = Mdiff / sqrt(
-      ( (length(rt_FALSE)-1) * sd_incongruent^2 + (length(rt_TRUE)-1) * sd_congruent^2 ) / 
-        ( length(rt_FALSE) + length(rt_TRUE) - 2 )),
+    d = cohensD(rt_FALSE, rt_TRUE, method = "paired"),
     )  -> d_rt
 
 ## proportion correct trials
 pct_test <- t.test(  d2$pct_FALSE, d2$pct_TRUE, paired = TRUE, alternative = "less" )
 pct_test_b <- ttestBF( d2$pct_FALSE, d2$pct_TRUE, paired = T, iterations = 10000, posterior = F )
+pct_test_b2 <- ttestBF( d2$pct_FALSE, d2$pct_TRUE, paired = T, iterations = 10000, posterior = T )
+pct_test_hdi <- hdi(pct_test_b2)
+  # weird if this is how you have to do it
 
 d2 |>
   summarise(
@@ -167,21 +182,20 @@ d2 |>
     df = pct_test$parameter,
     p = pct_test$p.value,
     p.cor = p.adjust(p, "bonferroni", n=2),
+    b.est = mean(pct_test_b2[,"mu"]),
+    hdi = paste0("[",fmt_APA_num(pct_test_hdi$CI_low[1]),", ", fmt_APA_num(pct_test_hdi$CI_high[1]),"]"),
     bf = extractBF(pct_test_b)$bf,
-    hdi.l = hdi(pct_test_b)$CI_low,
-    hdi.h = hdi(pct_test_b)$CI_high,
-    d = Mdiff / sqrt(
-      ( (length(rt_FALSE)-1) * sd_incongruent^2 + (length(rt_TRUE)-1) * sd_congruent^2 ) / 
-        ( length(rt_FALSE) + length(rt_TRUE) - 2 )),
+    d = cohensD(pct_FALSE, pct_TRUE, method = "paired"),
   ) -> d_pct
-
 
 ```
 
-
 ```{r stat table}
 #| echo: false
-rbind(d_rt, d_pct) |> summarize(x=sum(df)/length(df)) |> pull() -> d2_df
+rbind(d_rt, d_pct) -> b
+b |> summarize(x=sum(df)/length(df)) |> pull() -> d2_df
+b |> pull(p) |> min() -> p_min
+
 if(d2_df != floor(d2_df)){warning("NOT SIMILAR, CHECK DF")}
   # degrees of freedom
 
@@ -194,9 +208,9 @@ rbind(d_rt, d_pct) |>
   cols_label(   m_incongruent = md("*M*"), sd_incongruent = md("*SD*" ) ) |>
   tab_spanner(  "Congruent", c(m_congruent, sd_congruent) ) |>
   cols_label(   m_congruent = md("*M*"),  sd_congruent = md("*SD*") ) |>
-  tab_spanner(  "Bayes", c(bf, hdi.l, hdi.h)) |>
-  cols_label(   bf = "BF10", hdi.l = "Low", hdi.h="High") |>
-  ##
+  tab_spanner(  "Bayes", c(b.est, bf, hdi)) |>
+  cols_label(   b.est = md("*M*"), bf = html("BF<sub>10</sub>"), hdi = "HDI",
+                Mdiff = html("<i>M</i><sub>diff</sub>") )  |>
   cols_move(    "ps", Mdiff ) |> 
   cols_move(    "em1", sd_incongruent ) |>
   cols_move(    "em2", ps ) |>
@@ -205,22 +219,23 @@ rbind(d_rt, d_pct) |>
   cols_align(   "center", c(2:15)) |> 
   cols_align(   "left", ps) |> 
   cols_label(   ps = "", d = md("*d*"))  |>
-  #fmt_markdown() |>
-    # Doesnt play nice with .docx (?)
   fmt_number()
 
-  # These do not work, for some reason.
-  # tab_footnote( "*p < 0.05, **p < 0.01, ***p < 0.001" ) |>
-  # tab_footnote( "P's are Bonferroni corrected for 2 tests", placement="left" ) |>
 ```
-`r cat("*p < .05, **p < .01, ***p < .001")`
-M = Mean, SD = standard deviation, df = `r  d2_df``.
-*Note.* P's are Bonferroni corrected for 2 tests.
 
+*Note.* P's are Bonferroni corrected for 2 tests. The tests
+have `r  d2_df` degrees of freedom.  \n
+`r fmt_APA_p_table_fig(p_min)` \n
+*M* = Mean, *SD* = standard deviation, *M*~diff~ = Differences
+of the means, HDI = highest density interval, *d* = Effect size.
 
+subscript H~20~
 
 ```{r rt and percent plot - difference to baseline}
 #| echo: false
+#| warning: false
+#| message: false
+#| error: false
 #| fig-dpi: 300
 
 d2 |>
@@ -254,34 +269,47 @@ p1+p2
 
 ```{r}
 #| echo: false
+#| warning: false
+#| message: false
+#| error: false
 #| fig-dpi: 300
 
 # This way of visualizing is not necessarily the best -- it can illustate each
 # change in data (congruent/incongruent), but summary score should not be used with it
+d |>
+  mutate(con = ifelse(congruent==TRUE,1,0)) |>
+  ggplot(aes(x = con, y = rt, group = id))+
+  stat_summary(position=position_dodge(.1), fun.data = mean_se, alpha = .3)+
+  stat_summary(position=position_dodge(.1), geom = "line", fun.data = mean_se, alpha = .3)+
+  stat_summary(aes(group=NULL), position=position_dodge(.05), fun.data = mean_se, col="red")+
+  stat_summary(aes(group=NULL), position=position_dodge(.05), geom = "line", fun.data = mean_se, col="red")+
+  scale_y_continuous(breaks = seq(0,2000,25), expand = c(.1,.1), minor_breaks = NULL)+
+  scale_x_continuous(breaks = c(0,1), labels = c("Incongruent", "Congruent"), name="",
+                     expand = c(.2,.2), minor_breaks = NULL)+
+  theme_minimal()+
+  theme(axis.text.x = element_text(size = 14))+
+  labs(title = "Response time (ms)", x = "", y = "Response time (ms)") ->
+  p1
 
-d2 |>
-  pivot_longer(c(rt_FALSE,rt_TRUE)) |>
-  mutate(name = ifelse(name=="rt_FALSE", "Incongruent", "Congruent")) |> 
-  ggplot(aes(x = name, y = value))+
-  geom_point(position = position_dodgenudge(.05, x = .05), alpha = .35)+
-  geom_line(aes(group = id), position = position_dodgenudge(.05, x=.05), alpha = .4)
-  stat_summary(fun.data = mean_se, col = "red")+
-  scale_y_continuous(breaks=seq(0,2000,50), expand = c(.5,.5), minor_breaks = NULL)+
-  labs(title = "Response time", x = "", y = "Response time (ms)")+
-  theme_minimal() #-> p1
-
-d2 |>
-  pivot_longer(c(pct_FALSE,pct_TRUE)) |>
-  mutate(name = ifelse(name=="pct_FALSE", "Incongruent", "Congruent")) |> 
-  ggplot(aes(x = name, y = value))+
-  geom_point(position = position_jitter(width=.05, seed = 1), alpha = .35)+
-  geom_line(aes(group = id), position = position_jitter(width=.05, seed = 1), alpha = .4)+
-  stat_summary(fun.data = mean_se, col = "red") 
-  scale_y_continuous(breaks = seq(0,1,.05), limits = c(.68,1))+
-  labs(title = "Proportion correct trials", x = "", y = "Proportion of correct ")+
-  theme_minimal() -> p2
+d |>
+  filter(!is.na(congruent)) |>
+  group_by(id, inducer_run, congruent) |>
+  summarize(pct = mean(correct_response)) |> 
+    # Summarize the proportion of correct per block
+  ungroup() |>   ungroup() |>
+  mutate(con = ifelse(congruent==TRUE,1,0)) |>
+  ggplot(aes(x = con, y = pct, group = id))+
+  stat_summary(position=position_dodge(.1), fun.data = mean_se, alpha = .3)+
+  stat_summary(position=position_dodge(.1), geom = "line", fun.data = mean_se, alpha = .3)+
+  stat_summary(aes(group=NULL), position=position_dodge(.05), fun.data = mean_se, col="red")+
+  stat_summary(aes(group=NULL), position=position_dodge(.05), geom = "line", fun.data = mean_se, col="red")+
+  scale_y_continuous(breaks = seq(0,1,.1), expand = c(.05,.05), minor_breaks = NULL)+
+  scale_x_continuous(breaks = c(0,1), labels = c("Incongruent", "Congruent"), name="",
+                     expand = c(.2,.2), minor_breaks = NULL)+
+  theme_minimal()+
+  theme(axis.text.x = element_text(size = 14))+
+  labs(title = "Proportion correct trials", x = "", y = "Proportion") -> 
+  p2
 
 p1+p2
-# rm summary
 ```
-
