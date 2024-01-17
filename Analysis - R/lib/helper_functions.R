@@ -48,29 +48,32 @@ levenshtein_distance <- function(word1, word2) {
 
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ###
 
-word_test <- function(word_list, new_word){
-  #'
-  #'
-  dist <- as.numeric()
+# 128 non-words: letter+number         ======
+generate_word_list <- function(data, length = NULL){
+  vec <- sample(data, size = 1) # start word
 
-  for(word in word_list){
-    dist <- c(dist, levenshtein_distance(word, new_word))
-    # Get the levenshtein distances for each word pair
+  while(length(data) > 1){
+    rnd_w <- sample(data, size=1)
+
+    if(any(mapply(levenshtein_distance, vec, rnd_w) <= 2)){
+      data[!data == rnd_w] -> data
+    } else {
+      c(vec, rnd_w) -> vec
+      data[!data == rnd_w] -> data
+    }
+    if( !is.null(length) ){
+      if(length(vec) >= length){
+        break
+      }
+    }
   }
 
-  if(sum(dist<3)>=1){
-    # if the chosen word is similar by a threshold of 2, to any items in
-    # the existing list skip the word.
-    # Threshold for similarity is 2 (e.g., two letters at the same location)
-    print(paste("Skipping word:",new_word))
-    return(word_list)
-  }
-  else {
-    print(paste("Adding new word:", new_word))
-    c(word_list, new_word) -> word_list
-    return(word_list)
-  }
+  cat("Length of", length(vec), "created.\n")
+  if(length(vec)>= length){ cat("Successfully rearched a length of", length) }
+  else{ cat("Failed to reach a length of", length) }
+  invisible(vec)
 }
+
 
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ###
 
@@ -140,8 +143,48 @@ gen_prob <- \(min, max, decent, math, spare = 0){
 }
 
 
+### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ###
+fmt_APA_num <- function(num, p=F, low_val=F){
+  if(p){
+    return( round(num, 3) |> as.character(num) |> sub("0.",".", x = _) )
+  }
+  if(num >= 100 | num <= -100){
+    return( round(num,0) )
+  }
+  if(num >= 10 | num <= -10){
+    return( round(num, 1) )
+  }
+  if(num >= 1 | num <= -1 | num < 1 & !low_val | num > -1 & !low_val){
+    return( round(num, 2) )
+  }
+  if(num < 1 & low_val | num > -1 & low_val){
+    return( round(num, 3) )
+  }
+}
 
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ###
+fmt_APA_p_table_fig <- function(p, crit = 0.05, div = 5){
+  chr <- ""
+  if( p > crit ){
+    return(chr)
+  }
+  if( p == crit ){
+    paste0( "* *p* = ", as.character(crit) |> sub("0.",".",x=_)) -> chr
+  }
+  if( p < crit ){
+    paste0( "* *p* < ", as.character(crit) |> sub("0.",".",x=_)) -> chr
+  }
+  if( p <= crit/div ){
+    paste0( chr, " ** *p* < ", ( crit/div ) |> as.character() |> sub("0.",".",x=_) ) -> chr
+  }
+  if( p <= crit/(div*10) ){
+    paste0( chr, " *** *p* < ",  ( crit/(div*10) ) |> as.character() |> sub("0.",".",x=_)  ) -> chr
+  }
+  return(chr)
+}
+
+### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ###
+# Not used
 max_diagnostic_length <- \(min, max, reps = 1000, experiment_length = 24,
                            probability = NULL,
                            decent = .1, math = "linear", spare = 0){
