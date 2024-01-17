@@ -54,11 +54,11 @@ const inducer_colours = ["red", "yellow", "blue"]      // Inducer colour randomi
     // This is also what is DISPLAYED to participants. Should therefore be a readable name. 
 
 ////    Diagnostic parameters   ////
-const number_of_inducers = 11;       // Number of inducers 
+const number_of_inducers = 23;       // Number of inducers 
     // !!! CHANGE max trials !!! 
 const diagnostic_min_length = 4         // Min run length
 const diagnostic_max_length = 16     // Max run length
-const max_diagnostic_trials = 100     // Total max diagnostic trials
+const max_diagnostic_trials = 210     // Total max diagnostic trials
     // max/2 * number_of_inducers
 
 ////    Practice parameters     ////
@@ -73,18 +73,20 @@ const run_italic_bias = [1,1]           // Left value correspond to ITALIC proba
 
 
 ////    Stimuli list    ////
-const stimuli = ["gwn", "eug", "sht", "cjm", "svs", "orp", "scy", "rve", "wjb", "drn", 
-    "emd", "nz1", "dlo", "hvp", "hmn", "auj", "cuo", "t&g", "jca", "ukt", "tne", "wue", 
-    "hhu", "m3p", "qut", "gbm", "byp", "mav", "sbk", "dnc", "mda", "clr", "uga", "ibb", 
-    "uau", "ozu", "lfd", "f.w", "mub", "kil", "yag", "hsm", "fef", "lbx", "kpt", "upv", 
-    "ifg", "foc", "mtd", "nh3", "wng", "t53", "wtc", "re8", "jme", "a82", "dym", "eif", 
-    "ctv", "tr6", "oco", "dmg", "crt", "vh1", "slp", "cea", "pwa", "eal", "f47", "ysh", 
-    "xss", "me1", "m45", "enw", "gft", "doy", "hrf", "oac", "wma", "lst", "yle", "s.r",
-    "hyo", "tey", "pib", "olt", "luu", "k19", "ff4", "efr", "k5u", "mhs", "pfl", "rch", 
-    "yrl", "nua", "afb", "ayy", "i50", "v&t", "m16", "dpf", "ubr", "syn", "lgs", "iec", 
-    "bsl", "vvm", "umf", "dba", "aip", "dts", "w&d", "avc", "dv6", "j&j", "sdc", "atr", 
-    "spm", "alh", "ows", "idd", "abv", "cml", "lpo", "r22", "z28", "eyt"]
-    // Randomly selected stimuli that should not overlapp by more than 1 character 
+const stimuli = [
+    "yqv", "mip", "rsn", "wld", "mrv", "lbn", "lii", "jso", "gre", "llt",
+    "thv", "vuk", "iiv", "tcn", "jny", "lya", "yif", "cji", "jtf", "hba",
+    "fic", "gfa", "qfc", "acd", "rct", "niz", "fuf", "vrn", "fst", "rwz",
+    "pir", "asc", "gcb", "iar", "tne", "aei", "nzb", "nnw", "ipd", "voc",
+    "hfl", "wss", "wdc", "djo", "p.o", "myn", "kpp", "bci", "ovi", "esr",
+    "bpf", "jue", "kro", "bbp", "jgw", "aws", "jlp", "bgt", "kfg", "kwd",
+    "cly", "rhm", "poy", "qra", "opg", "gid", "wch", "ccu", "mkb", "iow",
+    "pej", "tul", "uan", "gxl", "adm", "cfe", "sdw", "crw", "gvs", "duj",
+    "hpc", "yvo", "j&j", "srg", "eqs", "rnl", "occ", "wpw", "puw", "xmm",
+    "ibt", "ddz", "p&a", "bdy", "dcl", "ufr", "hdh", "aht", "gmo", "slk",
+    "olu", "cks", "koj", "knm", "omy", "dmb", "ewm", "leh", "ita", "gdn",
+    "dga", "ojs", "iex", "dvr", "kbe", "kck", "eja", "ebd", "zbl", "atn",
+    "pmg", "d&g", "ngn", "quu", "fxx", "sgm", "zer", "inf"];
     // Enough stimuli for 64 rounds. 
 
 ////////////////////////////
@@ -358,9 +360,9 @@ const about_the_experiment_and_consent = {
         `<div style="font-size:${instruction_font_size}"> 
         
         <h3>About the experiment</h3>                
-        In this experiment, you will be presented with 3-character non-words. <br> 
-        The non-words responded to with either a left (<b>F</b> key) or right (<b>J</b> key) response. <br>
-        Instructions will be provided, describing the relationship between the 3-character non-word and the responses. <br>
+        In this experiment, you will be presented with 3-character non-words.  <br> 
+        The experiment will only use either a left (<b>F</b> key) or right (<b>J</b> key) response.  <br>
+        Instructions will be provided, describing the relationship between the 3-character non-words and the responses.  <br>
         <br><br>
         At the end of the experiment, you will receive the opportunity to provide feedback. 
         </div>`,
@@ -436,8 +438,8 @@ let diagnostic_task_instruction_description = {
             A left response corresponds to the <b>F</b> key, and a right response corresponds to the <b>J</b> key.
             <br><br>
             The task consists of two instructions: <br>
-            One instruction remains the same throughout the task, and is related to non-words presented in <b>black colour</b>. <br>
-            One instruction changes throughout the task, and is related to non-words presented in <b> \n
+            One instruction remains the same throughout the task, and is connected to non-words presented in <b>black colour</b>. <br>
+            One instruction changes throughout the task, and is connected to non-words presented in <b> \n
             <span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour.toLowerCase() + " colour"}</span></b>.
             <br><br>
             You will receive a maximum of 20 seconds to read the instructions. <br>
@@ -449,10 +451,10 @@ let diagnostic_task_instruction_description = {
             `<div style="font-size:${instruction_font_size}">
 
             On the next screen, the instruction that remains the same throughout the task, will be presented. <br>
-            (Related to non-wrods presented in <b> black colour</b>.)  
+            (Connected to non-words presented in <b> black colour</b>.)  
             <br><br>
             A couple of practice rounds will be presented. <br>
-            The practice will have no time limit, but the main task will have a time limit. 
+            The practice will have no time limit, but the main task will have a time limit on each . 
             <br><br>
             The practice starts by clicking NEXT.
 
@@ -482,7 +484,7 @@ let diagnostic_task_instruction = {
         `<p style="font-size: ${general_font_size};"> If <i> italic </i> press ${rnd_diagnostic_response_sides[0]}`+
         `<p style="font-size: ${general_font_size};"> If upright press ${rnd_diagnostic_response_sides[1]}`]
     }, 
-    prompt: "Press SPACE to continue",
+    prompt: "Put your index fingers on the F and J key. <br> When you are ready, press SPACE to continue.",
     choices: " ", 
     trial_duration: instruction_delay,
     data: {
@@ -523,7 +525,7 @@ if(prac_diagnostic_rounds > 0 && !skip_instructions){ // & skip_instructions ===
                 }
             }, 
             choices: allowed_responses,
-            trial_duration: 0,
+            trial_duration: null,
             data: {
                 stimulus: rnd_diag_stim,         // Stimulus
                 inducer_run: "practice",                   // Inducer run number (i.e., block)
@@ -577,7 +579,7 @@ if(prac_diagnostic_rounds > 0 && !skip_instructions){ // & skip_instructions ===
                     `<div style="font-size:${instruction_font_size}">
                     
                     On the next screen, the instruction that changes throughout the task, will be presented. <br>
-                    (Related to non-words presented in <b> \n
+                    (Connected to non-words presented in <b> \n
                     <span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour.toLowerCase() + " colour"}</span></b>.)
                     <br><br>
                     The instructions will have the same format, but describe two new 3-character non-words. 
@@ -642,7 +644,7 @@ if(prac_diagnostic_rounds > 0 && !skip_instructions){ // & skip_instructions ===
             type: jsPsychHtmlKeyboardResponse,
             stimulus: () => { return `<p style="font-size: ${general_font_size}; color:${rnd_inducer_colour}">${rnd_inducer_stimulus}` },
             choices: allowed_responses,
-            trial_duration: 0,
+            trial_duration: null,
             data: {
                 stimulus: rnd_inducer_stimulus,         // Stimulus
                 inducer_run: "practice",                // Inducer run number
@@ -680,15 +682,24 @@ if(prac_diagnostic_rounds > 0 && !skip_instructions){ // & skip_instructions ===
         stimulus: function(){   
             return `<div style="font-size:${instruction_font_size}">
             You have now completed the practice.
+            
+            <br><br>
+            Each new round will present two new non-words. <br>
+            These will not be executed immediately (as in the practice). <br>
+            Rather, some black coloured (italic/upright) non-words will be presented. <br>
+            At the end of the round, the \n
+            <span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour.toLowerCase()} \n
+            non-word will be presented. 
+            
             <br><br>
             Keep in mind:<br>
-            The unchanging instruction relates to 3-character non-words presented in <b>black colour</b>.
-            The changing instruction relates to 3-character non-words presented in <b>\n
-            <span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour.toLowerCase() + " colour"}</span></b>.<br><br>
+            The unchanging instruction (italic/upright) us connected to 3-character non-words presented in <b>black colour</b>. <br>
+            The changing instruction is connected to 3-character non-words presented in <b>\n
+            <span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour.toLowerCase() + " colour"}</span></b>.
+
             </div>`
-            //  
         }, 
-        prompt: "Press SPACE to start the task",
+        prompt: "<br>Press SPACE to start the task",
         choices: " ", 
         data: {
             stimulus: `End practice`,
@@ -730,7 +741,7 @@ for(let exp_block = 0; exp_block < number_of_inducers; exp_block++){ // less tha
             return  `<p style="font-size: ${general_font_size}"> If <span style="color: ${rnd_inducer_colour}">${run_stimuli[0]}</span> press ${response_sides[0]}`+
                     `<p style="font-size: ${general_font_size}"> If <span style="color: ${rnd_inducer_colour}">${run_stimuli[1]}</span> press ${response_sides[1]}`; 
         }, 
-        prompt: "Press SPACE to continue",
+        prompt: "Put your index fingers on the F and J key. <br>When you are ready, press SPACE to continue.",
         choices: " ", 
         data: {
             inducer_run: exp_block,     // Inducer run number
@@ -892,7 +903,7 @@ const experiment_feedback  = {
             [ /// General feedback
                 {
                     type: "text",
-                    prompt: `You feedback is welcome! Do you have any comments, thoughts, or remarks in relation to the experiment?`,
+                    prompt: `Your feedback is welcome! Do you have any comments, thoughts, or remarks in relation to the experiment?`,
                     name: 'open_feedback',
                     textbox_columns: 100,
                     textbox_rows: 5,
@@ -929,7 +940,7 @@ timeline.push(experiment_feedback)
 timeline.push({
     type: jsPsychFullscreen,
     message: `Redirecting...<br><br>\n
-    If you finished and is still on this page, follow this link: https://app.prolific.com/submissions/complete?cc=C1BHSUPK`,
+    If you were not redirected, follow this link: https://app.prolific.com/submissions/complete?cc=C1BHSUPK`,
     button_label: "End experiment", 
     fullscreen_mode: false,    
     on_finish: () => {
