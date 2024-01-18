@@ -26,6 +26,6 @@ g_len <- function(len = 100){
 }
 
 g_len()
-g_len(33)
+g_len(1)
 
 # if(sum(s$s[s$n>10]) != sum(s$s[s$n<10])){ cat( sum(s$s[s$n>10]), "UNEQUAL", sum(s$s[s$n<10])) }

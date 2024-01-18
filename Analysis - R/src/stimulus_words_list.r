@@ -25,9 +25,15 @@ word_num_128 <- generate_word_list(
 
 
 # 128 only words              =======
-word_128 <- generate_word_list(
+word_not.nums_128 <- generate_word_list(
   relevant_word_list[str_detect(relevant_word_list, "\\b\\D+\\b")], 128)
-#write.csv( tibble(words=word_128), file="data/word_stimuli/word_128.csv", row.names = F)
+#write.csv( tibble(words=word_not.nums_128), file="data/word_stimuli/word_not.nums_128.csv", row.names = F)
+
+
+# 128 only words              =======
+word_only_128 <- generate_word_list(
+  relevant_word_list[str_detect(relevant_word_list, "^[[:alpha:]]+$")], 128)
+#write.csv( tibble(words=word_only_128), file="data/word_stimuli/word_only_128.csv", row.names = F)
 
 
 # Parse all items             ======

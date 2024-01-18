@@ -48,7 +48,6 @@ levenshtein_distance <- function(word1, word2) {
 
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ###
 
-# 128 non-words: letter+number         ======
 generate_word_list <- function(data, length = NULL){
   vec <- sample(data, size = 1) # start word
 
