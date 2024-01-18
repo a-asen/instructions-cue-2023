@@ -202,15 +202,15 @@ if(d2_df != floor(d2_df)){warning("NOT SIMILAR, CHECK DF")}
 rbind(d_rt, d_pct) |>
   # add bayes row? 
   mutate(ps = case_when(p.cor < .05 ~ "*", p < 0.01 ~ "**", p < 0.001 ~ "***", T ~ ""),
-         em1 = "", em2="") |>
+         em1 = "", em2="", em3="") |>
   gt() |>
   tab_spanner(  "Incongruent", c(m_incongruent, sd_incongruent) ) |>
   cols_label(   m_incongruent = md("*M*"), sd_incongruent = md("*SD*" ) ) |>
   tab_spanner(  "Congruent", c(m_congruent, sd_congruent) ) |>
   cols_label(   m_congruent = md("*M*"),  sd_congruent = md("*SD*") ) |>
   tab_spanner(  "Bayes", c(b.est, bf, hdi)) |>
-  cols_label(   b.est = md("*M*"), bf = html("BF<sub>10</sub>"), hdi = "HDI",
-                Mdiff = html("<i>M</i><sub>diff</sub>") )  |>
+  cols_label(   b.est = md("*M*"), bf = md("BF~10~"), hdi = "HDI", # html("BF<sub>10</sub>")
+                Mdiff = md("*M*~diff~") )  |> # html("<i>M</i><sub>diff</sub>") 
   cols_move(    "ps", Mdiff ) |> 
   cols_move(    "em1", sd_incongruent ) |>
   cols_move(    "em2", ps ) |>
@@ -218,7 +218,9 @@ rbind(d_rt, d_pct) |>
   cols_label(   em1="",em2="", name = "") |>
   cols_align(   "center", c(2:15)) |> 
   cols_align(   "left", ps) |> 
-  cols_label(   ps = "", d = md("*d*"))  |>
+  cols_label(   ps = "", d = md("*d*"), em3="")  |>
+  cols_move(    "em3", hdi) |>
+  fmt_markdown() |>
   fmt_number()
 
 ```
@@ -260,7 +262,7 @@ d3 |>
   stat_function(aes(x,), tibble(x=c(-3,3)), fun=dnorm, col="red", linewidth=2, alpha=.3)+
   geom_density()+
   scale_x_continuous(breaks=seq(-3,3,1))+
-  labs(title = "Proportion correct trials", x="Standardized difference", y="")+
+  labs(title = "Proportion of correct trials", x="Standardized difference", y="")+
   theme_minimal() -> p2
     # Theoretical normal distribution over 0
 
@@ -272,44 +274,50 @@ p1+p2
 #| warning: false
 #| message: false
 #| error: false
-#| fig-dpi: 300
+#| fig-dpi: 250
 
 # This way of visualizing is not necessarily the best -- it can illustate each
 # change in data (congruent/incongruent), but summary score should not be used with it
 d |>
   mutate(con = ifelse(congruent==TRUE,1,0)) |>
   ggplot(aes(x = con, y = rt, group = id))+
-  stat_summary(position=position_dodge(.1), fun.data = mean_se, alpha = .3)+
-  stat_summary(position=position_dodge(.1), geom = "line", fun.data = mean_se, alpha = .3)+
-  stat_summary(aes(group=NULL), position=position_dodge(.05), fun.data = mean_se, col="red")+
-  stat_summary(aes(group=NULL), position=position_dodge(.05), geom = "line", fun.data = mean_se, col="red")+
-  scale_y_continuous(breaks = seq(0,2000,25), expand = c(.1,.1), minor_breaks = NULL)+
+  stat_summary(position=position_dodge(.1), fun = mean, alpha = .3)+
+  stat_summary(position=position_dodge(.1), geom = "line", fun = mean, alpha = .3)+
+  stat_summary(aes(group=NULL), fun.data = mean_se, geom = "point",col="red")+
+  stat_summary(aes(group=NULL), fun.data = mean_se, geom = "errorbar", width=.2, col="red")+
+  scale_y_continuous(breaks = seq(0,2000,50), expand = c(.1,.1), minor_breaks = NULL)+
   scale_x_continuous(breaks = c(0,1), labels = c("Incongruent", "Congruent"), name="",
                      expand = c(.2,.2), minor_breaks = NULL)+
   theme_minimal()+
-  theme(axis.text.x = element_text(size = 14))+
-  labs(title = "Response time (ms)", x = "", y = "Response time (ms)") ->
+  theme(axis.text.x = element_text(size = 10))+
+  labs(title = "Response time", x = "", y = "Response time (ms)") ->
   p1
 
 d |>
   filter(!is.na(congruent)) |>
-  group_by(id, inducer_run, congruent) |>
+  group_by(id, congruent) |>
+    # ????????????????  inducer_run
   summarize(pct = mean(correct_response)) |> 
     # Summarize the proportion of correct per block
-  ungroup() |>   ungroup() |>
+  ungroup() |>  ungroup() |>
+  
   mutate(con = ifelse(congruent==TRUE,1,0)) |>
-  ggplot(aes(x = con, y = pct, group = id))+
-  stat_summary(position=position_dodge(.1), fun.data = mean_se, alpha = .3)+
-  stat_summary(position=position_dodge(.1), geom = "line", fun.data = mean_se, alpha = .3)+
-  stat_summary(aes(group=NULL), position=position_dodge(.05), fun.data = mean_se, col="red")+
-  stat_summary(aes(group=NULL), position=position_dodge(.05), geom = "line", fun.data = mean_se, col="red")+
-  scale_y_continuous(breaks = seq(0,1,.1), expand = c(.05,.05), minor_breaks = NULL)+
+  ggplot(aes(x = con, y = pct, col=id))+
+  stat_summary(position=position_dodge(.1), geom = "point", fun = mean, alpha = .3)+
+  stat_summary(position=position_dodge(.1), geom = "line", fun = mean, alpha = .3)
+  stat_summary(aes(group=NULL), fun.data = mean_se, geom = "point",col="red")+
+  stat_summary(aes(group=NULL), fun.data = mean_se, geom = "errorbar", width=.2, col="red")+
   scale_x_continuous(breaks = c(0,1), labels = c("Incongruent", "Congruent"), name="",
                      expand = c(.2,.2), minor_breaks = NULL)+
+  scale_y_continuous(breaks = seq(0,1,.1), expand = c(.05,.05), minor_breaks = NULL)+
   theme_minimal()+
-  theme(axis.text.x = element_text(size = 14))+
-  labs(title = "Proportion correct trials", x = "", y = "Proportion") -> 
+  theme(axis.text.x = element_text(size = 10))+
+  labs(title = "Proportion of correct trials", x = "", y = "Proportion") -> 
   p2
 
 p1+p2
 ```
+
+
+
+
