@@ -3,7 +3,7 @@
 
 // CHANGE THESE BEFORE EXPERIMENT!
 const debug = true              // Show some console information
-const skip_instructions = false  // Skip intro? (to test trials)
+const skip_instructions = true  // Skip intro? (to test trials)
 const save_local_data = false    // Save a local file (test analysis)
 
 
@@ -54,11 +54,11 @@ const inducer_colours = ["red", "yellow", "blue"]      // Inducer colour randomi
     // This is also what is DISPLAYED to participants. Should therefore be a readable name. 
 
 ////    Diagnostic parameters   ////
-const number_of_inducers = 23;       // Number of inducers 
+const number_of_inducers = 1//23;       // Number of inducers 
     // !!! CHANGE max trials !!! 
 const diagnostic_min_length = 4         // Min run length
-const diagnostic_max_length = 16     // Max run length
-const max_diagnostic_trials = 210     // Total max diagnostic trials
+const diagnostic_max_length = 16        // Max run length
+const max_diagnostic_trials = 5 //220     // Total max diagnostic trials
     // max/2 * number_of_inducers
 
 ////    Practice parameters     ////
@@ -74,21 +74,21 @@ const run_italic_bias = [1,1]           // Left value correspond to ITALIC proba
 
 ////    Stimuli list    ////
 const stimuli = [
-    "yqv", "mip", "rsn", "wld", "mrv", "lbn", "lii", "jso", "gre", "llt",
-    "thv", "vuk", "iiv", "tcn", "jny", "lya", "yif", "cji", "jtf", "hba",
-    "fic", "gfa", "qfc", "acd", "rct", "niz", "fuf", "vrn", "fst", "rwz",
-    "pir", "asc", "gcb", "iar", "tne", "aei", "nzb", "nnw", "ipd", "voc",
-    "hfl", "wss", "wdc", "djo", "p.o", "myn", "kpp", "bci", "ovi", "esr",
-    "bpf", "jue", "kro", "bbp", "jgw", "aws", "jlp", "bgt", "kfg", "kwd",
-    "cly", "rhm", "poy", "qra", "opg", "gid", "wch", "ccu", "mkb", "iow",
-    "pej", "tul", "uan", "gxl", "adm", "cfe", "sdw", "crw", "gvs", "duj",
-    "hpc", "yvo", "j&j", "srg", "eqs", "rnl", "occ", "wpw", "puw", "xmm",
-    "ibt", "ddz", "p&a", "bdy", "dcl", "ufr", "hdh", "aht", "gmo", "slk",
-    "olu", "cks", "koj", "knm", "omy", "dmb", "ewm", "leh", "ita", "gdn",
-    "dga", "ojs", "iex", "dvr", "kbe", "kck", "eja", "ebd", "zbl", "atn",
-    "pmg", "d&g", "ngn", "quu", "fxx", "sgm", "zer", "inf"];
+    "hhd", "rrd", "wrz", "sdw", "mmo", "pxv", "chy", "saj", "flh",
+    "fuc", "vrm", "ila", "bms", "xet", "iei", "epy", "snx", "uus", "dul",
+    "anz", "hfs", "ebe", "gso", "afp", "guf", "lct", "cnl", "jsf", "tgf",
+    "mik", "upf", "efg", "cta", "lff", "dij", "slu", "xlv", "hrc", "ois",
+    "swr", "cmj", "dof", "cpt", "prg", "yna", "idy", "pcm", "uen", "adj",
+    "vpu", "dpa", "quy", "vnn", "ccx", "cer", "nga", "jft", "jil", "frn",
+    "dnc", "faq", "ecl", "asn", "gdn", "vib", "glp", "ofa", "yoy", "amb",
+    "rif", "ori", "bwe", "tkb", "oez", "kue", "jup", "yrp", "kho", "vbt",
+    "wwt", "csp", "eeu", "eht", "pph", "rpw", "ume", "psl", "pbz", "vle",
+    "drk", "aor", "kmh", "bsh", "gfm", "goj", "ufc", "sjn", "ivr", "mts",
+    "dlg", "pte", "crf", "edc", "ndm", "mvv", "bgi", "rbc", "wab", "mda",
+    "ttm", "jcr", "hlb", "cui", "jey", "fja", "jlm", "otr", "dgv", "imm",
+    "lpn", "zpl", "feg", "ydi", "vsc", "pmf", "ibg", "geb", "byy"];
     // Enough stimuli for 64 rounds. 
-
+    
 ////////////////////////////
 ////                    ////
 ////    Initialize      ////
@@ -360,9 +360,9 @@ const about_the_experiment_and_consent = {
         `<div style="font-size:${instruction_font_size}"> 
         
         <h3>About the experiment</h3>                
-        In this experiment, you will be presented with 3-character non-words.  <br> 
-        The experiment will only use either a left (<b>F</b> key) or right (<b>J</b> key) response.  <br>
-        Instructions will be provided, describing the relationship between the 3-character non-words and the responses.  <br>
+        In this experiment, you will be presented with 3-letter non-words.  <br> 
+        The experiment will only use a left (<b>F</b> key) or right (<b>J</b> key) response (unless otherwise noted).  <br>
+        Instructions will be provided, describing the relationship between the 3-letter non-words and the responses.  <br>
         <br><br>
         At the end of the experiment, you will receive the opportunity to provide feedback. 
         </div>`,
@@ -380,7 +380,6 @@ const about_the_experiment_and_consent = {
         <br><br> 
         The data will be used for scientific purposes. <br> 
         If you agree to these terms and conditions and want to participate click NEXT. <br>
-        <i>Importantly, your data is anonymous and cannot be traced back to you</i>.\n
         </div>`,
 
         ]
@@ -434,7 +433,7 @@ let diagnostic_task_instruction_description = {
             // FIRST, what keys will be used in this experiment? 
             `<div style="font-size:${instruction_font_size}">
             <h3> The task </h3><br>
-            The task will present 3-character non-words that require either a left or right response. <br>
+            The task will present 3-letter non-words that require either a left or right response. <br>
             A left response corresponds to the <b>F</b> key, and a right response corresponds to the <b>J</b> key.
             <br><br>
             The task consists of two instructions: <br>
@@ -451,10 +450,9 @@ let diagnostic_task_instruction_description = {
             `<div style="font-size:${instruction_font_size}">
 
             On the next screen, the instruction that remains the same throughout the task, will be presented. <br>
-            (Connected to non-words presented in <b> black colour</b>.)  
+            (Connected to non-words in <b> black colour</b>.)  
             <br><br>
             A couple of practice rounds will be presented. <br>
-            The practice will have no time limit, but the main task will have a time limit on each . 
             <br><br>
             The practice starts by clicking NEXT.
 
@@ -579,14 +577,14 @@ if(prac_diagnostic_rounds > 0 && !skip_instructions){ // & skip_instructions ===
                     `<div style="font-size:${instruction_font_size}">
                     
                     On the next screen, the instruction that changes throughout the task, will be presented. <br>
-                    (Connected to non-words presented in <b> \n
+                    (Connected to non-words in <b> \n
                     <span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour.toLowerCase() + " colour"}</span></b>.)
                     <br><br>
-                    The instructions will have the same format, but describe two new 3-character non-words. 
-                    <br>
+                    These instructions will have the same format, <br> but will describe two new 3-letter non-words.
+                    <br><br>
                     A couple of practice trials will be presented.
-                    <br><br><br>
-                    The practice round starts when you click "Start".
+                    <br><br>
+                    The practice round starts by clicking "Start".
                     </div>`,
                 ]
             },
@@ -684,20 +682,22 @@ if(prac_diagnostic_rounds > 0 && !skip_instructions){ // & skip_instructions ===
             You have now completed the practice.
             
             <br><br>
-            Each new round will present two new non-words. <br>
-            These will not be executed immediately (as in the practice). <br>
-            Rather, some black coloured (italic/upright) non-words will be presented. <br>
-            At the end of the round, the \n
-            <span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour.toLowerCase()} \n
-            non-word will be presented. 
+            A new round will present two new 3-letter non-words. <br>
+            Some black coloured (italic/upright) non-words will be presented before the 
+            <b><span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour.toLowerCase()+ " coloured"}</span></b>
+            non-word. 
             
             <br><br>
-            Keep in mind:<br>
-            The unchanging instruction (italic/upright) us connected to 3-character non-words presented in <b>black colour</b>. <br>
-            The changing instruction is connected to 3-character non-words presented in <b>\n
-            <span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour.toLowerCase() + " colour"}</span></b>.
-
+            Each presentation will have a deadline of 2 seconds. <br>
+            Respond as <b>fast and accurately</b> as possible. <br>
+            The task will be difficult, but feedback will be provided. 
+            
             </div>`
+            // <br><br>
+            // Keep in mind:<br>
+            // The unchanging instruction (italic/upright) is connected to 3-letter non-words presented in <b>black colour</b>. <br>
+            // The changing instruction is connected to 3-letter non-words presented in <b>\n
+            // <span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour.toLowerCase() + " colour"}</span></b>.
         }, 
         prompt: "<br>Press SPACE to start the task",
         choices: " ", 
@@ -899,7 +899,7 @@ const experiment_feedback  = {
     required_error: `Please check whether you responded to (all) the question(s)`,
     required_question_label: "*",
     pages:() => {
-        return [
+        return [    
             [ /// General feedback
                 {
                     type: "text",
@@ -925,29 +925,35 @@ const experiment_feedback  = {
 
         // save interactive data
         data.interactive = jsPsych.data.getInteractionData()["trials"]
-
-        // If local save is enabled save it as a csv 
-        if(save_local_data) { jsPsych.data.get().localSave('csv','mydata.csv') }
-
-        // POST data to server as: 
-        saveData( "data_" + start_dateTime + "_" + ID + ".csv", jsPsych.data.get().csv() )
     }
 }
 timeline.push(experiment_feedback)
 
+timeline.push({
+    type: jsPsychHtmlKeyboardResponse,
+    stimulus: "Thank you for participating!  You will be redirected...",
+    choices: "NO_KEYS",
+    trial_duration: 2000, 
+    on_load: () => {
+        saveData( "data_" + start_dateTime + "_" + ID + ".csv", jsPsych.data.get().csv() )
+        if(debug) { console.log("Redirecting..... ")}
+        // If local save is enabled save it as a csv 
+        if(save_local_data) { jsPsych.data.get().localSave('csv','mydata.csv') }
+    }
+})
 
 // Exit fullscreen and end experiment. 
-timeline.push({
+timeline.push(
+    {
     type: jsPsychFullscreen,
-    message: `Redirecting...<br><br>\n
-    If you were not redirected, follow this link: https://app.prolific.com/submissions/complete?cc=C1BHSUPK`,
-    button_label: "End experiment", 
+    message: "", 
     fullscreen_mode: false,    
     on_finish: () => {
         window.location = "https://app.prolific.com/submissions/complete?cc=C1BHSUPK"
-        console.log("")
+        console.log("Linking")
     }
 }); 
 
+timeline.push( {type:jsPsychHtmlKeyboardResponse, stimulus:""} )
 
 jsPsych.run(timeline)

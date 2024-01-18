@@ -34,4 +34,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Invalid request method
     echo json_encode(['success' => false, 'error' => 'Invalid request method']);
 }
+
+// If await request.
+// if (file_put_contents($destination, $filedata)) {
+//     // File upload successful
+//     echo json_encode(['success' => true, 'continue' => true]); // 'continue' flag set to true
+// } else {
+//     // File upload failed
+//     echo json_encode(['success' => false, 'error' => 'Error saving file', 'continue' => false]);
+// }
 ?>
