@@ -144,21 +144,24 @@ gen_prob <- \(min, max, decent, math, spare = 0){
 
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ###
 fmt_APA_num <- function(num, p=F, low_val=F){
-  if(p){
-    return( round(num, 3) |> as.character(num) |> sub("0.",".", x = _) )
-  }
-  if(num >= 100 | num <= -100){
-    return( round(num,0) )
-  }
-  if(num >= 10 | num <= -10){
-    return( round(num, 1) )
-  }
-  if(num >= 1 | num <= -1 | num < 1 & !low_val | num > -1 & !low_val){
-    return( round(num, 2) )
-  }
-  if(num < 1 & low_val | num > -1 & low_val){
-    return( round(num, 3) )
-  }
+  require(purrr)
+  purrr::map(num, \(num){
+    if(p){
+      return( round(num, 3) |> as.character(num) |> sub("0.",".", x = _) )
+    }
+    if(num >= 100 | num <= -100){
+      return( round(num,0) )
+    }
+    if(num >= 10 | num <= -10){
+      return( round(num, 1) )
+    }
+    if(num >= 1 | num <= -1 | num < 1 & !low_val | num > -1 & !low_val){
+      return( round(num, 2) )
+    }
+    if(num < 1 & low_val | num > -1 & low_val){
+      return( round(num, 3) )
+    }
+  })
 }
 
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ###
