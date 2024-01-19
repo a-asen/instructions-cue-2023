@@ -3,7 +3,7 @@
 
 // CHANGE THESE BEFORE EXPERIMENT!
 const debug = true              // Show some console information
-const skip_instructions = true  // Skip intro? (to test trials)
+const skip_instructions = false  // Skip intro? (to test trials)
 const save_local_data = false    // Save a local file (test analysis)
 
 
@@ -54,11 +54,11 @@ const inducer_colours = ["red", "yellow", "blue"]      // Inducer colour randomi
     // This is also what is DISPLAYED to participants. Should therefore be a readable name. 
 
 ////    Diagnostic parameters   ////
-const number_of_inducers = 1//23;       // Number of inducers 
+const number_of_inducers = 11//23;       // Number of inducers 
     // !!! CHANGE max trials !!! 
 const diagnostic_min_length = 4         // Min run length
 const diagnostic_max_length = 16        // Max run length
-const max_diagnostic_trials = 5 //220     // Total max diagnostic trials
+const max_diagnostic_trials = 110 //220     // Total max diagnostic trials
     // max/2 * number_of_inducers
 
 ////    Practice parameters     ////
@@ -264,12 +264,14 @@ if(debug){ console.log("Random diagnostic lengths list:", rnd_diagnostic_length)
 const sum_diags = rnd_diagnostic_length.reduce((list, i) => list + i, 0);
 if(debug){ console.log("Total diagnostic trials:", sum_diags) }
 
+
 // If the sum is more or less than the specified value, adjust accordingly
 if(sum_diags != max_diagnostic_trials){
     let operation = (sum_diags < max_diagnostic_trials) ? "+" : (sum_diags > max_diagnostic_trials) ? "-" : "";
     let diff = Math.abs(sum_diags-max_diagnostic_trials)
     var cond;
     if(debug){ console.log("Current operation", operation, "with a differences of", diff) }
+    var break_count = 0;
     do{
         if(debug){ console.log("Diff: ", diff) }
         // Randomly sample a location
@@ -288,9 +290,12 @@ if(sum_diags != max_diagnostic_trials){
             diff--;
         } else { // else skip
             if(debug){ console.log("Value: ", rnd_diagnostic_length[loc], "at location", loc, "is at threshold, skipping...") } }
-    } while( diff > 0)
+        break_count+=1 // in case 
+        if(debug){ console.log( break_count ) }
+    } while( diff > 0 & break_count < 500)
     if(debug){ console.log("Fixed diagnostic lengths:", rnd_diagnostic_length) }
 }
+
 
 ////////////////////////////////////////////////////////////////////
 
@@ -508,10 +513,15 @@ if(prac_diagnostic_rounds > 0 && !skip_instructions){ // & skip_instructions ===
     let prac_stim = [rnd_stimuli[0], rnd_stimuli[1]] // Get new stimuli
     rnd_stimuli.splice(0, 2) // Remove those stimuli from the list
     
+    // Equal italic/upright 
+    var prac_dia = Array(  Array(Math.floor(prac_diagnostic_rounds/2)).fill(1) ,  Array( Math.ceil(prac_diagnostic_rounds/2) ).fill(0)  ).flat()
+    var rnd_prac_dia = jsPsych.randomization.shuffle(prac_dia)
+
     //// PRAC: Diagnostic task ////
     for(let pi = 0; pi < prac_diagnostic_rounds; pi++){
         let rnd_diag_stim = jsPsych.randomization.sampleWithReplacement(prac_stim, 1)[0]
-        let run_rnd_italic = jsPsych.randomization.sampleWithReplacement([true,false], 1, run_italic_bias)[0]
+        let run_rnd_italic = rnd_prac_dia[0]
+        rnd_prac_dia.splice(0)
     
         let diagnostic_run = { 
             type: jsPsychHtmlKeyboardResponse,
@@ -532,7 +542,7 @@ if(prac_diagnostic_rounds > 0 && !skip_instructions){ // & skip_instructions ===
                 italic: run_rnd_italic,             // Whether the run is ITALIC or not
                 trial_info: "Practice diganostic trial",         // This is a diagnostic trial
                 correct_diag_response_side: () => {     // Required response side for the diagnostic task
-                    if (run_rnd_italic) { return rnd_diagnostic_response_sides[0] } 
+                    if (run_rnd_italic == 0) { return rnd_diagnostic_response_sides[0] } 
                     else                { return rnd_diagnostic_response_sides[1] } 
                 },
             },
@@ -682,14 +692,18 @@ if(prac_diagnostic_rounds > 0 && !skip_instructions){ // & skip_instructions ===
             You have now completed the practice.
             
             <br><br>
-            A new round will present two new 3-letter non-words. <br>
-            Some black coloured (italic/upright) non-words will be presented before the 
-            <b><span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour.toLowerCase()+ " coloured"}</span></b>
-            non-word. 
+            Every new round will present two new 3-letter non-words. <br>
+            These relate to the non-words presented in 
+            <b><span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour.toLowerCase()+ " colour"}</span></b>. 
             
             <br><br>
-            Each presentation will have a deadline of 2 seconds. <br>
-            Respond as <b>fast and accurately</b> as possible. <br>
+            However, before the 
+            <b><span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour.toLowerCase()+ " coloured"}</span></b> 
+            non-word is presented, some <b>black coloured<b> non-words will be presented. <br>
+            
+            <br><br>
+            From now on, each presentation will have a deadline of 2 seconds. <br>
+            Respond to each non-word as <b>fast and accurately</b> as possible. <br>
             The task will be difficult, but feedback will be provided. 
             
             </div>`
@@ -899,7 +913,16 @@ const experiment_feedback  = {
     required_error: `Please check whether you responded to (all) the question(s)`,
     required_question_label: "*",
     pages:() => {
-        return [    
+        return [
+            [
+                {
+                    type: "text",
+                    prompt: `What strategy did you use to solve the task? `,
+                    name: "strategy_feedback",
+                    textbox_columns: 100,
+                    textbox_rows: 5,
+                },
+            ],
             [ /// General feedback
                 {
                     type: "text",
@@ -929,6 +952,7 @@ const experiment_feedback  = {
 }
 timeline.push(experiment_feedback)
 
+
 timeline.push({
     type: jsPsychHtmlKeyboardResponse,
     stimulus: "Thank you for participating!  You will be redirected...",
@@ -943,8 +967,7 @@ timeline.push({
 })
 
 // Exit fullscreen and end experiment. 
-timeline.push(
-    {
+timeline.push({
     type: jsPsychFullscreen,
     message: "", 
     fullscreen_mode: false,    
@@ -953,6 +976,7 @@ timeline.push(
         console.log("Linking")
     }
 }); 
+
 
 timeline.push( {type:jsPsychHtmlKeyboardResponse, stimulus:""} )
 
