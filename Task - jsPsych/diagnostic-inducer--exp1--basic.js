@@ -1,14 +1,18 @@
 ////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////
 
+
 // CHANGE THESE BEFORE EXPERIMENT!
-const debug = true              // Show some console information
+const debug = true               // Show some console information
 const skip_instructions = false  // Skip intro? (to test trials)
 const save_local_data = false    // Save a local file (test analysis)
 
 
 
-// INSERT THE PROPER SUBMISSION COMPLETION LINK!! @ THE BOTTOM
+const study_name = "pilot" // add to filename 
+const redirect_link = "" 
+        // https://app.prolific.com/submissions/complete?cc=COAKFO2E (REPLICATION STUDY)
+        // https://app.prolific.com/submissions/complete?cc=C4S441ES (CUE TASK)
 
 
 
@@ -18,7 +22,8 @@ const save_local_data = false    // Save a local file (test analysis)
 
 ////////////////////////////
 ////    Parameters      ////
-////////////////////////
+////////////////////////////
+
 
 //    background default      ////
 const default_background_colour = "#cccccc" // Light grey
@@ -128,6 +133,7 @@ function changeBackground(colour) {
 ////                    ////
 ////////////////////////////
 
+
 const jsPsych = initJsPsych({
     // experiment_width : 1280, 
         // w/e add later if necessary
@@ -137,7 +143,7 @@ const jsPsych = initJsPsych({
 const timeline = []; // Timeline
 
 //// %% Set %% background to a light gray
-timeline.push(set_background_colour_default) 
+timeline.push( { type: jsPsychCallFunction,  func: () => { changeBackground(default_background_colour) } } ) 
     // To ensure the background colour is correct.
 
 
@@ -1006,7 +1012,7 @@ timeline.push({
     choices: "NO_KEYS",
     trial_duration: 2000, 
     on_load: () => {
-        saveData( "data_" + start_dateTime + "_" + ID + ".csv", jsPsych.data.get().csv() )
+        saveData( study_name, "_data_" + start_dateTime + "_" + ID + ".csv", jsPsych.data.get().csv() )
         if(debug) { console.log("Redirecting..... ")}
         // If local save is enabled save it as a csv 
         if(save_local_data) { jsPsych.data.get().localSave('csv','mydata.csv') }
@@ -1019,9 +1025,7 @@ timeline.push({
     message: "", 
     fullscreen_mode: false,    
     on_finish: () => {
-        window.location = "https://app.prolific.com/submissions/complete?cc=C1BHSUPK"
-        // https://app.prolific.com/submissions/complete?cc=COAKFO2E (REPLICATION STUDY)
-        // https://app.prolific.com/submissions/complete?cc=C4S441ES (CUE TASK)
+        window.location = redirect_link
         console.log("Linking")
     }
 }); 
