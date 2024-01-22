@@ -62,7 +62,7 @@ const max_diagnostic_trials = 110 //220     // Total max diagnostic trials
     // max/2 * number_of_inducers
 
 ////    Practice parameters     ////
-const prac_diagnostic_rounds = 15                    // Number of diagnostic practice rounds
+const prac_diagnostic_rounds = 5                    // Number of diagnostic practice rounds
     // Set to 0 if no practice rounds should occur.
 const prac_inducer_rounds = 4
     // NB: Max 64 rounds of new stimuli (prac_inducer_rounds + number_of_inducer > 64)
@@ -70,7 +70,6 @@ const prac_inducer_rounds = 4
 
 // Not used 
 const run_italic_bias = [1,1]           // Left value correspond to ITALIC probability, right correspond to UPRIGHT probability
-
 
 ////    Stimuli list    ////
 const stimuli = [
@@ -89,21 +88,7 @@ const stimuli = [
     "lpn", "zpl", "feg", "ydi", "vsc", "pmf", "ibg", "geb", "byy"];
     // Enough stimuli for 64 rounds. 
     
-////////////////////////////
-////                    ////
-////    Initialize      ////
-////                    ////
-////////////////////////////
-const jsPsych = initJsPsych({
-    // experiment_width : 1280, 
-        // w/e add later if necessary
-    on_finish: function() {
-        jsPsych.data.displayData() }
-});
-const timeline = []; // Timeline
-
-
-/// Functions ////
+////         Functions          ////
 // Date functions 
 Date.prototype.today = function () { 
     return this.getFullYear() + "-" + (((this.getMonth()+1) < 10)?"0":"") + (this.getMonth()+1) +"-"+ ((this.getDate() < 10)?"0":"") + this.getDate();
@@ -113,7 +98,6 @@ Date.prototype.timeNow = function () {
 }
 var start_dateTime = new Date().today() + "_" + new Date().timeNow();
 if( debug ) { console.log(start_dateTime) }
-
 
 // Save data (to server)
 var saveData = function(name, data) {
@@ -137,7 +121,30 @@ function changeBackground(colour) {
     document.body.style.background = colour;
 }
 
+
+////////////////////////////
+////                    ////
+////    Initialize      ////
+////                    ////
+////////////////////////////
+
+const jsPsych = initJsPsych({
+    // experiment_width : 1280, 
+        // w/e add later if necessary
+    on_finish: function() {
+        jsPsych.data.displayData() }
+});
+const timeline = []; // Timeline
+
+//// %% Set %% background to a light gray
+timeline.push(set_background_colour_default) 
+    // To ensure the background colour is correct.
+
+
+////////////////////////////////
 ////        Trials          ////
+////////////////////////////////
+
 // Change background trials
 const set_background_colour_default = {
     type: jsPsychCallFunction,
@@ -177,7 +184,7 @@ const long_fixation = {
     }
 }
 
-//// FEEDBACK ////
+////        FEEDBACK        ////
 // Wrong response trial
 const wrong_response = {
     type: jsPsychHtmlKeyboardResponse,
@@ -205,7 +212,7 @@ const too_slow = {
     }
 }
 
-////     Feedback block trial   //// 
+////     Feedback block trial       //// 
 // Relates to changing the background and then showing trial 
 
 // Wrong response trial (background change + info)
@@ -213,11 +220,9 @@ const wrong_response_trial = {
     timeline: [set_background_colour_wrong_response, wrong_response , set_background_colour_default],
     conditional_function: () => {
         let data = jsPsych.data.get().last(1).values()[0]
-        
-        if(debug){ console.log(data) }
-        
+
         if( data.correct_response == false)  { return true } 
-        else                        { return false }
+        else                                 { return false }
     }
 }
 // To slow trial (background change + info)
@@ -225,16 +230,16 @@ const too_slow_trial = {
     timeline: [set_background_colour_wrong_response, too_slow, set_background_colour_default],
     conditional_function: () => {
         let data = jsPsych.data.get().last(1).values()[0];
+
         if(data.response === null)  { return true } 
         else                        { return false }
     }
 }
 
 
-///////////////////////////////////////////////////////////////////////////////////////
-// Set background to a light gray
-timeline.push(set_background_colour_default) 
-    // To ensure the background colour is correct.
+////////////////////////////////////////////////////////////////////////////////////////////
+////                        General experiment things                                   ////
+////////////////////////////////////////////////////////////////////////////////////////////
 
 
 // Inducer colour
@@ -294,16 +299,15 @@ if(sum_diags != max_diagnostic_trials){
         if(debug){ console.log( break_count ) }
     } while( diff > 0 & break_count < 500)
     if(debug){ console.log("Fixed diagnostic lengths:", rnd_diagnostic_length) }
+    if(break_count >= 500){ "WARNING: COULD NOT EQUALIZE DIAGNOSTIC LENGTHS, CHECK PARAMETERS" }
 }
 
-
-////////////////////////////////////////////////////////////////////
-
+/////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////
 
 ////////////////////////////
 ////    Instructions    ////
 ////////////////////////////
-
 
 // We want to ensure some features before task start? 
     // Perhas we  trust prolifics inclusion/exclusion check ? 
@@ -422,12 +426,9 @@ if( !skip_instructions ){
     });
 }
 
-/////////////////////////////////////////
-/////            TASK               /////
-/////////////////////////////////////////
 
-let rnd_diagnostic_response_sides = jsPsych.randomization.shuffle(response_sides);    // randomize response side 
-        // Could/would probably be a good idea to randomize italic/upright appearance as well, but w/e
+// Shuffle left/right for each participants (remains the same throughout)
+let rnd_response_sides = jsPsych.randomization.shuffle(response_sides); 
 
 
 ////    GENERAL DIAGNOSTIC INSTRUCTIONS   ////
@@ -484,14 +485,14 @@ let diagnostic_task_instruction = {
     type: jsPsychHtmlKeyboardResponse,
     stimulus: function(){   
         return [ 
-        `<p style="font-size: ${general_font_size};"> If <i> italic </i> press ${rnd_diagnostic_response_sides[0]}`+
-        `<p style="font-size: ${general_font_size};"> If upright press ${rnd_diagnostic_response_sides[1]}`]
+        `<p style="font-size: ${general_font_size};"> If <i> italic </i> press ${rnd_response_sides[0]}`+
+        `<p style="font-size: ${general_font_size};"> If upright press ${rnd_response_sides[1]}`]
     }, 
     prompt: "Put your index fingers on the F and J key. <br> When you are ready, press SPACE to continue.",
     choices: " ", 
     trial_duration: instruction_delay,
     data: {
-        stimulus: `If italic press ${rnd_diagnostic_response_sides[0]} | If upright press ${rnd_diagnostic_response_sides[1]}`,
+        stimulus: `If italic press ${rnd_response_sides[0]} | If upright press ${rnd_response_sides[1]}`,
         trial_info: "Diagnostic instructions",
     },
     on_finish: (data) => { 
@@ -506,23 +507,32 @@ timeline.push( diagnostic_task_instruction )
 timeline.push( short_fixation )
 
 
-/////////  PRAC ROUND    ////// 
+//////////////////////////////////////////////////
+/////            TASK PRACTICE               /////
+//////////////////////////////////////////////////
+
+
 if(prac_diagnostic_rounds > 0 && !skip_instructions){ // & skip_instructions === false
 
     // This first get the number of different inducers
     let prac_stim = [rnd_stimuli[0], rnd_stimuli[1]] // Get new stimuli
     rnd_stimuli.splice(0, 2) // Remove those stimuli from the list
+    if(debug) { console.log("Run stimuli:", prac_stim)}
     
     // Equal italic/upright 
     var prac_dia = Array(  Array(Math.floor(prac_diagnostic_rounds/2)).fill(1) ,  Array( Math.ceil(prac_diagnostic_rounds/2) ).fill(0)  ).flat()
-    var rnd_prac_dia = jsPsych.randomization.shuffle(prac_dia)
+    let rnd_prac_dia = jsPsych.randomization.shuffle(prac_dia)
+    if(debug){ console.log("Practice diagnostic italic/upright:", prac_dia) }
+    if(debug){ console.log("Randomized diagnostic response:", rnd_prac_dia) }
 
     //// PRAC: Diagnostic task ////
     for(let pi = 0; pi < prac_diagnostic_rounds; pi++){
         let rnd_diag_stim = jsPsych.randomization.sampleWithReplacement(prac_stim, 1)[0]
         let run_rnd_italic = rnd_prac_dia[0]
-        rnd_prac_dia.splice(0)
-    
+        rnd_prac_dia.splice(0,1)
+        console.log(run_rnd_italic)
+        console.log(rnd_prac_dia)
+
         let diagnostic_run = { 
             type: jsPsychHtmlKeyboardResponse,
             stimulus: () => {   
@@ -542,8 +552,8 @@ if(prac_diagnostic_rounds > 0 && !skip_instructions){ // & skip_instructions ===
                 italic: run_rnd_italic,             // Whether the run is ITALIC or not
                 trial_info: "Practice diganostic trial",         // This is a diagnostic trial
                 correct_diag_response_side: () => {     // Required response side for the diagnostic task
-                    if (run_rnd_italic == 0) { return rnd_diagnostic_response_sides[0] } 
-                    else                { return rnd_diagnostic_response_sides[1] } 
+                    if (run_rnd_italic) { return rnd_response_sides[0] } 
+                    else                { return rnd_response_sides[1] } 
                 },
             },
             on_finish: (data) => {
@@ -615,23 +625,30 @@ if(prac_diagnostic_rounds > 0 && !skip_instructions){ // & skip_instructions ===
         timeline.push( inducer_task_instruction_description )
     }
 
+    // Equalize
+    var prac_inducer = Array(  Array(Math.floor(prac_inducer_rounds/2)).fill(1) ,  Array( Math.ceil(prac_inducer_rounds/2) ).fill(0)  ).flat()
+    var rnd_prac_inducer = jsPsych.randomization.shuffle(prac_inducer)
+    let prac_inducer_stim;
+    if(debug){ console.log("Practice inducer array:", prac_inducer) }
+    if(debug){ console.log("Randomized practice inducer array:", rnd_prac_inducer) }
+
     ///// PRAC: Inducer task /////
     for( let pi2 = 0; pi2 < prac_inducer_rounds; pi2++){
-
-        // stim
+        // Stim selection & removal
         let prac_stim = [rnd_stimuli[0], rnd_stimuli[1]] // Get new stimuli
         rnd_stimuli.splice(0, 2) // Remove those stimuli from the list
     
+        // Generate instruction trial
         let inducer_instruction = { 
             type: jsPsychHtmlKeyboardResponse,
-            stimulus: () => {   
-                return  `<p style="font-size: ${general_font_size}"> If <span style="color: ${rnd_inducer_colour}">${prac_stim[0]}</span> press ${response_sides[0]}`+
-                        `<p style="font-size: ${general_font_size}"> If <span style="color: ${rnd_inducer_colour}">${prac_stim[1]}</span> press ${response_sides[1]}`; 
+            stimulus: () => { 
+                return  `<p style="font-size: ${general_font_size}"> If <span style="color: ${rnd_inducer_colour}">${prac_stim[0]}</span> press ${rnd_response_sides[0]}`+
+                 `<p style="font-size: ${general_font_size}"> If <span style="color: ${rnd_inducer_colour}">${prac_stim[1]}</span> press ${rnd_response_sides[1]}`; 
             }, 
             prompt: "Put your index fingers on the F and J key. <br> When you are ready, press SPACE to continue.",
             choices: " ", 
             data: {
-                stimulus: `If ${prac_stim[0]} press ${response_sides[0]} | If ${prac_stim[1]} press ${response_sides[1]}`,
+                stimulus: `If ${prac_stim[0]} press ${rnd_response_sides[0]} | If ${prac_stim[1]} press ${rnd_response_sides[1]}`,
                 trial_info: "Practice inducer instructions",
                 inducer_run: "practice",
             },
@@ -644,31 +661,48 @@ if(prac_diagnostic_rounds > 0 && !skip_instructions){ // & skip_instructions ===
             }
         }
         timeline.push(inducer_instruction)
-
-        let rnd_inducer_stimulus = jsPsych.randomization.sampleWithReplacement(prac_stim, 1)[0]
-            // Randomly select inducer stimulus
-
+        
+        // Generate response trial
         let inducer_task = {
             type: jsPsychHtmlKeyboardResponse,
-            stimulus: () => { return `<p style="font-size: ${general_font_size}; color:${rnd_inducer_colour}">${rnd_inducer_stimulus}` },
+            stimulus: () => { 
+                // Based on the randomly generated array length, create a traial that requires either a left or right response
+                if(rnd_prac_inducer[0]){
+                    prac_inducer_stim = prac_stim[0]
+                } else {
+                    prac_inducer_stim = prac_stim[1]
+                }
+                rnd_prac_inducer.splice(0, 1) // remove the selected side from the array
+                return `<p style="font-size: ${general_font_size}; color:${rnd_inducer_colour}">${prac_inducer_stim}` },
             choices: allowed_responses,
             trial_duration: null,
             data: {
-                stimulus: rnd_inducer_stimulus,         // Stimulus
+                stimulus: prac_inducer_stim,         // Stimulus
                 inducer_run: "practice",                // Inducer run number
                 inducer_trial: true,                    // This is an inducer trial
                 trial_info: "Practice inducer trial",   // General trial info 
-                
+                correct_indu_response_side: () => {     // Required response side for the inducer task
+                    if (prac_inducer_stim == prac_stim[0]) { return rnd_response_sides[0] } 
+                    else                                   { return rnd_response_sides[1] } 
+                }
             },
             on_finish: (data) => {
                 // Current window size
                 data.width = window.innerWidth
                 data.height = window.innerHeight
                 
-                // Find correct response key 
-                if( (rnd_inducer_stimulus == prac_stim[0] && data.response == allowed_responses[0]) || (rnd_inducer_stimulus == prac_stim[1] && data.response == allowed_responses[1]) ){ 
-                    data.correct_response = 1 }
-                else { data.correct_response = 0 }
+                // Get correct response key from rnd response side
+                if(data.correct_indu_response_side == response_sides[0]) 
+                            { data.correct_response_key = allowed_responses[0] }
+                   else     { data.correct_response_key = allowed_responses[1] }
+                
+
+                if(data.response == null){  data.correct_response = NaN  } 
+                else {
+                    // If response equals correct_response_key
+                    if(data.correct_response_key == data.response)    { data.correct_response = 1 }
+                    else                                              { data.correct_response = 0 }
+                }
 
                 if(debug){ console.log(data) }
             }
@@ -697,9 +731,9 @@ if(prac_diagnostic_rounds > 0 && !skip_instructions){ // & skip_instructions ===
             <b><span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour.toLowerCase()+ " colour"}</span></b>. 
             
             <br><br>
-            However, before the 
+            Before the 
             <b><span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour.toLowerCase()+ " coloured"}</span></b> 
-            non-word is presented, some <b>black coloured<b> non-words will be presented. <br>
+            non-word appears, some <b>black coloured</b> non-words will be presented. <br>
             
             <br><br>
             From now on, each presentation will have a deadline of 2 seconds. <br>
@@ -707,11 +741,6 @@ if(prac_diagnostic_rounds > 0 && !skip_instructions){ // & skip_instructions ===
             The task will be difficult, but feedback will be provided. 
             
             </div>`
-            // <br><br>
-            // Keep in mind:<br>
-            // The unchanging instruction (italic/upright) is connected to 3-letter non-words presented in <b>black colour</b>. <br>
-            // The changing instruction is connected to 3-letter non-words presented in <b>\n
-            // <span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour.toLowerCase() + " colour"}</span></b>.
         }, 
         prompt: "<br>Press SPACE to start the task",
         choices: " ", 
@@ -732,11 +761,14 @@ if(prac_diagnostic_rounds > 0 && !skip_instructions){ // & skip_instructions ===
 }
 
 
-////////////////////////////////
-////    EXPERIMENT PROPER   ////
-////////////////////////////////
+
+//////////////////////////////////////////////////
+/////            TASK PROPER                 /////
+//////////////////////////////////////////////////
+
 
 for(let exp_block = 0; exp_block < number_of_inducers; exp_block++){ // less than, since we start at 0
+    
     ////////////////////////////////////////
     ////    Inducer instructions        ////
     ////////////////////////////////////////
@@ -752,14 +784,14 @@ for(let exp_block = 0; exp_block < number_of_inducers; exp_block++){ // less tha
     let inducer_instruction = { 
         type: jsPsychHtmlKeyboardResponse,
         stimulus: () => {   
-            return  `<p style="font-size: ${general_font_size}"> If <span style="color: ${rnd_inducer_colour}">${run_stimuli[0]}</span> press ${response_sides[0]}`+
-                    `<p style="font-size: ${general_font_size}"> If <span style="color: ${rnd_inducer_colour}">${run_stimuli[1]}</span> press ${response_sides[1]}`; 
+            return  `<p style="font-size: ${general_font_size}"> If <span style="color: ${rnd_inducer_colour}">${run_stimuli[0]}</span> press ${rnd_response_sides[0]}`+
+                    `<p style="font-size: ${general_font_size}"> If <span style="color: ${rnd_inducer_colour}">${run_stimuli[1]}</span> press ${rnd_response_sides[1]}`; 
         }, 
         prompt: "Put your index fingers on the F and J key. <br>When you are ready, press SPACE to continue.",
         choices: " ", 
         data: {
             inducer_run: exp_block,     // Inducer run number
-            stimulus: `If ${run_stimuli[0]} press ${response_sides[0]} | If ${run_stimuli[1]} press ${response_sides[1]}`,
+            stimulus: `If ${run_stimuli[0]} press ${rnd_response_sides[0]} | If ${run_stimuli[1]} press ${rnd_response_sides[1]}`,
             trial_info: "Inducer instructions"
         },
         trial_duration: instruction_delay, 
@@ -778,6 +810,7 @@ for(let exp_block = 0; exp_block < number_of_inducers; exp_block++){ // less tha
     ////    Diagnostic run      /////
     /////////////////////////////////
 
+    
     // Then we generate the diagnostic trials 
         // Should perhaps be a color? Or randomize a color? 
     for(let exp_diag = 0; exp_diag < run_diagnostic_length; exp_diag++){
@@ -810,8 +843,8 @@ for(let exp_block = 0; exp_block < number_of_inducers; exp_block++){ // less tha
                     else                                      { return response_sides[1] }
                 },
                 correct_diag_response_side: () => {     // Required response side for the diagnostic task
-                    if (run_rnd_italic) { return rnd_diagnostic_response_sides[0] } 
-                    else                { return rnd_diagnostic_response_sides[1] } 
+                    if (run_rnd_italic) { return rnd_response_sides[0] } 
+                    else                { return rnd_response_sides[1] } 
                 },
             },
             on_finish: (data) => {
@@ -870,15 +903,29 @@ for(let exp_block = 0; exp_block < number_of_inducers; exp_block++){ // less tha
             inducer_run: exp_block,                     // Inducer run number
             inducer_trial: true,                    // This is an inducer trial
             trial_info: "Inducer trial",            // General trial info 
+            correct_indu_response_side: () => {     // Required response side for the diagnostic task
+                if (rnd_inducer_stimulus == run_stimuli[0]) { return rnd_response_sides[0] } 
+                else                                     { return rnd_response_sides[1] } 
+            }
         },
         on_finish: (data) => {
             // Current window size
             data.width = window.innerWidth
             data.height = window.innerHeight
             
-            if( (rnd_inducer_stimulus == run_stimuli[0] && data.response == allowed_responses[0]) || (rnd_inducer_stimulus == run_stimuli[1] && data.response == allowed_responses[1]) ){ 
-                data.correct_response = 1 }
-            else { data.correct_response = 0 }
+            // Check the correct response key: 
+            // Associate correct key from response sides
+            if(data.correct_indu_response_side == response_sides[0]) 
+                    { data.correct_response_key = allowed_responses[0] }
+            else    { data.correct_response_key = allowed_responses[1] }
+            
+            // Associate correct response from correct response key
+            if(data.response == null){  data.correct_response = NaN  } 
+            else {
+                // If response equals correct_response_key
+                if(data.correct_response_key == data.response)    { data.correct_response = 1 }
+                else                                              { data.correct_response = 0 }
+            }
             
             if(debug){ console.log(data) }
         }
@@ -926,7 +973,7 @@ const experiment_feedback  = {
             [ /// General feedback
                 {
                     type: "text",
-                    prompt: `Your feedback is welcome! Do you have any comments, thoughts, or remarks in relation to the experiment?`,
+                    prompt: `Do you have any comments, thoughts, or remarks in relation to the experiment?`,
                     name: 'open_feedback',
                     textbox_columns: 100,
                     textbox_rows: 5,
@@ -973,11 +1020,13 @@ timeline.push({
     fullscreen_mode: false,    
     on_finish: () => {
         window.location = "https://app.prolific.com/submissions/complete?cc=C1BHSUPK"
+        // https://app.prolific.com/submissions/complete?cc=COAKFO2E (REPLICATION STUDY)
+        // https://app.prolific.com/submissions/complete?cc=C4S441ES (CUE TASK)
         console.log("Linking")
     }
 }); 
 
 
-timeline.push( {type:jsPsychHtmlKeyboardResponse, stimulus:""} )
+timeline.push( {type: jsPsychHtmlKeyboardResponse, stimulus: ""} )
 
 jsPsych.run(timeline)
