@@ -139,62 +139,67 @@ d |>
 
 # Freq:
 ## response times
-rt_test <- t.test( d2$rt_FALSE, d2$rt_TRUE, paired = TRUE, alternative = "greater" )
-rt_test_b <- ttestBF( d2$rt_FALSE, d2$rt_TRUE, paired = T, iterations = 10000, posterior = F )
-rt_test_b2 <- ttestBF( d2$rt_FALSE, d2$rt_TRUE, paired = T, iterations = 10000, posterior = T )
-rt_test_hdi <- hdi(rt_test_b2)
+rt_test      <- t.test( d2$rt_FALSE, d2$rt_TRUE, paired = TRUE, alternative = "greater" )
+rt_test_b    <- ttestBF( d2$rt_FALSE, d2$rt_TRUE, paired = T, iterations = 10000, posterior = F )
+rt_test_b2   <- ttestBF( d2$rt_FALSE, d2$rt_TRUE, paired = T, iterations = 10000, posterior = T )
+rt_test_hdi  <- hdi(rt_test_b2)
   # weird if this is how you have to do it
+
 d2 |>
   summarise(
-    name = "RT",
-    m_incongruent = mean(rt_FALSE),
-    sd_incongruent = sd(rt_FALSE),
-    incon_comb = paste0( fmt_APA_num(m_incongruent), " (", fmt_APA_num(sd_incongruent), ")" ),
-    m_congruent = mean(rt_TRUE),
-    sd_congruent = sd(rt_TRUE),
-    con_comb = paste0( fmt_APA_num(m_congruent), " (", fmt_APA_num(sd_congruent), ")" ),
-    Mdiff = mean( rt_FALSE - rt_TRUE),
-    t = rt_test$statistic,
-    df = rt_test$parameter,
-    p = rt_test$p.value,
-    p.cor = p.adjust(p, "bonferroni", n=2),
-    b.est = mean(rt_test_b2[,"mu"]),
-    hdi = paste0("[", fmt_APA_num(rt_test_hdi$CI_low[1]),", ", fmt_APA_num(rt_test_hdi$CI_high[1]),"]"),
-    bf = extractBF(rt_test_b)$bf,
-    d = cohensD(rt_FALSE, rt_TRUE, method = "corrected"),
+    name            = "RT",
+    m_incongruent   = fmt_APA_numbers( mean(rt_FALSE) ),
+    sd_incongruent  = fmt_APA_numbers( sd(rt_FALSE) ), 
+    m_congruent     = fmt_APA_numbers( mean(rt_TRUE) ),
+    sd_congruent    = fmt_APA_numbers( sd(rt_TRUE) ),
+    Mdiff           = mean(rt_FALSE - rt_TRUE),
+    t               = rt_test$statistic,
+    df              = rt_test$parameter,
+    p               = rt_test$p.value,
+    p.cor           = p.adjust(p, "bonferroni", n=rt_test$parameter+1),
+    ps              = case_when(p.cor < .05 ~ "*", p < 0.01 ~ "**", p < 0.001 ~ "***", T ~ ""),
+    Mdiff           = paste0( fmt_APA_num(Mdiff), ps ),
+    b.est           = fmt_APA_numbers( mean(rt_test_b2[,"mu"]) ),
+    hdi             = paste0("[", fmt_APA_numbers(rt_test_hdi$CI_low[1]),", ", 
+                                  fmt_APA_numbers(rt_test_hdi$CI_high[1]),"]"),
+    bf              = extractBF(rt_test_b)$bf,
+    d               = cohensD( rt_FALSE, rt_TRUE, method = "corrected" ),
     )  -> d_rt
 
 ## proportion correct trials
-pct_test <- t.test(  d2$pct_FALSE, d2$pct_TRUE, paired = TRUE, alternative = "less" )
-pct_test_b <- ttestBF( d2$pct_FALSE, d2$pct_TRUE, paired = T, iterations = 10000, posterior = F )
-pct_test_b2 <- ttestBF( d2$pct_FALSE, d2$pct_TRUE, paired = T, iterations = 10000, posterior = T )
-pct_test_hdi <- hdi(pct_test_b2)
+pct_test      <- t.test(  d2$pct_FALSE, d2$pct_TRUE, paired = TRUE, alternative = "less" )
+pct_test_b    <- ttestBF( d2$pct_FALSE, d2$pct_TRUE, paired = T, iterations = 10000, posterior = F )
+pct_test_b2   <- ttestBF( d2$pct_FALSE, d2$pct_TRUE, paired = T, iterations = 10000, posterior = T )
+pct_test_hdi  <- hdi(pct_test_b2)
   # weird if this is how you have to do it
 
 d2 |>
   summarise(
-    name = "PCT",
-    m_incongruent = mean( pct_FALSE ),
-    sd_incongruent = sd( pct_FALSE ),
-    incon_comb = paste0( fmt_APA_num(m_incongruent), " (", fmt_APA_num(sd_incongruent), ")" ),
-    m_congruent = mean( pct_TRUE ),
-    sd_congruent = mean( pct_TRUE ),
-    con_comb = paste0( fmt_APA_num(m_congruent), " (", fmt_APA_num(sd_congruent), ")" ),
-    Mdiff = mean( pct_FALSE - pct_TRUE ),
-    t = pct_test$statistic,
-    df = pct_test$parameter,
-    p = pct_test$p.value,
-    p.cor = p.adjust(p, "bonferroni", n=2),
-    b.est = mean(pct_test_b2[,"mu"]),
-    hdi = paste0("[",fmt_APA_num(pct_test_hdi$CI_low[1]),", ", fmt_APA_num(pct_test_hdi$CI_high[1]),"]"),
-    bf = extractBF(pct_test_b)$bf,
-    d = cohensD(pct_FALSE, pct_TRUE, method = "corrected"),
+    name             = "PCT",
+    m_incongruent    = fmt_APA_numbers( mean(pct_FALSE) ),
+    sd_incongruent   = fmt_APA_numbers( sd(pct_FALSE) ),
+    m_congruent      = fmt_APA_numbers( mean(pct_TRUE) ),
+    sd_congruent     = fmt_APA_numbers( sd(pct_TRUE) ),
+    Mdiff            = mean(pct_FALSE - pct_TRUE),
+    t                = fmt_APA_numbers( pct_test$statistic ),
+    df               = pct_test$parameter,
+    p                = pct_test$p.value,
+    p.cor            = p.adjust(p, "bonferroni", n = pct_test$parameter+1),
+    
+    ps               = case_when(p.cor < .05 ~ "*", p < 0.01 ~ "**", p < 0.001 ~ "***", T ~ ""),
+    Mdiff            = paste0( fmt_APA_numbers(Mdiff), ps ),
+    b.est            = fmt_APA_numbers( mean(pct_test_b2[,"mu"]) ),
+    hdi              = paste0("[",fmt_APA_numbers(pct_test_hdi$CI_low[1]),", ", 
+                                  fmt_APA_numbers(pct_test_hdi$CI_high[1]),"]"),
+    bf               = extractBF(pct_test_b)$bf,
+    d                = cohensD(pct_FALSE, pct_TRUE, method = "corrected"),
   ) -> d_pct
 
 ```
 
 
-## Diagnostic table
+# Diagnostic 
+## Table
 ```{r stat table}
 #| echo: false
 rbind(d_rt, d_pct) -> b
@@ -204,24 +209,22 @@ b |> pull(p) |> min() -> p_min
 if(d2_df != floor(d2_df)){warning("NOT SIMILAR, CHECK DF")}
   # degrees of freedom
 
-rbind(d_rt, d_pct) |>
-  mutate(ps = case_when(p.cor < .05 ~ "*", p < 0.01 ~ "**", p < 0.001 ~ "***", T ~ ""),
-         Mdiff = paste0(fmt_APA_num(Mdiff), ps),
-         em1 = "", em2="", em3="") |>
+b |>
+  # add bayes row? 
+  mutate(em1 = "", em2="", em3="") |>
   gt() |>
-  cols_hide(c(p, t, df, p.cor, ps, m_incongruent, sd_incongruent, m_congruent, sd_congruent)) |>
-  tab_spanner(  "Incongruent", incon_comb )  |>
-  cols_label(   incon_comb = md("*M* (*SD*)") ) |> 
-  tab_spanner(  "Congruent", con_comb ) |> 
-  cols_label(   con_comb = md("*M* (*SD*)") |> 
+  cols_hide(    c(p, t, df, p.cor, ps) ) |>
+  tab_spanner(  "Incongruent", c(m_incongruent, sd_incongruent) ) |>
+  cols_label(   m_incongruent = md("*M*"), sd_incongruent = md("*SD*" ) ) |>
+  tab_spanner(  "Congruent", c(m_congruent, sd_congruent) ) |>
+  cols_label(   m_congruent = md("*M*"),  sd_congruent = md("*SD*") ) |>
   tab_spanner(  "Bayes", c(b.est, bf, hdi)) |>
-  cols_label(   b.est = md("*M*"), bf = md("BF~10~"), hdi = "HDI", # html("BF<sub>10</sub>")
-                Mdiff = md("*M*~diff~") )  |> # html("<i>M</i><sub>diff</sub>") 
+  cols_label(   b.est = md("*M*"), bf = md("BF~10~"), hdi = "HDI",    # html("BF<sub>10</sub>")
+                Mdiff = md("*M*~diff~") )  |>     # html("<i>M</i><sub>diff</sub>") 
   #fmt_markdown() |>
   cols_move(    "ps", Mdiff ) |> 
   cols_move(    "em1", sd_incongruent ) |>
   cols_move(    "em2", ps ) |>
-  cols_hide(     ) |> 
   cols_label(   em1="",em2="", name = "", d = md("*d*"), em3="") |>
   cols_align(   "center", c(2:15)) |> 
   cols_move(    "em3", hdi) |>
@@ -235,7 +238,8 @@ have `r  d2_df` degrees of freedom.  \n
 of the means, HDI = highest density interval, *d* = Effect size.
 
 
-
+## Figures
+### linerange
 ```{r}
 #| echo: false
 #| warning: false
@@ -297,7 +301,7 @@ p1+p2
 ```
 
 
-
+### Bar plot
 ```{r}
 #| echo: false
 #| warning: false
@@ -350,8 +354,10 @@ d |>
 p1+p2
 ```
 
+# Inducer (with correlation)
+```{r sum data}
+#| echo: false
 
-```{r}
 d_ind <- 
   data |> 
   select(id, trial_info, inducer_run, correct_response, rt) |>
@@ -360,38 +366,128 @@ d_ind <-
   pivot_wider(names_from = trial_info, values_from = c(correct_response, rt)) |> 
   mutate(instructions = ifelse(is.na(`rt_Inducer instructions`)>20000, 20000, `rt_Inducer instructions`),
          trial = ifelse(is.na(`rt_Inducer trial`), 2000, `rt_Inducer trial` ))
+```
 
-
+## Total
+### Table
+Grand correlation, encoding time (ms) and response time (ms) for the inducer task
+```{r total table}
+#| echo: false
 d_ind |> 
-  group_by(`correct_response_Inducer trial`) |>
+  #group_by(`correct_response_Inducer trial`) |>
   summarize(cor = cor(instructions, trial),
             #correct = mean(`correct_response_Inducer trial`), 
             instructions =  mean(instructions),
-            trial = mean(trial),
-            ) #|>
-  ungroup()# |>
-  summarize(cor = cor(trial, instructions))
+            trial = mean(trial)) 
+```
+
+```{r total plot}
+#| fig-dpi: 300
+#| echo: false
+#| error: false
+#| warning: false
 
 d_ind |> 
-  pivot_wider(names_from = trial_info, values_from = c(correct_response, rt)) |>
-  mutate(instructions = ifelse(is.na(`rt_Inducer instructions`)>20000, 20000, `rt_Inducer instructions`),
-         trial = ifelse(is.na(`rt_Inducer trial`), 2000, `rt_Inducer trial` )) |>
-  ggplot(aes(instructions, trial, col = id)) +
-  geom_point()+
-  geom_smooth(method=lm)+
+  filter( !is.na(`rt_Inducer trial`) ) |>
+  mutate(instructions = ifelse(is.na(`rt_Inducer instructions`)>20000, 20000, `rt_Inducer instructions`)) |>
+  ggplot(aes(instructions, trial)) +
+  geom_point(alpha=.2) +
+  geom_smooth(method=lm, col="indianred2", linewidth=1) +
+  scale_x_continuous(breaks=seq(0,20000,1000)) +
+  scale_y_continuous(breaks=seq(0,2000,250)) +
   labs(y = "Trial response time (ms)", x = "Instruction response time (ms)")+
-  scale_x_continuous(breaks=seq(0,20000,1000))+
   theme(legend.position = "none")+
   coord_cartesian(ylim=c(0,2000))
+  
 ```
 
+
+## Within 
+### table
+Individual correlation, encoding time (ms) and response time (ms)
+```{r within table}
+# Correlation for each person: 
+d_ind |>
+  group_by(id) |>
+  summarize(cor = cor(trial, instructions),
+            #correct = mean(`correct_response_Inducer trial`), 
+            encoding =  mean(instructions),
+            trial = mean(trial)) 
+```
+
+
+Response time in milliseconds (ms) for encoding the instructions and inducer trial.
+```{r within plot}
+#| fig-dpi: 300
+#| echo: false
+#| error: false
+#| warning: false
+d_ind |>
+  ggplot(aes(x=instructions, y=trial, col=id))+
+  geom_line(stat="smooth", method=lm, alpha = .7)+
+  # grand line
+  #geom_smooth(aes(fill=NULL), method=lm, col="red")+
+  #geom_line(aes(fill=NULL), stat="smooth", method=lm, alpha = .8, col="red", linewidth=1)
+  scale_y_continuous(breaks=seq(0,2000,250))+
+  scale_x_continuous(breaks=seq(0,20000,1000))+
+  coord_cartesian(ylim=c(0,2000))+
+  theme_minimal()+
+  theme(legend.position="none")+
+  labs(x="Encoding", y="Trial")
+
+```
+
+
+
+# explore
+```{r}
+# difference between correct and incorrect inducers ? 
+
+# exploring
+d_ind |> 
+  group_by(id, `correct_response_Inducer trial`) |>
+  summarize(cor = cor(instructions, trial),
+            #correct = mean(`correct_response_Inducer trial`), 
+            instructions =  mean(instructions),
+            trial = mean(trial),) |>
+  ungroup() ->
+  ind_within_split
+
+ind_within_split |>
+  pivot_wider(names_from=`correct_response_Inducer trial`, values_from=c(instructions,trial, cor)) 
+
+```
 
 ```{r}
+# but  why would we test this? 
+trial     <- t.test(test$trial_0, test$trial_1, paired=T)
+encoding  <- t.test(test$instructions_0, test$instructions_1, paired=T)
+cor       <- t.test(test$cor_0, test$cor_1, paired=T)
+
+ind_within_split |>
+  ggplot(aes(x = factor(`correct_response_Inducer trial`), y=cor))+
+  geom_point(position=position_jitter(width = .1), alpha =.35)+
+  stat_summary(col="red")+
+  labs(title="Correlation over correct inducer response", x="Correct inducer", y="Correlation")
 
 ```
 
+```{r}
+ind_within_split |>
+  ggplot(aes(x = factor(`correct_response_Inducer trial`), y=trial))+
+  geom_point(position=position_jitter(width = .1), alpha = .35)+
+  stat_summary(col="red")+
+  labs(title="Response time over correct inducer response", x="Correct inducer", y="Response time")
+```
 
+```{r}
+ind_within_split |>
+  ggplot(aes(x = factor(`correct_response_Inducer trial`), y=instructions))+
+  geom_point(position=position_jitter(width = .1), alpha = .35)+
+  stat_summary(col="red")+
+  labs(title="Encoding time over correct inducer response", x="Correct inducer", y="Encoding time (ms)")
 
+```
 
 
 
