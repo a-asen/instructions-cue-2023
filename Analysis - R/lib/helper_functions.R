@@ -143,7 +143,7 @@ gen_prob <- \(min, max, decent, math, spare = 0){
 
 
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ###
-fmt_APA_num <- function(num, p=F, low_val=F){
+fmt_APA_numbers <- function(num, p=F, low_val=F){
   require(purrr)
   purrr::map(num, \(num){
     if(p){
@@ -161,7 +161,7 @@ fmt_APA_num <- function(num, p=F, low_val=F){
     if(num < 1 & low_val | num > -1 & low_val){
       return( round(num, 3) )
     }
-  })
+  }) |> unlist()
 }
 
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ###
