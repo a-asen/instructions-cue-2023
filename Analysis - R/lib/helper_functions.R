@@ -150,7 +150,7 @@ fmt_APA_numbers <- function(num, p=F, low_val=F){
       return( round(num, 3) |> as.character(num) |> sub("0.",".", x = _) )
     }
     if(num >= 100 | num <= -100){
-      return( round(num,0) )
+      return( as.numeric( round(num,0) ) )
     }
     if(num >= 10 | num <= -10){
       return( round(num, 1) )
