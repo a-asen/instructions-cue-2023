@@ -129,7 +129,7 @@ d |>
   filter(trial_info=="Diagnostic trial") |>
   group_by(id, congruent) |>
   summarize(rt = mean(rt, na.rm = TRUE),
-            pct = sum(correct_response==1) / length(correct_response)) |>
+            pct = mean(correct_response),) |>
   pivot_wider( names_from = congruent, values_from = c(rt, pct) ) |>
   ungroup() -> d2
 ```
@@ -158,7 +158,7 @@ d2 |>
     p               = rt_test$p.value,
     p.cor           = p.adjust(p, "bonferroni", n=rt_test$parameter+1),
     ps              = case_when(p.cor < .05 ~ "*", p < 0.01 ~ "**", p < 0.001 ~ "***", T ~ ""),
-    Mdiff           = paste0( fmt_APA_num(Mdiff), ps ),
+    Mdiff           = paste0( fmt_APA_numbers(Mdiff), ps ),
     b.est           = fmt_APA_numbers( mean(rt_test_b2[,"mu"]) ),
     hdi             = paste0("[", fmt_APA_numbers(rt_test_hdi$CI_low[1]),", ", 
                                   fmt_APA_numbers(rt_test_hdi$CI_high[1]),"]"),
@@ -354,7 +354,64 @@ d |>
 p1+p2
 ```
 
-# Inducer (with correlation)
+
+# Exploratory
+
+## LISAS 
+```{r lisas calculation}
+#| echo: false
+#| warning: false
+#| message: false
+
+# Linear integrated speed-accuracy score (LISAS) 
+# See Vandierendonck 2017 @ https://doi.org/10.3758/s13428-016-0721-5
+
+d |>
+  filter(trial_info=="Diagnostic trial") |>
+  group_by(id) |>
+  summarize(g_rt = mean(rt, na.rm = TRUE),
+            g_rt_sd = sd(rt),
+            g_pe = 1 - mean(correct_response),
+            g_pe_sd =  sd(correct_response)) ->  lisas_grand
+
+d |>
+  filter(trial_info=="Diagnostic trial") |>
+  group_by(id, congruent) |>
+  summarize(rt = mean(rt, na.rm = TRUE),
+            pe = 1 - mean(correct_response) ) |>
+  pivot_wider( names_from = congruent, values_from = c(rt, pe) ) -> lisas_ind
+
+lisas_ind |>
+  left_join(lisas_grand, by="id") |>
+  mutate(lisas_IN   = rt_FALSE + (g_rt_sd/g_pe_sd) * pe_FALSE,
+         lisas_CON  = rt_TRUE + (g_rt_sd/g_pe_sd) * pe_TRUE,
+         ) ->
+  lisas
+```
+
+Figure XX
+*Instruction-based congruency effect by linear integrated speed-accuracy score (LISAS)*
+```{r lisas plot}
+#| echo: false
+#| fig-dpi: 300
+#| warning: false
+#| warning: false
+lisas |> 
+  pivot_longer(c(lisas_IN, lisas_CON)) |> 
+  mutate(name = ifelse(name=="lisas_IN", "Incongruent", "Congruent")) |>
+  ggplot(aes(factor(name), value))+
+  geom_point(aes(group=id), position = position_dodge(.1), alpha = .4)+
+  geom_line(aes(group=id), position = position_dodge(.1), alpha = .4)+
+  stat_summary(col = "indianred2")+
+  labs(x = "", )
+  
+
+```
+
+
+
+
+## Inducer encoding/RT (& correlation)
 ```{r sum data}
 #| echo: false
 
@@ -368,17 +425,19 @@ d_ind <-
          trial = ifelse(is.na(`rt_Inducer trial`), 2000, `rt_Inducer trial` ))
 ```
 
-## Total
 ### Table
 Grand correlation, encoding time (ms) and response time (ms) for the inducer task
 ```{r total table}
 #| echo: false
+sd(d_ind$trial)
 d_ind |> 
-  #group_by(`correct_response_Inducer trial`) |>
   summarize(cor = cor(instructions, trial),
-            #correct = mean(`correct_response_Inducer trial`), 
-            instructions =  mean(instructions),
-            trial = mean(trial)) 
+            encoding =  mean(instructions),
+            encoding_sd =  sd(instructions),
+            d = moments::skewness(instructions),
+            trial = mean(trial),
+            trial_sd = sd(trial, na.rm = TRUE))# |>
+  gt()
 ```
 
 ```{r total plot}
@@ -397,8 +456,8 @@ d_ind |>
   scale_y_continuous(breaks=seq(0,2000,250)) +
   labs(y = "Trial response time (ms)", x = "Instruction response time (ms)")+
   theme(legend.position = "none")+
-  coord_cartesian(ylim=c(0,2000))
-  
+  coord_cartesian(ylim=c(0,2000)) 
+
 ```
 
 
@@ -406,13 +465,30 @@ d_ind |>
 ### table
 Individual correlation, encoding time (ms) and response time (ms)
 ```{r within table}
+#| echo: false
+
 # Correlation for each person: 
 d_ind |>
   group_by(id) |>
   summarize(cor = cor(trial, instructions),
-            #correct = mean(`correct_response_Inducer trial`), 
             encoding =  mean(instructions),
-            trial = mean(trial)) 
+            encoding_sd = sd (instructions),
+            encoding_skew = moments::skewness(instructions), 
+            trial = mean(trial),
+            trial_sd = sd(trial, na.rm = T)) 
+
+d_ind |>
+  group_by(id) |>
+  mutate(instructions2 = log(instructions)) |>
+  ggplot(aes(id, instructions2))+
+  geom_point()
+  summarize(
+                encoding =  mean(instructions2),
+            encoding_sd = sd (instructions2),
+            encoding_skew = moments::skewness(instructions2), 
+  ) 
+  
+
 ```
 
 
@@ -422,6 +498,7 @@ Response time in milliseconds (ms) for encoding the instructions and inducer tri
 #| echo: false
 #| error: false
 #| warning: false
+
 d_ind |>
   ggplot(aes(x=instructions, y=trial, col=id))+
   geom_line(stat="smooth", method=lm, alpha = .7)+
@@ -439,8 +516,16 @@ d_ind |>
 
 
 
-# explore
+
+
+
+
+
+
+## Split by in/correct  ????
 ```{r}
+#| echo: false
+
 # difference between correct and incorrect inducers ? 
 
 # exploring
@@ -453,12 +538,17 @@ d_ind |>
   ungroup() ->
   ind_within_split
 
-ind_within_split |>
-  pivot_wider(names_from=`correct_response_Inducer trial`, values_from=c(instructions,trial, cor)) 
+test <- 
+  ind_within_split |>
+  pivot_wider(names_from=`correct_response_Inducer trial`, values_from=c(instructions,trial, cor))
+  
 
 ```
 
 ```{r}
+#| echo: false
+
+
 # but  why would we test this? 
 trial     <- t.test(test$trial_0, test$trial_1, paired=T)
 encoding  <- t.test(test$instructions_0, test$instructions_1, paired=T)
@@ -473,6 +563,9 @@ ind_within_split |>
 ```
 
 ```{r}
+#| echo: false
+
+
 ind_within_split |>
   ggplot(aes(x = factor(`correct_response_Inducer trial`), y=trial))+
   geom_point(position=position_jitter(width = .1), alpha = .35)+
@@ -481,6 +574,9 @@ ind_within_split |>
 ```
 
 ```{r}
+#| echo: false
+
+
 ind_within_split |>
   ggplot(aes(x = factor(`correct_response_Inducer trial`), y=instructions))+
   geom_point(position=position_jitter(width = .1), alpha = .35)+
