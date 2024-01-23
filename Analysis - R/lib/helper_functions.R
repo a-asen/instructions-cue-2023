@@ -145,12 +145,21 @@ gen_prob <- \(min, max, decent, math, spare = 0){
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ###
 fmt_APA_numbers <- function(num, p=F, low_val=F){
   require(purrr)
+
   purrr::map(num, \(num){
+    o_num <- num
+      # Store original value
+    num <- as.numeric(num)
+      # Transform to numeric (if possible)
+    if(is.na(num)){
+      return(o_num)
+      # if is not numeric after transformation, return original
+    }
     if(p){
       return( round(num, 3) |> as.character(num) |> sub("0.",".", x = _) )
     }
     if(num >= 100 | num <= -100){
-      return( as.numeric( round(num,0) ) )
+      return( round(num,0) )
     }
     if(num >= 10 | num <= -10){
       return( round(num, 1) )
