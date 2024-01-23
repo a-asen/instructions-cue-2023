@@ -122,6 +122,8 @@ trials were lost. Representing a loss of
 `r round(loss$exclude_par_pct + loss$rt_sd_pct + loss$inducer_fail_pct, 2)`
 percent of the data.
 
+# Diagnostic 
+
 ```{r}
 #| include: FALSE
 # data summary
@@ -134,6 +136,7 @@ d |>
   ungroup() -> d2
 ```
 
+## Table
 ```{r RT tables}
 #| echo: false
 
@@ -149,11 +152,12 @@ d2 |>
   summarise(
     name            = "RT",
     m_incongruent   = fmt_APA_numbers( mean(rt_FALSE) ),
+                      # fmt here, b/c fmt_numbers() is to general
     sd_incongruent  = fmt_APA_numbers( sd(rt_FALSE) ), 
-    m_congruent     = fmt_APA_numbers( mean(rt_TRUE) ),
+    m_congruent     = fmt_APA_numbers( mean(rt_TRUE) ) ,
     sd_congruent    = fmt_APA_numbers( sd(rt_TRUE) ),
-    Mdiff           = mean(rt_FALSE - rt_TRUE),
-    t               = rt_test$statistic,
+    Mdiff           = fmt_APA_numbers( mean(rt_FALSE - rt_TRUE) ),
+    t               = fmt_APA_numbers( rt_test$statistic ),
     df              = rt_test$parameter,
     p               = rt_test$p.value,
     p.cor           = p.adjust(p, "bonferroni", n=rt_test$parameter+1),
@@ -162,8 +166,8 @@ d2 |>
     b.est           = fmt_APA_numbers( mean(rt_test_b2[,"mu"]) ),
     hdi             = paste0("[", fmt_APA_numbers(rt_test_hdi$CI_low[1]),", ", 
                                   fmt_APA_numbers(rt_test_hdi$CI_high[1]),"]"),
-    bf              = extractBF(rt_test_b)$bf,
-    d               = cohensD( rt_FALSE, rt_TRUE, method = "corrected" ),
+    bf              = fmt_APA_numbers( extractBF(rt_test_b)$bf ),
+    d               = fmt_APA_numbers( cohensD( rt_FALSE, rt_TRUE, method = "corrected" ) ),
     )  -> d_rt
 
 ## proportion correct trials
@@ -180,31 +184,30 @@ d2 |>
     sd_incongruent   = fmt_APA_numbers( sd(pct_FALSE) ),
     m_congruent      = fmt_APA_numbers( mean(pct_TRUE) ),
     sd_congruent     = fmt_APA_numbers( sd(pct_TRUE) ),
-    Mdiff            = mean(pct_FALSE - pct_TRUE),
+    Mdiff            = fmt_APA_numbers( mean(pct_FALSE - pct_TRUE) ),
     t                = fmt_APA_numbers( pct_test$statistic ),
     df               = pct_test$parameter,
     p                = pct_test$p.value,
     p.cor            = p.adjust(p, "bonferroni", n = pct_test$parameter+1),
-    
     ps               = case_when(p.cor < .05 ~ "*", p < 0.01 ~ "**", p < 0.001 ~ "***", T ~ ""),
     Mdiff            = paste0( fmt_APA_numbers(Mdiff), ps ),
     b.est            = fmt_APA_numbers( mean(pct_test_b2[,"mu"]) ),
     hdi              = paste0("[",fmt_APA_numbers(pct_test_hdi$CI_low[1]),", ", 
                                   fmt_APA_numbers(pct_test_hdi$CI_high[1]),"]"),
-    bf               = extractBF(pct_test_b)$bf,
-    d                = cohensD(pct_FALSE, pct_TRUE, method = "corrected"),
+    bf               = fmt_APA_numbers( extractBF(pct_test_b)$bf ),
+    d                = fmt_APA_numbers( cohensD(pct_FALSE, pct_TRUE, method = "corrected") ),
   ) -> d_pct
 
 ```
 
 
-# Diagnostic 
-## Table
+Table XX
+*Test statistics for the experimental conditions*
 ```{r stat table}
 #| echo: false
 rbind(d_rt, d_pct) -> b
-b |> summarize(x=sum(df)/length(df)) |> pull() -> d2_df
-b |> pull(p) |> min() -> p_min
+b |> summarize( m = mean(df) ) |> pull() -> d2_df
+b |> pull(p.cor) |> min() -> p_min
 
 if(d2_df != floor(d2_df)){warning("NOT SIMILAR, CHECK DF")}
   # degrees of freedom
@@ -219,7 +222,7 @@ b |>
   tab_spanner(  "Congruent", c(m_congruent, sd_congruent) ) |>
   cols_label(   m_congruent = md("*M*"),  sd_congruent = md("*SD*") ) |>
   tab_spanner(  "Bayes", c(b.est, bf, hdi)) |>
-  cols_label(   b.est = md("*M*"), bf = md("BF~10~"), hdi = "HDI",    # html("BF<sub>10</sub>")
+  cols_label(   b.est = md("*M*~est~"), bf = md("BF~10~"), hdi = "HDI",    # html("BF<sub>10</sub>")
                 Mdiff = md("*M*~diff~") )  |>     # html("<i>M</i><sub>diff</sub>") 
   #fmt_markdown() |>
   cols_move(    "ps", Mdiff ) |> 
@@ -227,8 +230,7 @@ b |>
   cols_move(    "em2", ps ) |>
   cols_label(   em1="",em2="", name = "", d = md("*d*"), em3="") |>
   cols_align(   "center", c(2:15)) |> 
-  cols_move(    "em3", hdi) |>
-  fmt_number()
+  cols_move(    "em3", hdi) 
 
 ```
 *Note.* P's are Bonferroni corrected for 2 tests. The tests
@@ -237,6 +239,7 @@ have `r  d2_df` degrees of freedom.  \n
 *M* = Mean, *SD* = standard deviation, *M*~diff~ = Differences
 of the means, HDI = highest density interval, *d* = Effect size.
 
+**remove extra zeros**
 
 ## Figures
 ### linerange
@@ -358,6 +361,7 @@ p1+p2
 # Exploratory
 
 ## LISAS 
+
 ```{r lisas calculation}
 #| echo: false
 #| warning: false
@@ -389,13 +393,117 @@ lisas_ind |>
   lisas
 ```
 
-Figure XX
-*Instruction-based congruency effect by linear integrated speed-accuracy score (LISAS)*
-```{r lisas plot}
+### Table
+
+Table XXX
+*Linear integrated speed-accuracy score (LISAS) test statistic*
+```{r}
 #| echo: false
+#| warning: false
+#| message: false
+
+t_lisas  <- t.test( lisas$lisas_IN, lisas$lisas_CON, paired=T)
+b_lisas  <- ttestBF(lisas$lisas_IN, lisas$lisas_CON, paired=T)
+b_lisas2 <- ttestBF(lisas$lisas_IN, lisas$lisas_CON, paired=T, posterior = T, iterations = 10000)
+
+lisas |>
+  rowwise() |>
+  mutate(l_diff = lisas_IN - lisas_CON) |> 
+  ungroup() |> 
+  summarize(
+    m_incongruent   = fmt_APA_numbers( mean(lisas_IN) ),
+    m_congruent     = fmt_APA_numbers( mean(lisas_CON) ),
+    p               = t_lisas$p.value,
+    ps              = case_when(p < .05 ~ "*", p < 0.01 ~ "**", p < 0.001 ~ "***", T ~ ""),
+    t               = t_lisas$statistic,
+    df              = t_lisas$parameter,
+    Mdiff           = paste0( fmt_APA_numbers( mean(l_diff) ), ps),
+    b.est           = fmt_APA_numbers( mean( b_lisas2[,"mu"] ) ), 
+    bf              = fmt_APA_numbers( extractBF(b_lisas)$bf ), 
+    hdi             = paste0("[", fmt_APA_numbers( hdi(b_lisas)[3] ), ", ", 
+                                  fmt_APA_numbers( hdi(b_lisas)[4] ), "]" ), 
+    d               = fmt_APA_numbers( cohensD(lisas_IN, lisas_CON, method="corrected") )
+    ) -> lisas_t
+
+lisas_t |>
+  mutate(em1="",em2="") |>
+  gt() |> 
+  tab_spanner("Bayesian", c(b.est, bf, hdi)) |>
+  cols_hide(c(p,ps,t,df)) |>
+  cols_move(em1, Mdiff) |> 
+  cols_move(em2, hdi) |>
+  cols_label(m_incongruent = "Incongruent", m_congruent = "Congruent", Mdiff = md("*M*~diff~"),
+             b.est = md("*M*~est~"), bf = md("BF~10~"), hdi = "HDI", d = md("*d*"),
+             em1="",em2="") |>
+  cols_align(   "center", everything()) 
+
+```
+
+*Note.* In/congruent are response time corrected using the linear integrated speed-accuracy score (LISAS). The test have `r  t_lisas$parameter` degrees of freedom.  \n
+`r fmt_APA_p_table_fig( min(t_lisas$p.value) )` \n
+*M*~diff~ = Difference between means, *M*~est~ = Bayesian sampling mean, BF~10~ = Bayesian factor, HDI = highest density interval, *d* = Effect size.
+
+**remove extra zeros**
+
+### Table: Combined
+
+Table YYYY
+*Test statistic of response time (RT), proportion of correct trials (PCT) and linear integrated speed-accuracy score (LISAS)*
+```{r}
+#| echo: false
+
+lisas_t[["name"]] <- "LISAS^1^"
+colnames(b)[!(colnames(b) %in% colnames(lisas_t))] -> missing
+
+for(x in missing){
+  lisas_t[, x] <- ""
+}
+
+b |> 
+  rbind(lisas_t) -> rt_int
+
+d_ind
+c(rt_int$p.cor, rt_int$p)
+b |> 
+  rbind(lisas_t) |> 
+  mutate(em1 = "", em2="", em3="", 
+         sd_incongruent = ifelse(sd_incongruent== "", "", fmt_APA_numbers(sd_incongruent) ),
+         sd_congruent   = ifelse(sd_congruent== "", "", fmt_APA_numbers(sd_congruent) )) |>
+  gt() |>
+  cols_hide(    c(p, t, df, p.cor, ps) ) |>
+  tab_spanner(  "Incongruent", c(m_incongruent, sd_incongruent) ) |>
+  cols_label(   m_incongruent = md("*M*"), sd_incongruent = md("*SD*" ) ) |>
+  tab_spanner(  "Congruent", c(m_congruent, sd_congruent) ) |>
+  cols_label(   m_congruent = md("*M*"),  sd_congruent = md("*SD*") ) |>
+  tab_spanner(  "Bayes", c(b.est, bf, hdi)) |>
+  cols_label(   b.est = md("*M*~est~"), bf = md("BF~10~"), hdi = "HDI",    # html("BF<sub>10</sub>")
+                Mdiff = md("*M*~diff~") )  |>     # html("<i>M</i><sub>diff</sub>") 
+  #fmt_markdown() |>
+  cols_move(    "ps", Mdiff ) |> 
+  cols_move(    "em1", sd_incongruent ) |>
+  cols_move(    "em2", ps ) |>
+  cols_label(   em1="",em2="", name = "", d = md("*d*"), em3="") |>
+  cols_align(   "center", c(2:15)) |> 
+  cols_move(    "em3", hdi)
+
+```
+*Note*. The test have `r  t_lisas$parameter` degrees of freedom.  \n
+`r fmt_APA_p_table_fig( min(t_lisas$p.value) )` \n
+In/congruent are response time corrected using the linear integrated speed-accuracy score (LISAS). The test have `r  t_lisas$parameter` degrees of freedom.  \n
+^1^ LISAS yields a single integrated score of response time that is corrected based on the proportion of error, see Vandierendonck 2017. 
+`r fmt_APA_p_table_fig( min(t_lisas$p.value) )` \n
+*M* = Mean, *SD* = standard deviation,  *M*~diff~ = Difference between means, *M*~est~ = Bayesian sampling mean, BF~10~ = Bayesian factor, HDI = highest density interval, *d* = Effect size.
+
+
+### Figure
+Figure XX
+*The instruction-based congruency effect with the linear integrated speed-accuracy score (LISAS)*
+```{r lisas plot}
 #| fig-dpi: 300
+#| echo: false
 #| warning: false
-#| warning: false
+#| message: false
+
 lisas |> 
   pivot_longer(c(lisas_IN, lisas_CON)) |> 
   mutate(name = ifelse(name=="lisas_IN", "Incongruent", "Congruent")) |>
@@ -403,12 +511,12 @@ lisas |>
   geom_point(aes(group=id), position = position_dodge(.1), alpha = .4)+
   geom_line(aes(group=id), position = position_dodge(.1), alpha = .4)+
   stat_summary(col = "indianred2")+
-  labs(x = "", )
-  
+  labs(x = "", y = bquote("Response time"[1]))
+
 
 ```
-
-
+*Note*. *Response time corrected score. 
+~1~ Response time are corrected using the linear integrated speed-accuracy score (LISAS), see Vandierendonck 2017. 
 
 
 ## Inducer encoding/RT (& correlation)
@@ -483,13 +591,16 @@ d_ind |>
   ggplot(aes(id, instructions2))+
   geom_point()
   summarize(
-                encoding =  mean(instructions2),
+            encoding =  mean(instructions2),
             encoding_sd = sd (instructions2),
             encoding_skew = moments::skewness(instructions2), 
   ) 
   
 
 ```
+
+
+
 
 
 Response time in milliseconds (ms) for encoding the instructions and inducer trial.
