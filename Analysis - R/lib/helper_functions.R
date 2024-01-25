@@ -73,10 +73,98 @@ generate_word_list <- function(data, length = NULL){
   invisible(vec)
 }
 
+### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ###
+fmt_APA_numbers <- function(num, p=F, low_val=F){
+  require(purrr)
+
+  purrr::map(num, \(num){
+    o_num <- num
+    # Store original value
+    num <- as.numeric(num)
+    # Transform to numeric (if possible)
+    if(is.na(num)){
+      return(o_num)
+      # if is not numeric after transformation, return original
+    }
+    if(p){
+      return( round(num, 3) |> as.character(num) |> sub("0.",".", x = _) )
+    }
+    if(num >= 100 | num <= -100){
+      return( round(num,0) )
+    }
+    if(num >= 10 | num <= -10){
+      return( round(num, 1) )
+    }
+    if(num >= 1 | num <= -1 | num < 1 & !low_val | num > -1 & !low_val){
+      return( round(num, 2) )
+    }
+    if(num < 1 & low_val | num > -1 & low_val){
+      return( round(num, 3) )
+    }
+  }) |> unlist()
+}
+
+### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ###
+fmt_APA_p_table_fig <- function(p, crit = 0.05, div = 5){
+  chr <- ""
+  if( p > crit ){
+    return(chr)
+  }
+  if( p == crit ){
+    paste0( "* *p* = ", as.character(crit) |> sub("0.",".",x=_)) -> chr
+  }
+  if( p < crit ){
+    paste0( "* *p* < ", as.character(crit) |> sub("0.",".",x=_)) -> chr
+  }
+  if( p <= crit/div ){
+    paste0( chr, " ** *p* < ", ( crit/div ) |> as.character() |> sub("0.",".",x=_) ) -> chr
+  }
+  if( p <= crit/(div*10) ){
+    paste0( chr, " *** *p* < ",  ( crit/(div*10) ) |> as.character() |> sub("0.",".",x=_)  ) -> chr
+  }
+  return(chr)
+}
 
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ###
 
-gen_prob <- \(min, max, decent, math, spare = 0){
+generate_diagnostic_lengths <- function(len = 100, d_min = 4, d_max = 16){
+  #'  Randomly generate diagnostic lengths for the experiment parameters
+  #'
+
+  t <- tibble(n = seq(d_min,d_max,1), count=0)
+
+  for(x in 1:len){
+    s <- table(diag_length())
+    s <- tibble(n = as.integer(names(s)), s=as.integer(s))
+
+
+    t |>
+      left_join(s, "n") |>
+      mutate(s = ifelse(is.na(s), 0,s)) |>
+      rowwise() |>  mutate(count = count+s) |>  ungroup() |>
+      select(!s) -> t
+  }
+  m <- mean(t[["count"]])
+  t |>
+    ggplot(aes(n, count))+
+    geom_col()+
+    geom_hline(yintercept = m, col="red") -> p1
+  print(p1)
+  invisible(t)
+}
+
+
+
+
+
+### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ###
+### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ###
+### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ###
+
+
+### Not used
+
+generate_diagnostic_distribution <- \(min, max, decent, math = "linear", spare = 0){
   #' Generate probability distribution
   #'
   #' @description This function generates a probability distribution (from the
@@ -141,60 +229,8 @@ gen_prob <- \(min, max, decent, math, spare = 0){
   return(final_probability_list)
 }
 
+### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ###
 
-### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ###
-fmt_APA_numbers <- function(num, p=F, low_val=F){
-  require(purrr)
-
-  purrr::map(num, \(num){
-    o_num <- num
-      # Store original value
-    num <- as.numeric(num)
-      # Transform to numeric (if possible)
-    if(is.na(num)){
-      return(o_num)
-      # if is not numeric after transformation, return original
-    }
-    if(p){
-      return( round(num, 3) |> as.character(num) |> sub("0.",".", x = _) )
-    }
-    if(num >= 100 | num <= -100){
-      return( round(num,0) )
-    }
-    if(num >= 10 | num <= -10){
-      return( round(num, 1) )
-    }
-    if(num >= 1 | num <= -1 | num < 1 & !low_val | num > -1 & !low_val){
-      return( round(num, 2) )
-    }
-    if(num < 1 & low_val | num > -1 & low_val){
-      return( round(num, 3) )
-    }
-  }) |> unlist()
-}
-
-### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ###
-fmt_APA_p_table_fig <- function(p, crit = 0.05, div = 5){
-  chr <- ""
-  if( p > crit ){
-    return(chr)
-  }
-  if( p == crit ){
-    paste0( "* *p* = ", as.character(crit) |> sub("0.",".",x=_)) -> chr
-  }
-  if( p < crit ){
-    paste0( "* *p* < ", as.character(crit) |> sub("0.",".",x=_)) -> chr
-  }
-  if( p <= crit/div ){
-    paste0( chr, " ** *p* < ", ( crit/div ) |> as.character() |> sub("0.",".",x=_) ) -> chr
-  }
-  if( p <= crit/(div*10) ){
-    paste0( chr, " *** *p* < ",  ( crit/(div*10) ) |> as.character() |> sub("0.",".",x=_)  ) -> chr
-  }
-  return(chr)
-}
-
-### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ###
 # Not used
 max_diagnostic_length <- \(min, max, reps = 1000, experiment_length = 24,
                            probability = NULL,
@@ -241,3 +277,5 @@ max_diagnostic_length <- \(min, max, reps = 1000, experiment_length = 24,
     #annotate("text", x=mean(n)-2*sd(n), y=max(n)/1000-.1, label=min)
 
 }
+
+
