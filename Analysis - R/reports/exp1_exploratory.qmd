@@ -1,5 +1,5 @@
 ---
-title: "exp1_results"
+title: "Experiment 1 - Exploratory"
 format: docx
 lang: en-GB
 editor: 
@@ -22,10 +22,9 @@ source("../lib/helper_functions.R")
 
 ```{r load data }
 #| include: FALSE
-list.files("../data/raw/experiment1/pilots", pattern = "*.csv", full.names = T) -> fnames
+list.files("../data/raw/experiment1/task", pattern = "*.csv", full.names = T) -> fnames
 
-fnames2 <- fnames[str_detect(fnames, "2024")][5:6]
-map_df(fnames2, \(x){
+map_df(fnames, \(x){
   read_csv(x)
 }) -> data
 ```
@@ -168,12 +167,15 @@ Table XXX
 #| warning: false
 #| message: false
 
-t_lisas  <- t.test( lisas$lisas_IN, lisas$lisas_CON, paired=T)
-b_lisas  <- ttestBF(lisas$lisas_IN, lisas$lisas_CON, paired=T)
-b_lisas2 <- ttestBF(lisas$lisas_IN, lisas$lisas_CON, paired=T, posterior = T, iterations = 10000)
+w_lisas <- 
+  lisas |> 
+  pivot_wider(names_from=congruent, values_from=c(everything(), -congruent,-id)) 
 
-lisas |>
-  pivot_wider(names_from=congruent, values_from=c(everything(), -congruent,-id)) |>
+t_lisas  <- t.test( w_lisas$lisas_FALSE, w_lisas$lisas_TRUE, paired=T)
+b_lisas  <- ttestBF(w_lisas$lisas_FALSE, w_lisas$lisas_TRUE, paired=T)
+b_lisas2 <- ttestBF(w_lisas$lisas_FALSE, w_lisas$lisas_TRUE, paired=T, posterior = T, iterations = 10000)
+
+w_lisas |>
   rowwise() |>
   mutate(l_diff = lisas_FALSE - lisas_TRUE) |> 
   ungroup() |> 
@@ -289,6 +291,7 @@ Balanced integration score (BIS)
 #| echo: false
 
 # Calculation: 
+# See Liesefeld & Janczyk 2019 @ https://doi.org/10.3758/s13428-018-1076-x
 
 d |>
   filter(trial_info=="Diagnostic trial") |>

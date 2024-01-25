@@ -1,5 +1,5 @@
 ---
-title: "Experiment 1: Preregistered analysis"
+title: "Experiment 1 - Preregistered"
 format: docx
 lang: en-GB
 editor: 
@@ -16,16 +16,14 @@ library(patchwork)
 library(BayesFactor)
 library(bayestestR)
 library(lsr)
-# library(lme4)
 source("../lib/helper_functions.R")
 ```
 
 ```{r load data }
 #| include: FALSE
-list.files("../data/raw/experiment1/pilots", pattern = "*.csv", full.names = T) -> fnames
+list.files("../data/raw/experiment1/task", pattern = "*.csv", full.names = T) -> fnames
 
-fnames2 <- fnames[str_detect(fnames, "2024")][5:6]
-map_df(fnames2, \(x){
+map_df(fnames, \(x){
   read_csv(x)
 }) -> data
 ```
