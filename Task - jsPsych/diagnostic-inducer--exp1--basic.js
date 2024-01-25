@@ -1,19 +1,16 @@
 ////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////
 
-
 // CHANGE THESE BEFORE EXPERIMENT!
-const debug = true               // Show some console information
+const debug = false               // Show some console information
 const skip_instructions = false  // Skip intro? (to test trials)
 const save_local_data = false    // Save a local file (test analysis)
 
 
-
-const study_name = "pilot" // add to filename 
-const redirect_link = "" 
+const study_name = "exp1" // add to filename 
+const redirect_link = "https://app.prolific.com/submissions/complete?cc=COAKFO2E" 
         // https://app.prolific.com/submissions/complete?cc=COAKFO2E (REPLICATION STUDY)
         // https://app.prolific.com/submissions/complete?cc=C4S441ES (CUE TASK)
-
 
 
 ////////////////////////////////////////////////////////////////////////
@@ -59,17 +56,17 @@ const inducer_colours = ["red", "yellow", "blue"]      // Inducer colour randomi
     // This is also what is DISPLAYED to participants. Should therefore be a readable name. 
 
 ////    Diagnostic parameters   ////
-const number_of_inducers = 11//23;       // Number of inducers 
+const number_of_inducers = 22;       // Number of inducers 
     // !!! CHANGE max trials !!! 
 const diagnostic_min_length = 4         // Min run length
 const diagnostic_max_length = 16        // Max run length
-const max_diagnostic_trials = 110 //220     // Total max diagnostic trials
+const max_diagnostic_trials = 240     // Total max diagnostic trials
     // max/2 * number_of_inducers
 
 ////    Practice parameters     ////
-const prac_diagnostic_rounds = 5                    // Number of diagnostic practice rounds
+const prac_diagnostic_rounds = 15                    // Number of diagnostic practice rounds
     // Set to 0 if no practice rounds should occur.
-const prac_inducer_rounds = 4
+const prac_inducer_rounds = 5
     // NB: Max 64 rounds of new stimuli (prac_inducer_rounds + number_of_inducer > 64)
 
 
@@ -480,7 +477,7 @@ let diagnostic_task_instruction_description = {
         data.width = window.innerWidth
         data.height = window.innerHeight
 
-        skip_instructions ? null : console.log(data) 
+        if(debug){  console.log(data) }
     }
 }
 if( !skip_instructions ){ timeline.push(diagnostic_task_instruction_description) }
@@ -536,8 +533,6 @@ if(prac_diagnostic_rounds > 0 && !skip_instructions){ // & skip_instructions ===
         let rnd_diag_stim = jsPsych.randomization.sampleWithReplacement(prac_stim, 1)[0]
         let run_rnd_italic = rnd_prac_dia[0]
         rnd_prac_dia.splice(0,1)
-        console.log(run_rnd_italic)
-        console.log(rnd_prac_dia)
 
         let diagnostic_run = { 
             type: jsPsychHtmlKeyboardResponse,
@@ -625,7 +620,7 @@ if(prac_diagnostic_rounds > 0 && !skip_instructions){ // & skip_instructions ===
                 data.width = window.innerWidth
                 data.height = window.innerHeight
 
-                skip_instructions ? null : console.log(data) 
+                if(debug){ console.log(data) }
             }
         }
         timeline.push( inducer_task_instruction_description )
@@ -1026,7 +1021,7 @@ timeline.push({
     fullscreen_mode: false,    
     on_finish: () => {
         window.location = redirect_link
-        console.log("Linking")
+        if(debug){ console.log("Linking") }
     }
 }); 
 
