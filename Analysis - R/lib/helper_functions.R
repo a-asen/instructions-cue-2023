@@ -164,7 +164,7 @@ generate_diagnostic_lengths <- function(len = 100, d_min = 4, d_max = 16){
 
 ### Not used
 
-generate_diagnostic_distribution <- \(min, max, decent, math = "linear", spare = 0){
+gen_diag_distribution <- \(min, max, decent, math = "linear", spare = 0){
   #' Generate probability distribution
   #'
   #' @description This function generates a probability distribution (from the
