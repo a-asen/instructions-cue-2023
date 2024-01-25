@@ -1,0 +1,596 @@
+---
+title: "exp1_results"
+format: docx
+lang: en-GB
+editor: 
+  markdown:
+      wrap: 62
+---
+
+```{r libraries }
+#| include: FALSE
+library(tidyverse)
+library(ggpp)
+library(gt)
+library(patchwork)
+library(BayesFactor)
+library(bayestestR)
+library(lsr)
+library(lme4)
+source("../lib/helper_functions.R")
+```
+
+```{r load data }
+#| include: FALSE
+list.files("../data/raw/experiment1/pilots", pattern = "*.csv", full.names = T) -> fnames
+
+fnames2 <- fnames[str_detect(fnames, "2024")][5:6]
+map_df(fnames2, \(x){
+  read_csv(x)
+}) -> data
+```
+
+```{r transformation}
+#| include: FALSE
+# Pre-transformation
+data |>
+  mutate(rt = as.integer(ifelse( rt == "null", NA, rt ))) -> data
+
+# Select the relevant columns & rows
+data |>
+  select(id, trial_info, inducer_run, correct_response, rt, congruent) |>
+  filter(trial_info == "Diagnostic trial" | trial_info == "Inducer trial") |>
+  # Filter the first inducer run (combined practice)
+  filter(inducer_run != 0) -> d
+```
+
+```{r exclusion start - accuracy}
+#| include: FALSE
+loss <- list()
+loss$data_trials <- nrow(d)
+
+# d |> filter(inducer_run > 0) -> d
+  # Pilot removing
+
+### Overall accuracy      ====
+d |>
+  filter( trial_info == "Diagnostic trial" | trial_info == "Inducer trial" ) |>
+  group_by( id ) |>
+  summarize( acc = sum(correct_response, na.rm = TRUE) / length( !is.na(correct_response) ) ) |>
+  filter( acc < .7 ) |>
+  pull( id ) -> loss$exclude_par
+
+loss[["exclude_par_trials"]] <- length( d$rt[d$id == loss$exclude_par] )
+loss[["exclude_par_pct"]] <- length( d$rt[d$id == loss$exclude_par] ) / loss$data_trials * 100
+
+d |> filter( !(id %in% loss$exclude_par) ) -> d
+```
+
+In total, `r length(loss[["exclude_par"]])`
+`r ifelse(length(loss[["data_trials"]]) > 1, "participants", "participant")`
+where excluded due to low accuracy (\> 70%). Resulting in a
+loss of `r loss[["exclude_par_pct"]]` percent of the data.
+
+```{r due to high SD & NA responses }
+#| include: FALSE
+# Removing trials more than 2.5 SD (from individual mean) & NA RT 
+d |>
+  group_by(id) |>
+  mutate(rt_crit = ifelse( trial_info == "Diagnostic trial",
+                           mean( rt, na.rm = TRUE ) + sd( rt, na.rm = TRUE ) * 2.5,
+                           NA ),
+         retain_trials = ifelse(
+           # Remove deviations more than 2.5 SD
+           rt >= rt_crit & trial_info == "Diagnostic trial" |
+             # AND remove slow responses
+             is.na(rt) & trial_info == "Diagnostic trial",
+                             0, 1 ) ) -> d
+
+sum(d$retain_trials == 0) -> loss[["rt_sd_trials"]]
+sum(d$retain_trials == 0) / loss$data_trials * 100 -> loss[["rt_sd_pct"]]
+
+d |> 
+  filter( retain_trials == 1 ) -> d
+```
+
+Furthermore, `r loss[["rt_sd_trials"]]` trials were lost due
+to deviating (2.5 SD) response times and none response(s).
+Representing a loss of `r round(loss[["rt_sd_pct"]], 2)`
+percent of the data.
+
+```{r only correct inducers}
+#| include: FALSE
+d |>
+  mutate( valid_trials = case_when( trial_info=="Inducer trial" & correct_response==1 ~ 1,
+                                    trial_info=="Inducer trial" & correct_response==0 ~ 0,
+                                    T ~ NA ) ) |>
+  fill(valid_trials, .direction = "up") -> d
+
+sum(d$valid_trials==0) -> loss[["inducer_fail_trials"]]
+sum(d$valid_trials==0) / loss$data_trials * 100 -> loss[["inducer_fail_pct"]]
+
+d |> filter( valid_trials == 1 ) -> d
+```
+
+Lastly, `r round(loss[["inducer_fail_trials"]], 2)` trials
+were removed due to a wrong response on the inducer trial.
+Representing a loss of
+`r round(loss[["inducer_fail_pct"]], 2)` percent of the data.
+
+A total of
+`r loss$exclude_par_trials + loss$rt_sd_trials + loss$inducer_fail_trials`
+trials were lost. Representing a loss of
+`r round(loss$exclude_par_pct + loss$rt_sd_pct + loss$inducer_fail_pct, 2)`
+percent of the data.
+
+# Exploratory
+
+## LISAS 
+
+```{r lisas calculation}
+#| echo: false
+#| warning: false
+#| message: false
+
+# Linear integrated speed-accuracy score (LISAS) 
+# See Vandierendonck 2017 @ https://doi.org/10.3758/s13428-016-0721-5
+
+d |>
+  filter(trial_info=="Diagnostic trial") |>
+  group_by(id) |>
+  summarize(g_rt = mean(rt, na.rm = TRUE),
+            g_rt_sd = sd(rt),
+            g_pe = 1 - mean(correct_response),
+            g_pe_sd =  sd(correct_response)) ->  lisas_grand
+
+d |>
+  filter(trial_info=="Diagnostic trial") |>
+  group_by(id, congruent) |>
+  summarize(rt = mean(rt, na.rm = TRUE),
+            pe = 1 - mean(correct_response) ) -> test
+  # pivot_wider( names_from = congruent, values_from = c(rt, pe) ) -> lisas_ind
+
+lisas <- 
+  # lisas_ind |>
+test |>
+  left_join(lisas_grand, by="id") |> ungroup() |>
+  # group_by(id, congruent) |>
+  mutate(lisas   = rt + (g_rt_sd/g_pe_sd) * pe)
+  
+```
+
+### Table
+
+Table XXX
+*Linear integrated speed-accuracy score (LISAS) test statistic*
+```{r}
+#| echo: false
+#| warning: false
+#| message: false
+
+t_lisas  <- t.test( lisas$lisas_IN, lisas$lisas_CON, paired=T)
+b_lisas  <- ttestBF(lisas$lisas_IN, lisas$lisas_CON, paired=T)
+b_lisas2 <- ttestBF(lisas$lisas_IN, lisas$lisas_CON, paired=T, posterior = T, iterations = 10000)
+
+lisas |>
+  pivot_wider(names_from=congruent, values_from=c(everything(), -congruent,-id)) |>
+  rowwise() |>
+  mutate(l_diff = lisas_FALSE - lisas_TRUE) |> 
+  ungroup() |> 
+  summarize(
+    m_incongruent   = fmt_APA_numbers( mean(lisas_FALSE) ),
+    m_congruent     = fmt_APA_numbers( mean(lisas_TRUE) ),
+    p               = t_lisas$p.value,
+    ps              = case_when(p < .05 ~ "*", p < 0.01 ~ "**", p < 0.001 ~ "***", T ~ ""),
+    t               = t_lisas$statistic,
+    df              = t_lisas$parameter,
+    Mdiff           = paste0( fmt_APA_numbers( mean(l_diff) ), ps),
+    b.est           = fmt_APA_numbers( mean( b_lisas2[,"mu"] ) ), 
+    bf              = fmt_APA_numbers( extractBF(b_lisas)$bf ), 
+    hdi             = paste0("[", fmt_APA_numbers( hdi(b_lisas)[3] ), ", ", 
+                                  fmt_APA_numbers( hdi(b_lisas)[4] ), "]" ), 
+    d               = fmt_APA_numbers( cohensD(lisas_FALSE, lisas_TRUE, method="corrected") )
+    ) -> lisas_t
+
+lisas_t |>
+  mutate(em1="",em2="") |>
+  gt() |> 
+  tab_spanner("Bayesian", c(b.est, bf, hdi)) |>
+  cols_hide(c(p,ps,t,df)) |>
+  cols_move(em1, Mdiff) |> 
+  cols_move(em2, hdi) |>
+  cols_label(m_incongruent = "Incongruent", m_congruent = "Congruent", Mdiff = md("*M*~diff~"),
+             b.est = md("*M*~est~"), bf = md("BF~10~"), hdi = "HDI", d = md("*d*"),
+             em1="",em2="") |>
+  cols_align(   "center", everything()) 
+
+```
+
+*Note.* In/congruent are response time corrected using the linear integrated speed-accuracy score (LISAS). The test have `r  t_lisas$parameter` degrees of freedom.  \n
+`r fmt_APA_p_table_fig( min(t_lisas$p.value) )` \n
+*M*~diff~ = Difference between means, *M*~est~ = Bayesian sampling mean, BF~10~ = Bayesian factor, HDI = highest density interval, *d* = Effect size.
+
+**remove extra zeros**
+
+### Table: Combined
+
+Table YYYY
+*Test statistic of response time (RT), proportion of correct trials (PCT) and linear integrated speed-accuracy score (LISAS)*
+```{r}
+#| echo: false
+
+lisas_t[["name"]] <- "LISAS^1^"
+colnames(b)[!(colnames(b) %in% colnames(lisas_t))] -> missing
+
+for(x in missing){
+  lisas_t[, x] <- ""
+}
+
+b |> 
+  rbind(lisas_t) -> rt_int
+
+b |> 
+  rbind(lisas_t) |> 
+  mutate(em1 = "", em2="", em3="", 
+         sd_incongruent = ifelse(sd_incongruent== "", "", fmt_APA_numbers(sd_incongruent) ),
+         sd_congruent   = ifelse(sd_congruent== "", "", fmt_APA_numbers(sd_congruent) )) |>
+  gt() |>
+  cols_hide(    c(p, t, df, p.cor, ps) ) |>
+  tab_spanner(  "Incongruent", c(m_incongruent, sd_incongruent) ) |>
+  cols_label(   m_incongruent = md("*M*"), sd_incongruent = md("*SD*" ) ) |>
+  tab_spanner(  "Congruent", c(m_congruent, sd_congruent) ) |>
+  cols_label(   m_congruent = md("*M*"),  sd_congruent = md("*SD*") ) |>
+  tab_spanner(  "Bayes", c(b.est, bf, hdi)) |>
+  cols_label(   b.est = md("*M*~est~"), bf = md("BF~10~"), hdi = "HDI",    # html("BF<sub>10</sub>")
+                Mdiff = md("*M*~diff~") )  |>     # html("<i>M</i><sub>diff</sub>") 
+  #fmt_markdown() |>
+  cols_move(    "ps", Mdiff ) |> 
+  cols_move(    "em1", sd_incongruent ) |>
+  cols_move(    "em2", ps ) |>
+  cols_label(   em1="",em2="", name = "", d = md("*d*"), em3="") |>
+  cols_align(   "center", c(2:15)) |> 
+  cols_move(    "em3", hdi)
+
+```
+*Note*. The test have `r  t_lisas$parameter` degrees of freedom.  \n
+`r fmt_APA_p_table_fig( min(t_lisas$p.value) )` \n
+In/congruent are response time corrected using the linear integrated speed-accuracy score (LISAS). The test have `r  t_lisas$parameter` degrees of freedom.  \n
+^1^ LISAS yields a single integrated score of response time that is corrected based on the proportion of error, see Vandierendonck 2017. 
+`r fmt_APA_p_table_fig( min(t_lisas$p.value) )` \n
+*M* = Mean, *SD* = standard deviation,  *M*~diff~ = Difference between means, *M*~est~ = Bayesian sampling mean, BF~10~ = Bayesian factor, HDI = highest density interval, *d* = Effect size.
+
+
+### Figure
+Figure XX
+*The instruction-based congruency effect with the linear integrated speed-accuracy score (LISAS)*
+```{r lisas plot}
+#| fig-dpi: 300
+#| echo: false
+#| warning: false
+#| message: false
+
+lisas |> 
+  mutate(congruent = ifelse(congruent==FALSE, "Incongruent", "Congruent")) |>
+  ggplot(aes(factor(congruent), lisas, col = congruent))+
+  geom_point(aes(group=id), position = position_dodge(.1), alpha = .4)+
+  geom_line(aes(group=id), position = position_dodge(.1), alpha = .4)+
+  stat_summary(fun.data=mean_se)+
+  labs(x = "", y = bquote("Response time"[1]))
+
+```
+*Note*. *Response time corrected score. 
+~1~ Response time are corrected using the linear integrated speed-accuracy score (LISAS), see Vandierendonck 2017. 
+
+
+## BIS 
+
+Balanced integration score (BIS)
+```{r}
+#| echo: false
+
+# Calculation: 
+
+d |>
+  filter(trial_info=="Diagnostic trial") |>
+  ungroup() |>
+  summarize(g_rt = mean(rt, na.rm = TRUE),
+            g_rt_sd = sd(rt),
+            g_pe = mean(correct_response),
+            g_pe_sd =  sd(correct_response),) -> g_bis
+
+d |>
+  filter(trial_info=="Diagnostic trial") |>
+  group_by(id, congruent) |>
+  summarize(rt = mean(rt, na.rm = TRUE),
+            pe = mean(correct_response) ) -> ind_bis # |>
+  #pivot_wider( names_from = congruent, values_from = c(rt, pe) ) -> ind_bis
+
+BIS <- 
+  ind_bis  |>
+  cbind(g_bis) |> 
+  mutate(congruent = ifelse(congruent==FALSE, "Incongruent", "Congruent")) |>
+  group_by(id, congruent) |>
+  mutate(BIS  = ( (pe - g_pe) / g_pe_sd ) - ( (rt - g_rt) / g_rt_sd ) )
+
+```
+
+
+```{r}
+#| echo: false
+
+
+bis__lisas <- 
+  lisas |> 
+  ungroup() |>
+  mutate(congruent = ifelse(congruent==FALSE, "Incongruent", "Congruent"), 
+            # item values 
+         # lisas_s = scale( lisas ) ) #|>
+            # standardize: would have to be done at calculation to yield informative output? 
+  ) |>
+  left_join(BIS, by=c("id", "congruent")) |>
+      # join by two conds. 
+  # select(!name) |> 
+  mutate(BIS_inv = -1*BIS,
+          # inverse
+         BIS_lisas = (-1*BIS) * g_rt_sd.y + g_rt.y ,
+          # Inverse & RT correct
+         ) |>
+  rename(rt = rt.x, pe = pe.x) |>
+  select(id, congruent, rt, pe, lisas, BIS_lisas, BIS) 
+
+```
+
+
+### Table: Combined
+```{r}
+#| echo: false
+
+comb_table <- 
+  bis__lisas |> 
+  pivot_longer(c(rt,pe,lisas,BIS,BIS_lisas))  |>
+  pivot_wider(names_from=congruent, values_from=value ) |>
+  rowwise() |>
+  mutate(diff = Incongruent - Congruent) |> 
+  group_by(name) |>
+  reframe(
+    m_incon   = mean(Incongruent),
+    sd_incon  = sd(Incongruent),
+    m_con     = mean(Congruent),
+    sd_con    = sd(Congruent),
+    mdiff     = mean(Incongruent-Congruent),
+    t.val     = t.test(Incongruent, Congruent, paired=T)$statistic,
+    df        = t.test(Incongruent, Congruent, paired=T)$parameter,
+    p.val     = t.test(Incongruent, Congruent, paired=T)$p.value  |> fmt_APA_numbers(p = T), 
+    b.est     = mean( ttestBF(Incongruent, Congruent, paired=T, posterior=T, iterations=5000)[,"mu"] ),
+    b         = extractBF( ttestBF(Incongruent, Congruent, paired=T) )$bf,
+    hdi       = paste0("[",
+      hdi( ttestBF(Incongruent, Congruent, paired=T, posterior=T, iterations=5000) )[1,3:4] |> 
+            map(fmt_APA_numbers)  |> 
+            paste0(collapse=", "), 
+      "]", sep="" ),
+    d         = cohensD(Incongruent, Congruent, method = "corrected"),
+  ) |> 
+  mutate( across( where(is.numeric), fmt_APA_numbers) ) 
+  
+comb_table |> 
+  mutate(name = factor(name, levels=c("rt","pe","lisas","BIS_lisas","BIS") ), 
+         e1="",e2="",e3="", e4="") |>
+  arrange(name) |>
+  gt() |>
+  cols_move(e1, sd_incon) |>
+  cols_move(e2, sd_con) |>
+  cols_move(e3, p.val) |>
+  cols_move(e4, hdi) |>
+  tab_spanner("Incongruent", c(m_incon, sd_incon) ) |>
+  tab_spanner("Bayesian", c(b.est, b,hdi)) |>
+  #tab_spanner("Congruent", C(m_con, sd_con) )
+    # why u not wrk? 
+  cols_label(m_incon = md("*M*"), sd_incon = md("*SD*"), m_con = md("*M*"), sd_con = md("*SD*"),
+             mdiff = md("*M*~diff~"), p.val = md("*p*"), b = md("BF~10~"), b.est = md("B~est~"), 
+             hdi = "HDI", d = md("*d*"), e1="",e2="",e3="", e4="") |>
+  tab_spanner("Congruent", c(m_con, sd_con) ) |>
+  cols_hide( c(t.val, df)) |>
+  cols_align("center" ) 
+
+```
+
+
+
+### Figure 
+#### Summarized: 
+##### Linerange - RT
+```{r}
+#| echo: false
+
+bis__lisas |>
+  pivot_longer(c(BIS_lisas, lisas)) |>
+  ggplot(aes(congruent, value, col=name, group = interaction(name, id)))+
+  # geom_point( position=position_dodge(.1), alpha = .3)+
+  # geom_line( position=position_dodge(.1), alpha = .3)+
+  stat_summary(aes(group=name), fun.data=mean_se, position=position_dodge(.1))+
+  labs(x="", y="Corrected response time")+
+  theme( axis.text.x = element_text(size=10) )
+  
+```
+*Note*. Balanced integration score (BIS) is inversed (i.e., -1*BIS) to correspond with the linear integration speed-accuracy score (LISAS).
+
+
+
+#### Combined
+Combined BIS + LISAS
+```{r}
+#| fig-dpi: 300
+#| echo: false
+#| warning: false
+#| message: false
+
+bis__lisas |>
+  pivot_longer(c(BIS_lisas, lisas)) |>
+  ggplot(aes(congruent, value, col=name, group = interaction(name, id)))+
+      # We can do -1* BIS to inverse the scale to make it overlap with the LISAS;
+  geom_point( position=position_dodge(.1), alpha = .3)+
+  geom_line( position=position_dodge(.1), alpha = .3)+
+  labs(x="",y="Corrected response time")
+  # stat_summary(aes(group=name), fun.data=mean_se, position=position_dodge(.1))
+# This will be a mess 
+#' Rather indicate a single participant and the similarity within one (or a couple) 
+#' -- Add id to highlight the associated lines
+```
+*Note*. The balanced integration score (BIS) is inversed to scale with the scaled linear integration speed-accuracy score (LISAS).
+
+
+
+
+## Inducer:
+### Corr: Encoding <-> Inducer RT
+
+```{r sum data}
+#| echo: false
+
+d_ind <- 
+  data |> 
+  select(id, trial_info, inducer_run, correct_response, rt) |>
+  filter(trial_info == "Inducer trial" | trial_info=="Inducer instructions" ) |>
+  filter(inducer_run > 0) |>
+  pivot_wider(names_from = trial_info, values_from = c(correct_response, rt)) |> 
+  mutate(instructions = `rt_Inducer instructions`,
+         trial        = ifelse(is.na(`rt_Inducer trial`), 2000, `rt_Inducer trial` ))
+```
+
+#### Table
+
+Grand correlation, encoding time (ms) and response time (ms) for the inducer task
+```{r total table}
+#| echo: false
+d_ind |> 
+  summarize(cor = cor(instructions, trial),
+            encoding =  mean(instructions),
+            encoding_sd =  sd(instructions),
+            d = moments::skewness(instructions),
+            trial = mean(trial),
+            trial_sd = sd(trial, na.rm = TRUE) )
+              #?
+```
+
+#### Figure
+
+```{r total plot}
+#| fig-dpi: 300
+#| echo: false
+#| error: false
+#| warning: false
+
+d_ind |> 
+  filter( !is.na(`rt_Inducer trial`) ) |>
+  mutate(instructions = ifelse(is.na(`rt_Inducer instructions`)>20000, 20000, `rt_Inducer instructions`)) |>
+  ggplot(aes(instructions, trial)) +
+  geom_point(alpha=.2) +
+  geom_smooth(method=lm, col="indianred2", linewidth=1) +
+  scale_x_continuous(breaks=seq(0,20000,1000)) +
+  scale_y_continuous(breaks=seq(0,2000,250)) +
+  labs(y = "Trial response time (ms)", x = "Instruction response time (ms)")+
+  theme(legend.position = "none")+
+  coord_cartesian(ylim=c(0,2000)) 
+```
+
+#### Figure: ind
+```{r}
+#| fig-dpi: 300
+#| echo: false
+#| error: false
+#| warning: false
+
+d_ind |> 
+  filter( !is.na(`rt_Inducer trial`) ) |>
+  mutate(instructions = ifelse(is.na(`rt_Inducer instructions`)>20000, 20000, `rt_Inducer instructions`)) |>
+  ggplot(aes(instructions, trial, group=id, col=id)) +
+  geom_point(alpha=.2) +
+  geom_smooth(method=lm, linewidth=1, alpha = .15) +
+  scale_x_continuous(breaks=seq(0,20000,1000)) +
+  scale_y_continuous(breaks=seq(0,2000,250)) +
+  labs(y = "Trial response time (ms)", x = "Instruction response time (ms)")+
+  #theme(legend.position = "none")+
+  coord_cartesian(ylim = c(0,2000)) 
+```
+
+
+## ANCOVA:  Inducer RT * Congruency 
+Individual correlation, encoding time (ms) and response time (ms)
+```{r within table}
+#| echo: false
+
+d |>
+  left_join(d_ind, by= c("id", "inducer_run")) ->
+  an_d
+
+mod1 <- lmer(rt ~ congruent + (1|id), 
+             an_d |> filter(trial_info=="Diagnostic trial") )
+
+mod2 <- lmer(rt ~ congruent*`rt_Inducer trial` + (1|id),
+             an_d |> filter(trial_info=="Diagnostic trial") )
+# Test whether inducer RT interact with congruency 
+
+# mod3 <- lmer(rt ~ congruent*`rt_Inducer instructions` + (1|id), 
+#              test |> filter(trial_info=="Diagnostic trial") )
+# # People might take a greater break on certain instruction runs, hence RT on the 
+  # inducer might be a better variable. 
+
+plot(mod1)
+plot(mod2)
+
+anova(mod1, mod2) -> test
+  test$`Pr(>Chisq)` 
+  # diff? 
+summary(mod2)
+  # what pred? 
+
+```
+
+
+```{r}
+#| echo: false
+
+library(brms)
+library(cmdstanr)
+library(bayesplot)
+bayes_plot <- function( data_list, variables = NULL ){
+  int <- variables(data_list)[str_detect(variables(data_list), "Intercept")]
+  remove_list <- c(c("disc","lp__", "lprior"),variables,int)
+  gpars <- setdiff(variables(data_list), remove_list)
+  brms::rhat(data_list) -> b
+  
+  if(max(b, na.rm=T) > 1.01){
+    print(paste("max:", max(b, na.rm=T), " <- High, check model"))
+  } else {
+    print(paste("max:", max(b, na.rm=T)))
+  }
+  print(paste("mean:", mean(b, na.rm=T)))
+  print(paste("median:", median(b, na.rm=T)))
+  
+  mcmc_intervals(as.matrix(data_list), pars=gpars, prob_outer = 0.95) + 
+    geom_vline(xintercept = 0, linetype = "dashed", )+
+    labs(title = colnames(data_list$data)[1])
+}
+
+
+d |>
+  left_join(d_ind, by= c("id", "inducer_run")) ->
+  an_d
+
+b_mod1 <- brm(rt ~ congruent + (1|id),
+            an_d |> filter(trial_info=="Diagnostic trial"),
+            chains = 6, iter = 4000, backend="cmdstanr", init=0, cores=6
+            )
+b_mod2 <- brm(rt ~ congruent * `rt_Inducer trial` + (1|id),
+            an_d |> filter(trial_info=="Diagnostic trial"),
+            chains = 6, iter = 4000, backend="cmdstanr", init=0, cores=6
+            )
+
+bayes_plot(b_mod1) 
+bayes_plot(b_mod2)
+
+```
+
+
+
+
