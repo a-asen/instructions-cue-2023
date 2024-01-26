@@ -491,7 +491,7 @@ let diagnostic_task_instruction = {
         `<p style="font-size: ${general_font_size};"> If <i> italic </i> press ${rnd_response_sides[0]}`+
         `<p style="font-size: ${general_font_size};"> If upright press ${rnd_response_sides[1]}`]
     }, 
-    prompt: "Put your index fingers on the F and J key. <br> When you are ready, press SPACE to continue.",
+    prompt: "Put your left index fingers on the F and your right index finger on the J key. <br> When you are ready, press SPACE to continue.",
     choices: " ", 
     trial_duration: instruction_delay,
     data: {
@@ -646,7 +646,7 @@ if(prac_diagnostic_rounds > 0 && !skip_instructions){ // & skip_instructions ===
                 return  `<p style="font-size: ${general_font_size}"> If <span style="color: ${rnd_inducer_colour}">${prac_stim[0]}</span> press ${rnd_response_sides[0]}`+
                  `<p style="font-size: ${general_font_size}"> If <span style="color: ${rnd_inducer_colour}">${prac_stim[1]}</span> press ${rnd_response_sides[1]}`; 
             }, 
-            prompt: "Put your index fingers on the F and J key. <br> When you are ready, press SPACE to continue.",
+            prompt: "Put your left index fingers on the F and your right index finger on the J key. <br> When you are ready, press SPACE to continue.",
             choices: " ", 
             data: {
                 stimulus: `If ${prac_stim[0]} press ${rnd_response_sides[0]} | If ${prac_stim[1]} press ${rnd_response_sides[1]}`,
@@ -788,7 +788,7 @@ for(let exp_block = 0; exp_block < number_of_inducers; exp_block++){ // less tha
             return  `<p style="font-size: ${general_font_size}"> If <span style="color: ${rnd_inducer_colour}">${run_stimuli[0]}</span> press ${rnd_response_sides[0]}`+
                     `<p style="font-size: ${general_font_size}"> If <span style="color: ${rnd_inducer_colour}">${run_stimuli[1]}</span> press ${rnd_response_sides[1]}`; 
         }, 
-        prompt: "Put your index fingers on the F and J key. <br>When you are ready, press SPACE to continue.",
+        prompt: "Put your left index fingers on the F and your right index finger on the J key. <br> When you are ready, press SPACE to continue.",
         choices: " ", 
         data: {
             inducer_run: exp_block,     // Inducer run number
