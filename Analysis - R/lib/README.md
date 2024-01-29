@@ -4,6 +4,7 @@ levenshtein_distance
 
 generate_word_list 
 - Generates a word list based on the parameters
+
 fmt_APA_numbers 
 - Format numbers according to APA standard.
 
@@ -12,6 +13,9 @@ fmt_APA_p_table_fig
 
 generate_diagnostic_lengths 
 - Generate random samples of the diagnostic lengths
+
+---
+(* not used*)
 
 gen_diag_distribution
 - Generates a probability distribution for the diagnostic lengths to normalize run lengths (has been changed for a hard limit; e.g., experiment 1 = 240 trials).

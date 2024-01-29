@@ -1,3 +1,6 @@
+Word list generated from Subtlex-UK. See `stimuli_list.R` & `helper_function.R` for code related to sampling. 
+
+
 Citation: 
 Van Heuven, W.J.B., Mandera, P., Keuleers, E., & Brysbaert, M. (2014). Subtlex-UK: A new and improved word frequency database for British English. Quarterly Journal of Experimental Psychology, 67, 1176-1190. http://crr.ugent.be/papers/SUBTLEX-UK_ms.pdf (retrieved 2023.10.23)
 

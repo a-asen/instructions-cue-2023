@@ -24,7 +24,8 @@ source("../lib/helper_functions.R")
 #| include: FALSE
 list.files("../data/raw/experiment1/pilots", pattern = "*.csv", full.names = T) -> fnames
 
-fnames2 <- fnames[str_detect(fnames, "2024")][5:6]
+fnames2 <- fnames[str_detect(fnames, "2024")][12:13]
+fnames2 <- fnames[str_detect(fnames, "2024")][1:4]
 map_df(fnames2, \(x){
   read_csv(x)
 }) -> data

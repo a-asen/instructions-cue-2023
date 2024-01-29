@@ -21,7 +21,6 @@ const redirect_link = "https://app.prolific.com/submissions/complete?cc=COAKFO2E
 ////    Parameters      ////
 ////////////////////////////
 
-
 //    background default      ////
 const default_background_colour = "#cccccc" // Light grey
 const wrong_response_colour = "#d22d2d"     // Blood red-ish 
@@ -56,7 +55,7 @@ const inducer_colours = ["red", "yellow", "blue"]      // Inducer colour randomi
     // This is also what is DISPLAYED to participants. Should therefore be a readable name. 
 
 ////    Diagnostic parameters   ////
-const number_of_inducers = 22;       // Number of inducers 
+const number_of_inducers = 24;       // Number of inducers 
     // !!! CHANGE max trials !!! 
 const diagnostic_min_length = 4         // Min run length
 const diagnostic_max_length = 16        // Max run length
@@ -64,9 +63,9 @@ const max_diagnostic_trials = 240     // Total max diagnostic trials
     // max/2 * number_of_inducers
 
 ////    Practice parameters     ////
-const prac_diagnostic_rounds = 15                    // Number of diagnostic practice rounds
+const prac_diagnostic_rounds = 16                    // Number of diagnostic practice rounds
     // Set to 0 if no practice rounds should occur.
-const prac_inducer_rounds = 5
+const prac_inducer_rounds = 6
     // NB: Max 64 rounds of new stimuli (prac_inducer_rounds + number_of_inducer > 64)
 
 
