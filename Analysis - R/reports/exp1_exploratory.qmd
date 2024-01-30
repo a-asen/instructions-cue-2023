@@ -237,7 +237,7 @@ b |>
          sd_incongruent = ifelse(sd_incongruent== "", "", fmt_APA_numbers(sd_incongruent) ),
          sd_congruent   = ifelse(sd_congruent== "", "", fmt_APA_numbers(sd_congruent) )) |>
   gt() |>
-  cols_hide(    c(p, t, df, p.cor, ps) ) |>
+  cols_hide(    c(p, t, df, ps) ) |>
   tab_spanner(  "Incongruent", c(m_incongruent, sd_incongruent) ) |>
   cols_label(   m_incongruent = md("*M*"), sd_incongruent = md("*SD*" ) ) |>
   tab_spanner(  "Congruent", c(m_congruent, sd_congruent) ) |>

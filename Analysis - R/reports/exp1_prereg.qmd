@@ -141,7 +141,7 @@ d |>
 
 # Freq:
 ## response times
-rt_test      <- t.test( d2$rt_FALSE, d2$rt_TRUE, paired = TRUE, alternative = "greater" )
+rt_test      <- t.test(  d2$rt_FALSE, d2$rt_TRUE, paired = TRUE, alternative = "greater" )
 rt_test_b    <- ttestBF( d2$rt_FALSE, d2$rt_TRUE, paired = T, iterations = 10000, posterior = F )
 rt_test_b2   <- ttestBF( d2$rt_FALSE, d2$rt_TRUE, paired = T, iterations = 10000, posterior = T )
 rt_test_hdi  <- hdi(rt_test_b2)
@@ -151,7 +151,7 @@ d2 |>
   summarise(
     name            = "RT",
     m_incongruent   = fmt_APA_numbers( mean(rt_FALSE) ),
-                      # fmt here, b/c fmt_numbers() is to general
+                      # fmt here, b/c fmt_numbers() [gt func] is to general
     sd_incongruent  = fmt_APA_numbers( sd(rt_FALSE) ), 
     m_congruent     = fmt_APA_numbers( mean(rt_TRUE) ) ,
     sd_congruent    = fmt_APA_numbers( sd(rt_TRUE) ),
@@ -159,8 +159,7 @@ d2 |>
     t               = fmt_APA_numbers( rt_test$statistic ),
     df              = rt_test$parameter,
     p               = rt_test$p.value,
-    p.cor           = p.adjust(p, "bonferroni", n=rt_test$parameter+1),
-    ps              = case_when(p.cor < .05 ~ "*", p < 0.01 ~ "**", p < 0.001 ~ "***", T ~ ""),
+    ps              = case_when(p < .05 ~ "*", p < 0.01 ~ "**", p < 0.001 ~ "***", T ~ ""),
     Mdiff           = paste0( fmt_APA_numbers(Mdiff), ps ),
     b.est           = fmt_APA_numbers( mean(rt_test_b2[,"mu"]) ),
     hdi             = paste0("[", fmt_APA_numbers(rt_test_hdi$CI_low[1]),", ", 
@@ -187,8 +186,7 @@ d2 |>
     t                = fmt_APA_numbers( pct_test$statistic ),
     df               = pct_test$parameter,
     p                = pct_test$p.value,
-    p.cor            = p.adjust(p, "bonferroni", n = pct_test$parameter+1),
-    ps               = case_when(p.cor < .05 ~ "*", p < 0.01 ~ "**", p < 0.001 ~ "***", T ~ ""),
+    ps               = case_when(p < .05 ~ "*", p < 0.01 ~ "**", p < 0.001 ~ "***", T ~ ""),
     Mdiff            = paste0( fmt_APA_numbers(Mdiff), ps ),
     b.est            = fmt_APA_numbers( mean(pct_test_b2[,"mu"]) ),
     hdi              = paste0("[",fmt_APA_numbers(pct_test_hdi$CI_low[1]),", ", 
@@ -206,7 +204,6 @@ Table XX
 #| echo: false
 rbind(d_rt, d_pct) -> b
 b |> summarize( m = mean(df) ) |> pull() -> d2_df
-b |> pull(p.cor) |> min() -> p_min
 
 if(d2_df != floor(d2_df)){warning("NOT SIMILAR, CHECK DF")}
   # degrees of freedom
@@ -215,7 +212,7 @@ b |>
   # add bayes row? 
   mutate(em1 = "", em2="", em3="") |>
   gt() |>
-  cols_hide(    c(p, t, df, p.cor, ps) ) |>
+  cols_hide(    c(p, t, df, ps) ) |>
   tab_spanner(  "Incongruent", c(m_incongruent, sd_incongruent) ) |>
   cols_label(   m_incongruent = md("*M*"), sd_incongruent = md("*SD*" ) ) |>
   tab_spanner(  "Congruent", c(m_congruent, sd_congruent) ) |>
