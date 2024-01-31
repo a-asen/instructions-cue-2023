@@ -1013,7 +1013,7 @@ timeline.push({
     choices: "NO_KEYS",
     trial_duration: 2000, 
     on_load: () => {
-        saveData( study_name, "_data_" + start_dateTime + "_" + ID + ".csv", jsPsych.data.get().csv() )
+        saveData( study_name + "_data_" + start_dateTime + "_" + ID + ".csv", jsPsych.data.get().csv() )
         if(debug) { console.log("Redirecting..... ")}
         // If local save is enabled save it as a csv 
         if(save_local_data) { jsPsych.data.get().localSave('csv','mydata.csv') }
