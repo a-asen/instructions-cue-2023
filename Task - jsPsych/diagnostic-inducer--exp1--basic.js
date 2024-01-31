@@ -357,27 +357,20 @@ const about_the_experiment_and_consent = {
        `<div style="font-size:${instruction_font_size}"> 
         
         <h3>Welcome to this cognitive psychology study!</h3>
-        We are investigating concentration and memory. <br><br>
+        We are investigating concentration and memory. 
+        <br><br>
 
-        The task relates to remembering the link between a 3-letter non-word and a response (left or right). <br>
-        Before the task is executed, however, a closely related task will be presented. <br> 
-        The task will be difficult (especially at the start), but feedback will be provided.
-
-        OR 
-
-        In this (experimental) study, 3 letter non-words will be presented that require either a left or right response.
-        Although these aspects might seem simple, <br>
-        the task is further complicated by relying on specific features of the 3-letter non-word, <br>
-        that inform the decision on whether the response is left or right. 
-        <br>
-        The task is difficult (especially at the start), but feedback will be provided. The task takes around 15-20 minutes.
-        <br>
+        In this (experimental) study, we will ask you to complete two categorization tasks in parallel,<br>
+        with instructions for one categorization changing during the task. <br>
+        The task is difficult (especially at the start), but feedback will be provided. <br>
+        The task takes around 15-20 minutes. <br>
         If you are up for a challenge, check it out - and do your best! :)
         <br><br>
 
         The study is conducted by Steffen Aasen (Master student) and \n
         Torsten Martiny-Huenger (Supervisor) at UiT – The Arctic University of Norway.
         <br><br>
+
         If you have questions about the study, you may contact Torsten Martiny-Huenger at (torsten.martiny-huenger@uit.no). </p>
 
         </div>`,    
