@@ -21,12 +21,31 @@ source("../lib/helper_functions.R")
 
 ```{r load data }
 #| include: FALSE
+
 list.files("../data/raw/experiment1/task", pattern = "*.csv", full.names = T) -> fnames
 
 map_df(fnames, \(x){
   read_csv(x)
 }) -> data
+
+read_csv("../data/raw/experiment1/demographics/demo.csv") -> demo
 ```
+
+```{r}
+demo |> 
+  mutate(s = ifelse(Sex=="Male", 1,0)) |> 
+  summarize(
+    age = mean(Age),
+    age_sd = sd(Age),
+    male = sum(s==1),
+    female = sum(s==0),
+    sex = mean(s),
+    sex_s = sd(s)
+  ) |> round(2) -> dem
+```
+
+We recruited `r length(dem$age)` participants (`r age$female` females) with a mean age of `r dem$age` (SD = `r dem$age_sd`) from the United Kingdom via Prolific. 
+
 
 ```{r transformation}
 #| include: FALSE
@@ -198,13 +217,13 @@ d2 |>
 ```
 
 
-Table XX
+Table XX \n
 *Test statistics for the experimental conditions*
 ```{r stat table}
 #| echo: false
 rbind(d_rt, d_pct) -> b
 b |> summarize( m = mean(df) ) |> pull() -> d2_df
-b |> select(p) |> pull() |> min() -> p_min
+b |> pull(p) |> min() -> p_min
 
 if(d2_df != floor(d2_df)){warning("NOT SIMILAR, CHECK DF")}
   # degrees of freedom
@@ -262,12 +281,12 @@ d |>
   ggplot(aes(x = con, y = rt, group=id, col = factor(con)))+
   stat_summary(aes(col=NULL), position=position_dodge(.1), geom = "point", fun = mean, alpha = .3)+
   stat_summary(aes(col=NULL), position=position_dodge(.1), geom = "line", fun = mean, alpha = .3)+
-  stat_summary(aes(group=NULL), fun.data = mean_se, geom = "errorbar", width=.2, size = 1.5, alpha = .5)+
+  stat_summary(aes(group=NULL), fun.data = mean_se, geom = "errorbar", width=.2, size = 1.5, alpha = .8)+
   stat_summary(aes(group=NULL, col=NULL), fun.data = mean_se, geom = "point", size = 1.5)+
   scale_x_continuous(breaks = c(0,1), labels = c("Incongruent", "Congruent"), name="",
                      expand = c(.2,.2), minor_breaks = NULL)+
   scale_y_continuous(breaks = seq(0,2000,50), minor_breaks = NULL)+
-  coord_cartesian(ylim = c(450, 1000))+
+  coord_cartesian(ylim = c(450, 960))+
                         # Adjust
   theme_minimal()+
   theme(axis.text.x = element_text(size = 10), legend.position = "none")+
@@ -284,14 +303,14 @@ d |>
   mutate(con = ifelse(congruent==T,1,0)) |>
   #mutate(con = ifelse(congruent==TRUE,1,0)) |>
   ggplot(aes(x = con, y = pct, group=id, col = factor(con)))+
-  stat_summary(aes(col=NULL), position=position_dodge(.1), geom = "point", fun = mean, alpha = .3)+
-  stat_summary(aes(col=NULL), position=position_dodge(.1), geom = "line", fun = mean, alpha = .3)+
-  stat_summary(aes(group=NULL), fun.data = mean_se, geom = "errorbar", width=.2, size = 1.5, alpha = .5)+
+  stat_summary(aes(col=NULL), position=position_dodge(.1), geom = "point", fun = mean, alpha = .2)+
+  stat_summary(aes(col=NULL), position=position_dodge(.1), geom = "line", fun = mean, alpha = .2)+
+  stat_summary(aes(group=NULL), fun.data = mean_se, geom = "errorbar", width=.2, size = 1.5, alpha = .8)+
   stat_summary(aes(group=NULL, col=NULL), fun.data = mean_se, geom = "point", size = 1.5)+
   scale_x_continuous(breaks = c(0,1), labels = c("Incongruent", "Congruent"), name="",
                      expand = c(.2,.2), minor_breaks = NULL)+
   scale_y_continuous(breaks = seq(0,1,.05), minor_breaks = NULL)+
-  coord_cartesian(ylim = c(.5, 1.01))+
+  coord_cartesian(ylim = c(.60, 1.01))+
                       # Adjust
   theme_minimal()+
   theme(axis.text.x = element_text(size = 10), legend.position = "none")+
