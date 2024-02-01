@@ -127,19 +127,70 @@ percent of the data.
 
 ```{r}
 colnames(data)
+
+data |>
+  group_by(id, inducer_run) |> 
+  reframe(stimulus[trial_info=="Inducer instructions"] )
 data |> 
-  select(id, trial_info, diagnostic_run, inducer_run, stimulus, congruent, correct_diag_response_side, response, correct_response,rt) |>
-  filter(trial_info=="Diagnostic trial") |>
-  group_by(id, correct_diag_response_side, congruent) |> 
-  summarize(rt = mean(rt, na.rm=T), 
-            acc = mean(correct_response, na.rm=T)) |>
-  ggplot(aes(x=correct_diag_response_side, rt))+
-  facet_wrap(~congruent)+
-  stat_summary()
-  geom_point()
-  
+  select(id, trial_info, diagnostic_run, italic, inducer_run, stimulus, congruent, correct_diag_response_side, response, correct_response,rt) |> 
+  filter(trial_info=="Diagnostic trial" | trial_info=="Inducer instructions" | trial_info =="Diagnostic instructions") |>
+  mutate(inducer_run = as.numeric(inducer_run),
+         italic = ifelse(italic=="true", TRUE, FALSE)) |>
+  fill(inducer_run, .direction = "up") |>
+  # fill(diagnostic_run, .direction="up") #|>
+  group_by(id) |>
+  mutate( 
+    diag_ins = stimulus[trial_info=="Diagnostic instructions"],
+    if_italic = str_split(diag_ins, " ") |> map_chr(4) ) |>
+  group_by(id, inducer_run) |> 
+  # reframe(ins = stimulus[trial_info=="Inducer instructions"] ) 
+  mutate(
+    response_side = ifelse(response=="j", "RIGHT", "LEFT"),
+    #
+    indu_ins = stimulus[trial_info=="Inducer instructions"], 
+    ins_left = str_split(indu_ins, " | ") |> map_chr(2),
+    ins_right = str_split(indu_ins, " | ") |> map_chr(7),
+    ins_resp = str_split(indu_ins, " | ") |> map_chr(4),
+    #
+    inducer_tap  = ifelse(stimulus==ins_left, ins_resp, ifelse(ins_resp=="LEFT", "RIGHT", "LEFT")),
+    diag_tap     = ifelse(italic, if_italic, ifelse(if_italic=="LEFT", "RIGHT","LEFT") ) ) |>
+  filter(trial_info=="Diagnostic trial") ->
+  raw_d
   
 
+raw_d |>
+  group_by(id, diag_tap, inducer_tap) |> 
+  summarize(
+    rt = mean(rt, na.rm=T), 
+    pct = mean(correct_response,na.rm=T)) ->
+  sum_d
+
+sum_d |>
+  ungroup() |>
+  group_by(diag_tap, inducer_tap) |>
+  summarise(
+    rt_m = mean(rt),
+    rt_sd = sd(rt),
+    pct_m = mean(pct),
+    pct_sd =sd(pct))
+
+sum_d |>
+  ggplot(aes(diag_tap, pct, fill=inducer_tap))+
+  stat_summary(aes(col=inducer_tap),geom="col", position=position_dodge(1))+
+  stat_summary(geom="errorbar", position=position_dodge(1), width=.4)+
+  scale_y_continuous(breaks=seq(0,1,.05))+
+  coord_cartesian(ylim=c(0.8, 1))+
+  theme(legend.position = "none") -> p1
+
+sum_d |>
+  ggplot(aes(diag_tap, rt, fill=inducer_tap))+
+  stat_summary(aes(col=inducer_tap),geom="col", position=position_dodge(1))+
+  stat_summary(geom="errorbar", position=position_dodge(1), width=.4)+
+  scale_y_continuous(breaks=seq(0,1000,50))+
+  coord_cartesian(ylim=c(600,750)) -> p2
+#-> p2
+
+p1+p2
 ```
 
 
@@ -169,15 +220,15 @@ d |>
   filter(trial_info=="Diagnostic trial") |>
   group_by(id, congruent) |>
   summarize(rt = mean(rt, na.rm = TRUE),
-            pe = 1 - mean(correct_response) ) -> test
-  # pivot_wider( names_from = congruent, values_from = c(rt, pe) ) -> lisas_ind
+            pe = 1 - mean(correct_response) ) -> lisas_ind
+  #pivot_wider( names_from = congruent, values_from = c(rt, pe) ) -> lisas_ind
 
 lisas <- 
-  # lisas_ind |>
-test |>
+  lisas_ind |>
   left_join(lisas_grand, by="id") |> ungroup() |>
   # group_by(id, congruent) |>
-  mutate(lisas   = rt + (g_rt_sd/g_pe_sd) * pe)
+  mutate(lisas   = rt + (g_rt_sd/g_pe_sd) * pe, 
+         lisas  = ifelse(is.nan(lisas), rt, lisas))
   
 ```
 
@@ -436,7 +487,6 @@ bis__lisas |>
   stat_summary(aes(group=name), fun.data=mean_se, position=position_dodge(.1))+
   labs(x="", y="Corrected response time")+
   theme( axis.text.x = element_text(size=10) )
-  
 ```
 *Note*. Balanced integration score (BIS) is inversed (i.e., -1*BIS) to correspond with the linear integration speed-accuracy score (LISAS).
 
@@ -531,7 +581,7 @@ d_ind |>
   mutate(instructions = ifelse(is.na(`rt_Inducer instructions`)>20000, 20000, `rt_Inducer instructions`)) |>
   ggplot(aes(instructions, trial, group=id, col=id)) +
   geom_point(alpha=.2) +
-  geom_smooth(method=lm, linewidth=1, alpha = .15) +
+  geom_smooth(method=lm, linewidth=1, alpha = .05) +
   scale_x_continuous(breaks=seq(0,20000,1000)) +
   scale_y_continuous(breaks=seq(0,2000,250)) +
   labs(y = "Trial response time (ms)", x = "Instruction response time (ms)")+
@@ -549,6 +599,7 @@ data |>
     open = map(response, fromJSON) |> map_chr(2), ) |>
   select(-response)
 ```
+
 
 
 ## ANCOVA:  Inducer RT * Congruency 
