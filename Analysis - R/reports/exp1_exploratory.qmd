@@ -17,6 +17,7 @@ library(BayesFactor)
 library(bayestestR)
 library(lsr)
 library(lme4)
+library(jsonlite)
 source("../lib/helper_functions.R")
 ```
 
@@ -123,6 +124,28 @@ trials were lost. Representing a loss of
 percent of the data.
 
 # Exploratory
+
+```{r}
+colnames(data)
+data |> 
+  select(id, trial_info, diagnostic_run, inducer_run, stimulus, congruent, correct_diag_response_side, response, correct_response,rt) |>
+  filter(trial_info=="Diagnostic trial") |>
+  group_by(id, correct_diag_response_side, congruent) |> 
+  summarize(rt = mean(rt, na.rm=T), 
+            acc = mean(correct_response, na.rm=T)) |>
+  ggplot(aes(x=correct_diag_response_side, rt))+
+  facet_wrap(~congruent)+
+  stat_summary()
+  geom_point()
+  
+  
+
+```
+
+
+
+
+
 
 ## LISAS 
 
@@ -456,7 +479,7 @@ d_ind <-
   filter(trial_info == "Inducer trial" | trial_info=="Inducer instructions" ) |>
   filter(inducer_run > 0) |>
   pivot_wider(names_from = trial_info, values_from = c(correct_response, rt)) |> 
-  mutate(instructions = `rt_Inducer instructions`,
+  mutate(instructions = ifelse(is.na(`rt_Inducer instructions`), 20000, `rt_Inducer instructions`),
          trial        = ifelse(is.na(`rt_Inducer trial`), 2000, `rt_Inducer trial` ))
 ```
 
@@ -469,7 +492,7 @@ d_ind |>
   summarize(cor = cor(instructions, trial),
             encoding =  mean(instructions),
             encoding_sd =  sd(instructions),
-            d = moments::skewness(instructions),
+            skew = moments::skewness(instructions),
             trial = mean(trial),
             trial_sd = sd(trial, na.rm = TRUE) )
               #?
@@ -514,6 +537,17 @@ d_ind |>
   labs(y = "Trial response time (ms)", x = "Instruction response time (ms)")+
   #theme(legend.position = "none")+
   coord_cartesian(ylim = c(0,2000)) 
+```
+
+## Strategy & feedback
+```{r}
+data |> 
+  filter(stimulus == "feedback") |> 
+  select(id, response) |>
+  mutate(
+    strat = map(response, fromJSON) |> map_chr(1),
+    open = map(response, fromJSON) |> map_chr(2), ) |>
+  select(-response)
 ```
 
 

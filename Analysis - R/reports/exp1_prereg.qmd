@@ -66,7 +66,7 @@ d |> filter( !(id %in% loss$exclude_par) ) -> d
 
 In total, `r length(loss[["exclude_par"]])`
 `r ifelse(length(loss[["data_trials"]]) > 1, "participants", "participant")`
-where excluded due to low accuracy (\> 70%). Resulting in a
+where excluded due to low accuracy (> 70%). Resulting in a
 loss of `r loss[["exclude_par_pct"]]` percent of the data.
 
 ```{r due to high SD & NA responses }
@@ -204,6 +204,7 @@ Table XX
 #| echo: false
 rbind(d_rt, d_pct) -> b
 b |> summarize( m = mean(df) ) |> pull() -> d2_df
+b |> select(p) |> pull() |> min() -> p_min
 
 if(d2_df != floor(d2_df)){warning("NOT SIMILAR, CHECK DF")}
   # degrees of freedom
@@ -229,8 +230,7 @@ b |>
   cols_move(    "em3", hdi) 
 
 ```
-*Note.* P's are Bonferroni corrected for 2 tests. The tests
-have `r  d2_df` degrees of freedom.  \n
+*Note.* The tests have `r  d2_df` degrees of freedom.  \n
 `r fmt_APA_p_table_fig(p_min)` \n
 *M* = Mean, *SD* = standard deviation, *M*~diff~ = Differences
 of the means, HDI = highest density interval, *d* = Effect size.
@@ -244,7 +244,8 @@ of the means, HDI = highest density interval, *d* = Effect size.
 #| warning: false
 #| message: false
 #| error: false
-#| fig-dpi: 250
+#| fig-dpi: 300
+#| fig-width: 6
 
 # This way of visualizing is not necessarily the best -- it can illustate each
 # change in data (congruent/incongruent), but summary score should not be used with it
@@ -266,7 +267,7 @@ d |>
   scale_x_continuous(breaks = c(0,1), labels = c("Incongruent", "Congruent"), name="",
                      expand = c(.2,.2), minor_breaks = NULL)+
   scale_y_continuous(breaks = seq(0,2000,50), minor_breaks = NULL)+
-  coord_cartesian(ylim = c(450, 750))+
+  coord_cartesian(ylim = c(450, 1000))+
                         # Adjust
   theme_minimal()+
   theme(axis.text.x = element_text(size = 10), legend.position = "none")+
@@ -290,7 +291,7 @@ d |>
   scale_x_continuous(breaks = c(0,1), labels = c("Incongruent", "Congruent"), name="",
                      expand = c(.2,.2), minor_breaks = NULL)+
   scale_y_continuous(breaks = seq(0,1,.05), minor_breaks = NULL)+
-  coord_cartesian(ylim = c(.75, 1.01))+
+  coord_cartesian(ylim = c(.5, 1.01))+
                       # Adjust
   theme_minimal()+
   theme(axis.text.x = element_text(size = 10), legend.position = "none")+
@@ -306,7 +307,8 @@ p1+p2
 #| warning: false
 #| message: false
 #| error: false
-#| fig-dpi: 250
+#| fig-dpi: 300
+#| fig-width: 6
 
 d |>
   filter(!is.na(congruent)) |>
