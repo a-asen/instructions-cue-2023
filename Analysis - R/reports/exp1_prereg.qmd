@@ -52,10 +52,13 @@ We recruited `r length(dem$age)` participants (`r age$female` females) with a me
 # Pre-transformation
 data |>
   mutate(rt = as.integer(ifelse( rt == "null", NA, rt ))) -> data
+```
 
+```{r}
 # Select the relevant columns & rows
+# Remove the first inducer_run (i.e., 0th)
 data |>
-  select(id, trial_info, inducer_run, correct_response, rt, congruent) |>
+  select(id, trial_info, inducer_run, diagnostic_run, correct_response, rt, congruent) |>
   filter(trial_info == "Diagnostic trial" | trial_info == "Inducer trial") |>
   # Filter the first inducer run (combined practice)
   filter(inducer_run != 0) -> d
@@ -66,19 +69,18 @@ data |>
 loss <- list()
 loss$data_trials <- nrow(d)
 
-# d |> filter(inducer_run > 0) -> d
-  # Pilot removing
-
 ### Overall accuracy      ====
 d |>
   filter( trial_info == "Diagnostic trial" | trial_info == "Inducer trial" ) |>
   group_by( id ) |>
+  mutate( correct_response = ifelse( trial_info=="Inducer trial" & is.na(rt), 0, correct_response) ) |>
+    #' !  Non-responses count as a wrong response & are subject to the exclusion criteria.  !
   summarize( acc = sum(correct_response, na.rm = TRUE) / length( !is.na(correct_response) ) ) |>
   filter( acc < .7 ) |>
   pull( id ) -> loss$exclude_par
 
 loss[["exclude_par_trials"]] <- length( d$rt[d$id == loss$exclude_par] )
-loss[["exclude_par_pct"]] <- length( d$rt[d$id == loss$exclude_par] ) / loss$data_trials * 100
+loss[["exclude_par_pct"]]    <- length( d$rt[d$id == loss$exclude_par] ) / loss$data_trials * 100
 
 d |> filter( !(id %in% loss$exclude_par) ) -> d
 ```
@@ -90,18 +92,40 @@ loss of `r loss[["exclude_par_pct"]]` percent of the data.
 
 ```{r due to high SD & NA responses }
 #| include: FALSE
-# Removing trials more than 2.5 SD (from individual mean) & NA RT 
+
+# Removing trials deviating more than 2.5 SD from each participants mean. 
+# Also remove NA responses
 d |>
   group_by(id) |>
-  mutate(rt_crit = ifelse( trial_info == "Diagnostic trial",
-                           mean( rt, na.rm = TRUE ) + sd( rt, na.rm = TRUE ) * 2.5,
-                           NA ),
-         retain_trials = ifelse(
-           # Remove deviations more than 2.5 SD
-           rt >= rt_crit & trial_info == "Diagnostic trial" |
-             # AND remove slow responses
-             is.na(rt) & trial_info == "Diagnostic trial",
-                             0, 1 ) ) -> d
+  mutate(
+    # Calculate: rt + SD * 2.5
+    rt_crit = ifelse( 
+      trial_info == "Diagnostic trial",
+      mean( rt, na.rm = TRUE ) + sd( rt, na.rm = TRUE ) * 2.5,
+      NA ),
+      # Trials to retain/remove: 
+      retain_trials = ifelse(
+        # Remove trials deviating **more** than 2.5 SD
+        (rt > rt_crit & trial_info == "Diagnostic trial") | # **OR**
+          # Remove slow (i.e., NA) responses
+          (is.na(rt) & trial_info == "Diagnostic trial"),
+        # !! Supposed to be *not* missing !! 
+        0, 1 ) 
+    ) -> d
+
+# IMPORTANT NOTE: 
+  #' Removing null RT responses are, in all theory, not preregistered. 
+  #' While there is a solution to "non-responses" for error (count them as wrong), 
+  #' there is no stated solution to response time. Generally, this leads to problems 
+  #' because a trial can be considered wrong under error conditions, while the accompanied 
+  #' "error" for response time is not obvious. Should the RT be 2000ms (max trial length)? 
+  #' Or as an infinity RT? 
+  #' 
+  #' Assuming a max trial length of 2000ms would highly likely yield exclusion based on 
+  #' the max rt * 2.5 SD (but that is not a given). 
+  #' 
+  #' The simplest solution is to exclude these trials as missing.
+  #' Importantly, this is not preregistered. 
 
 sum(d$retain_trials == 0) -> loss[["rt_sd_trials"]]
 sum(d$retain_trials == 0) / loss$data_trials * 100 -> loss[["rt_sd_pct"]]
@@ -115,11 +139,14 @@ to deviating (2.5 SD) response times and none response(s).
 Representing a loss of `r round(loss[["rt_sd_pct"]], 2)`
 percent of the data.
 
+
 ```{r only correct inducers}
 #| include: FALSE
 d |>
   mutate( valid_trials = case_when( trial_info=="Inducer trial" & correct_response==1 ~ 1,
                                     trial_info=="Inducer trial" & correct_response==0 ~ 0,
+                                    trial_info=="Inducer trial" & is.na(correct_response) ~ 0,
+                                      # non-responses count as a wrong response
                                     T ~ NA ) ) |>
   fill(valid_trials, .direction = "up") -> d
 
@@ -148,8 +175,12 @@ percent of the data.
 d |>
   filter(trial_info=="Diagnostic trial") |>
   group_by(id, congruent) |>
-  summarize(rt = mean(rt, na.rm = TRUE),
-            pct = mean(correct_response),) |>
+  mutate(correct_response = ifelse(is.na(correct_response), 0, correct_response)) |>
+    # non-response are counted as missing 
+  summarize(rt = mean(rt),
+            pct = mean(correct_response)) |>
+    #' na.rm is not necessary, because problems related to missing trials 
+    #' should be handled by the above criteria.
   pivot_wider( names_from = congruent, values_from = c(rt, pct) ) |>
   ungroup() -> d2
 ```
@@ -161,8 +192,8 @@ d |>
 # Freq:
 ## response times
 rt_test      <- t.test(  d2$rt_FALSE, d2$rt_TRUE, paired = TRUE, alternative = "greater" )
-rt_test_b    <- ttestBF( d2$rt_FALSE, d2$rt_TRUE, paired = T, iterations = 10000, posterior = F )
-rt_test_b2   <- ttestBF( d2$rt_FALSE, d2$rt_TRUE, paired = T, iterations = 10000, posterior = T )
+rt_test_b    <- ttestBF( d2$rt_FALSE, d2$rt_TRUE, paired = TRUE, iterations = 10000, posterior = F )
+rt_test_b2   <- ttestBF( d2$rt_FALSE, d2$rt_TRUE, paired = TRUE, iterations = 10000, posterior = T )
 rt_test_hdi  <- hdi(rt_test_b2)
   # weird if this is how you have to do it
 
@@ -225,7 +256,7 @@ rbind(d_rt, d_pct) -> b
 b |> summarize( m = mean(df) ) |> pull() -> d2_df
 b |> pull(p) |> min() -> p_min
 
-if(d2_df != floor(d2_df)){warning("NOT SIMILAR, CHECK DF")}
+if(d2_df != floor(d2_df)){ warning("NOT SIMILAR, CHECK DF") }
   # degrees of freedom
 
 b |>
@@ -349,6 +380,7 @@ d |>
   theme_minimal()+
   theme(axis.text.x = element_text(size = 10), legend.position = "none")+
   labs(title = "Response time", x = "", y = "Response time (ms)") -> p1
+
 
 d |>
   filter(!is.na(congruent)) |>
