@@ -131,7 +131,10 @@ colnames(data)
 data |>
   group_by(id, inducer_run) |> 
   reframe(stimulus[trial_info=="Inducer instructions"] )
+
+l
 data |> 
+  filter(!(id %in% loss$exclude_par)) |>
   select(id, trial_info, diagnostic_run, italic, inducer_run, stimulus, congruent, correct_diag_response_side, response, correct_response,rt) |> 
   filter(trial_info=="Diagnostic trial" | trial_info=="Inducer instructions" | trial_info =="Diagnostic instructions") |>
   mutate(inducer_run = as.numeric(inducer_run),
@@ -156,8 +159,10 @@ data |>
     diag_tap     = ifelse(italic, if_italic, ifelse(if_italic=="LEFT", "RIGHT","LEFT") ) ) |>
   filter(trial_info=="Diagnostic trial") ->
   raw_d
-  
+```
 
+
+```{r}
 raw_d |>
   group_by(id, diag_tap, inducer_tap) |> 
   summarize(
@@ -165,6 +170,18 @@ raw_d |>
     pct = mean(correct_response,na.rm=T)) ->
   sum_d
 
+# base
+aov(rt ~ diag_tap*inducer_tap + Error( id/(diag_tap*inducer_tap) ), sum_d) |>
+  summary()
+
+library(ez)
+ez::ezANOVA(sum_d, dv=rt, wid=id, within = diag_tap*inducer_tap)
+ez::ezANOVA(sum_d, dv=pct, wid=id, within = diag_tap*inducer_tap)
+
+```
+
+
+```{r}
 sum_d |>
   ungroup() |>
   group_by(diag_tap, inducer_tap) |>
@@ -194,6 +211,46 @@ p1+p2
 ```
 
 
+```{r}
+
+raw_d |> 
+  mutate(congruent = case_when(diag_tap==inducer_tap ~ "congruent",
+                               T ~ "Incongruent")) -> test
+
+test |> 
+  filter(!inducer_run==0) |>
+  group_by(id,  congruent) |>
+  summarize(rt = mean(rt,na.rm=T), 
+            pct= mean(correct_response,na.rm=T)) -> test2
+test2 |> 
+  pivot_wider(names_from=congruent, values_from=c(rt,pct)) -> test3
+test3 |> 
+  group_by(id) |>
+  summarise()
+
+t.test(test3$rt_Incongruent, test3$rt_congruent, paired=T)
+t.test(test3$pct_Incongruent, test3$pct_congruent, paired=T)
+
+test2 |> 
+  ggplot(aes(x=congruent, rt, fill=congruent))+
+  stat_summary(geom="col")+
+  stat_summary(aes(group=id), position=position_dodge(.4))+
+  stat_summary(aes(group=id), position=position_dodge(.4), geom="line")+
+  coord_cartesian(ylim=c(500,1000))
+  
+test2 |> 
+  ggplot(aes(x=congruent, pct, fill=congruent))+
+  stat_summary(geom="col")+
+  stat_summary(aes(group=id), position=position_dodge(.4))+
+  stat_summary(aes(group=id), position=position_dodge(.4), geom="line")+
+  coord_cartesian(ylim=c(0.6,1))
+
+test |> 
+  pivot_wider(names_from=congruent, values_from=c(rt,pct)) #-> test2
+
+t.test(test2$rt_congruent, test2$rt_Incongruent, paired=T)
+test2 
+```
 
 
 
