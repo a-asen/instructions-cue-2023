@@ -242,7 +242,7 @@ w_lisas |>
     m_incongruent   = fmt_APA_numbers( mean(lisas_FALSE) ),
     m_congruent     = fmt_APA_numbers( mean(lisas_TRUE) ),
     p               = t_lisas$p.value,
-    ps              = case_when(p < .05 ~ "*", p < 0.01 ~ "**", p < 0.001 ~ "***", T ~ ""),
+    ps              = set_p_star(p),
     t               = t_lisas$statistic,
     df              = t_lisas$parameter,
     Mdiff           = paste0( fmt_APA_numbers( mean(l_diff) ), ps),
@@ -501,10 +501,8 @@ bis__lisas |>
 
 
 
-
 ## Inducer:
 ### Corr: Encoding <-> Inducer RT
-
 ```{r sum data}
 #| echo: false
 
@@ -549,7 +547,6 @@ d_ind |>
         trial = mean(trial),
         trial_sd = sd(trial, na.rm = TRUE) )
   )
-
 ```
 
 #### Figure overall cor (corrected)
@@ -640,7 +637,6 @@ data |>
 ```
 
 
-
 ## ANCOVA:  Inducer RT * Congruency 
 Individual correlation, encoding time (ms) and response time (ms)
 ```{r within table}
@@ -651,72 +647,24 @@ d |>
             by= c("id", "inducer_run")) ->
   an_d
 
-mod1 <- lmer(rt ~ con + (con|id), 
+mod1 <- lmer(rt ~ con + (1|id), 
              an_d |> filter(trial_info=="Diagnostic trial") )
-
-mod2 <- lmer(rt ~ con * trial + (con*trial|id),
+mod2 <- lmer(rt ~ con * trial + (1|id),
              an_d |> filter(trial_info=="Diagnostic trial") )
-# Test whether inducer RT interact with congruency 
-mod2 |> summary()
-# mod3 <- lmer(rt ~ con*`rt_Inducer instructions` + (1|id), 
-#              test |> filter(trial_info=="Diagnostic trial") )
-# # People might take a greater break on certain instruction runs, hence RT on the 
-  # inducer might be a better variable. 
+mod3 <- lmer(rt ~ con * instructions + (1|id),
+             an_d |> filter(trial_info=="Diagnostic trial") )
+anova(mod1, mod2)
+anova(mod1, mod3)
+anova(mod2, mod3)
 
-plot(mod1)
-plot(mod2)
-
-anova(mod1, mod2) -> test
-  test$`Pr(>Chisq)` 
-  # diff? 
+summary(mod1)
 summary(mod2)
-  # what pred? 
+  # rt is adjusted by inducer RT by 0.05 * inducer_rt
+summary(mod3)
+  # rt is adjusted by instruction time by 0.005 * instructions
 
-```
-
-
-```{r}
-#| echo: false
-
-library(brms)
-library(cmdstanr)
-library(bayesplot)
-
-bayes_plot <- function( data_list, variables = NULL ){
-  int <- variables(data_list)[str_detect(variables(data_list), "Intercept")]
-  remove_list <- c(c("disc","lp__", "lprior"),variables,int)
-  gpars <- setdiff(variables(data_list), remove_list)
-  brms::rhat(data_list) -> b
-  
-  if(max(b, na.rm=T) > 1.01){
-    print(paste("max:", max(b, na.rm=T), " <- High, check model"))
-  } else {
-    print(paste("max:", max(b, na.rm=T)))
-  }
-  print(paste("mean:", mean(b, na.rm=T)))
-  print(paste("median:", median(b, na.rm=T)))
-  
-  mcmc_intervals(as.matrix(data_list), pars=gpars, prob_outer = 0.95) + 
-    geom_vline(xintercept = 0, linetype = "dashed", )+
-    labs(title = colnames(data_list$data)[1])
-}
-
-
-d |>
-  left_join(d_ind, by= c("id", "inducer_run")) ->
-  an_d
-# 
-# b_mod1 <- brm(rt ~ con + (1|id),
-#             an_d |> filter(trial_info=="Diagnostic trial"),
-#             chains = 6, iter = 4000, backend="cmdstanr", init=0, cores=6
-#             )
-# b_mod2 <- brm(rt ~ con * `rt_Inducer trial` + (1|id),
-#             an_d |> filter(trial_info=="Diagnostic trial"),
-#             chains = 6, iter = 4000, backend="cmdstanr", init=0, cores=6
-#             )
-
-bayes_plot(b_mod1) 
-bayes_plot(b_mod2)
+#' No interaction between congruency and instruction/inducer rt. Suggesting that
+#' more preparation/inducer rt generally slows RT on the diagnostic task.
 
 ```
 
