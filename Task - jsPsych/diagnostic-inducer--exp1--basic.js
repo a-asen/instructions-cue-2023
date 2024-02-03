@@ -846,8 +846,8 @@ for(let exp_block = 0; exp_block < number_of_inducers; exp_block++){ // less tha
                 italic: run_rnd_italic,             // Whether the run is ITALIC or not
                 trial_info: "Diagnostic trial",         // This is a diagnostic trial
                 correct_inducer_response_side: () => { // Required response side for the inducer task
-                    if( rnd_diag_stimulus == run_stimuli[0] ) { return response_sides[0] }
-                    else                                      { return response_sides[1] }
+                    if( rnd_diag_stimulus == run_stimuli[0] ) { return rnd_response_sides[0] }
+                    else                                      { return rnd_response_sides[1] }
                 },
                 correct_diag_response_side: () => {     // Required response side for the diagnostic task
                     if (run_rnd_italic) { return rnd_response_sides[0] } 
