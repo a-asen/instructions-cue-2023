@@ -31,7 +31,6 @@ map_df(fnames, \(x){
 read_csv("../data/raw/experiment1/demographics/demo.csv") -> demo
 ```
 
-
 ```{r transformation}
 #| include: FALSE
 # Pre-transformation
@@ -57,9 +56,6 @@ dem$age
 ```
 
 We recruited `r length(demo$Age)+4`, participants from the United Kingdom via Prolific. Due to a coding mistake, four participants did not generate any data. This left us with a mean age of `r dem$age` (SD = `r dem$age_sd`; `r dem$females` females) from the United Kingdom via Prolific. Note that two participants were excluded from the data analysis, but cannot be removed from the demographics due to non-connections between data points and demographics variables. 
-
-
-
 
 
 

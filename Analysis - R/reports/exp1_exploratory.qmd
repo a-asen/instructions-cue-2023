@@ -23,11 +23,14 @@ source("../lib/helper_functions.R")
 
 ```{r load data }
 #| include: FALSE
+
 list.files("../data/raw/experiment1/task", pattern = "*.csv", full.names = T) -> fnames
 
 map_df(fnames, \(x){
   read_csv(x)
 }) -> data
+
+read_csv("../data/raw/experiment1/demographics/demo.csv") -> demo
 ```
 
 ```{r transformation}
@@ -35,116 +38,39 @@ map_df(fnames, \(x){
 # Pre-transformation
 data |>
   mutate(rt = as.integer(ifelse( rt == "null", NA, rt ))) -> data
+```
 
+# Data 
+```{r base data }
+#| include: false
 # Select the relevant columns & rows
+# Remove the first inducer_run (i.e., 0th)
 data |>
-  select(id, trial_info, inducer_run, correct_response, rt, congruent) |>
+  select(id, trial_info, inducer_run, diagnostic_run, correct_response, rt, congruent) |>
+    # note. Congruent has a conding error. Recalculating congruency is done below
   filter(trial_info == "Diagnostic trial" | trial_info == "Inducer trial") |>
   # Filter the first inducer run (combined practice)
   filter(inducer_run != 0) -> d
 ```
 
-```{r exclusion start - accuracy}
-#| include: FALSE
-loss <- list()
-loss$data_trials <- nrow(d)
+```{r recalculating the congruency effect}
+#| include: false
 
-# d |> filter(inducer_run > 0) -> d
-  # Pilot removing
+#' Due to a typo in the task script, the congruency output would (for some participants)
+#' be the opposite. 
 
-### Overall accuracy      ====
-d |>
-  filter( trial_info == "Diagnostic trial" | trial_info == "Inducer trial" ) |>
-  group_by( id ) |>
-  summarize( acc = sum(correct_response, na.rm = TRUE) / length( !is.na(correct_response) ) ) |>
-  filter( acc < .7 ) |>
-  pull( id ) -> loss$exclude_par
-
-loss[["exclude_par_trials"]] <- length( d$rt[d$id == loss$exclude_par] )
-loss[["exclude_par_pct"]] <- length( d$rt[d$id == loss$exclude_par] ) / loss$data_trials * 100
-
-d |> filter( !(id %in% loss$exclude_par) ) -> d
-```
-
-In total, `r length(loss[["exclude_par"]])`
-`r ifelse(length(loss[["data_trials"]]) > 1, "participants", "participant")`
-where excluded due to low accuracy (\> 70%). Resulting in a
-loss of `r loss[["exclude_par_pct"]]` percent of the data.
-
-```{r due to high SD & NA responses }
-#| include: FALSE
-# Removing trials more than 2.5 SD (from individual mean) & NA RT 
-d |>
-  group_by(id) |>
-  mutate(rt_crit = ifelse( trial_info == "Diagnostic trial",
-                           mean( rt, na.rm = TRUE ) + sd( rt, na.rm = TRUE ) * 2.5,
-                           NA ),
-         retain_trials = ifelse(
-           # Remove deviations more than 2.5 SD
-           rt >= rt_crit & trial_info == "Diagnostic trial" |
-             # AND remove slow responses
-             is.na(rt) & trial_info == "Diagnostic trial",
-                             0, 1 ) ) -> d
-
-sum(d$retain_trials == 0) -> loss[["rt_sd_trials"]]
-sum(d$retain_trials == 0) / loss$data_trials * 100 -> loss[["rt_sd_pct"]]
-
-d |> 
-  filter( retain_trials == 1 ) -> d
-```
-
-Furthermore, `r loss[["rt_sd_trials"]]` trials were lost due
-to deviating (2.5 SD) response times and none response(s).
-Representing a loss of `r round(loss[["rt_sd_pct"]], 2)`
-percent of the data.
-
-```{r only correct inducers}
-#| include: FALSE
-d |>
-  mutate( valid_trials = case_when( trial_info=="Inducer trial" & correct_response==1 ~ 1,
-                                    trial_info=="Inducer trial" & correct_response==0 ~ 0,
-                                    T ~ NA ) ) |>
-  fill(valid_trials, .direction = "up") -> d
-
-sum(d$valid_trials==0) -> loss[["inducer_fail_trials"]]
-sum(d$valid_trials==0) / loss$data_trials * 100 -> loss[["inducer_fail_pct"]]
-
-d |> filter( valid_trials == 1 ) -> d
-```
-
-Lastly, `r round(loss[["inducer_fail_trials"]], 2)` trials
-were removed due to a wrong response on the inducer trial.
-Representing a loss of
-`r round(loss[["inducer_fail_pct"]], 2)` percent of the data.
-
-A total of
-`r loss$exclude_par_trials + loss$rt_sd_trials + loss$inducer_fail_trials`
-trials were lost. Representing a loss of
-`r round(loss$exclude_par_pct + loss$rt_sd_pct + loss$inducer_fail_pct, 2)`
-percent of the data.
-
-# Exploratory
-
-```{r}
-colnames(data)
-
-data |>
-  group_by(id, inducer_run) |> 
-  reframe(stimulus[trial_info=="Inducer instructions"] )
-
-l
-data |> 
-  filter(!(id %in% loss$exclude_par)) |>
-  select(id, trial_info, diagnostic_run, italic, inducer_run, stimulus, congruent, correct_diag_response_side, response, correct_response,rt) |> 
+raw_d <- 
+  data |> 
+  select(id, trial_info, diagnostic_run, italic, inducer_run, stimulus, congruent, correct_diag_response_side, response, correct_response,rt) |>
   filter(trial_info=="Diagnostic trial" | trial_info=="Inducer instructions" | trial_info =="Diagnostic instructions") |>
   mutate(inducer_run = as.numeric(inducer_run),
          italic = ifelse(italic=="true", TRUE, FALSE)) |>
   fill(inducer_run, .direction = "up") |>
-  # fill(diagnostic_run, .direction="up") #|>
   group_by(id) |>
   mutate( 
     diag_ins = stimulus[trial_info=="Diagnostic instructions"],
-    if_italic = str_split(diag_ins, " ") |> map_chr(4) ) |>
+    if_italic = str_split(diag_ins, " ") |> map_chr(4) ) |> 
+  ungroup() |>
   group_by(id, inducer_run) |> 
   # reframe(ins = stimulus[trial_info=="Inducer instructions"] ) 
   mutate(
@@ -157,100 +83,102 @@ data |>
     #
     inducer_tap  = ifelse(stimulus==ins_left, ins_resp, ifelse(ins_resp=="LEFT", "RIGHT", "LEFT")),
     diag_tap     = ifelse(italic, if_italic, ifelse(if_italic=="LEFT", "RIGHT","LEFT") ) ) |>
-  filter(trial_info=="Diagnostic trial") ->
-  raw_d
-```
-
-
-```{r}
-raw_d |>
-  group_by(id, diag_tap, inducer_tap) |> 
-  summarize(
-    rt = mean(rt, na.rm=T), 
-    pct = mean(correct_response,na.rm=T)) ->
-  sum_d
-
-# base
-aov(rt ~ diag_tap*inducer_tap + Error( id/(diag_tap*inducer_tap) ), sum_d) |>
-  summary()
-
-library(ez)
-ez::ezANOVA(sum_d, dv=rt, wid=id, within = diag_tap*inducer_tap)
-ez::ezANOVA(sum_d, dv=pct, wid=id, within = diag_tap*inducer_tap)
-
-```
-
-
-```{r}
-sum_d |>
+  filter(trial_info=="Diagnostic trial") |> 
   ungroup() |>
-  group_by(diag_tap, inducer_tap) |>
-  summarise(
-    rt_m = mean(rt),
-    rt_sd = sd(rt),
-    pct_m = mean(pct),
-    pct_sd =sd(pct))
+  mutate(con = ifelse(inducer_tap==diag_tap, T,F)) |>
+  select(id, inducer_run, diagnostic_run, con)
 
-sum_d |>
-  ggplot(aes(diag_tap, pct, fill=inducer_tap))+
-  stat_summary(aes(col=inducer_tap),geom="col", position=position_dodge(1))+
-  stat_summary(geom="errorbar", position=position_dodge(1), width=.4)+
-  scale_y_continuous(breaks=seq(0,1,.05))+
-  coord_cartesian(ylim=c(0.8, 1))+
-  theme(legend.position = "none") -> p1
-
-sum_d |>
-  ggplot(aes(diag_tap, rt, fill=inducer_tap))+
-  stat_summary(aes(col=inducer_tap),geom="col", position=position_dodge(1))+
-  stat_summary(geom="errorbar", position=position_dodge(1), width=.4)+
-  scale_y_continuous(breaks=seq(0,1000,50))+
-  coord_cartesian(ylim=c(600,750)) -> p2
-#-> p2
-
-p1+p2
+d <- 
+  d |> 
+  mutate(inducer_run = as.numeric(inducer_run)) |>
+  left_join(raw_d, by=c("id","inducer_run", "diagnostic_run"))
 ```
 
+## Exclusion
+```{r exclusion start - accuracy}
+#| include: FALSE
+loss <- list()
+loss$data_trials <- nrow(d)
 
-```{r}
+### Overall accuracy      ====
+d |>
+  filter( trial_info == "Diagnostic trial" | trial_info == "Inducer trial" ) |>
+  group_by( id ) |>
+  mutate( correct_response = ifelse( trial_info=="Inducer trial" & is.na(rt), 0, correct_response) ) |>
+    #' !  Non-responses count as a wrong response & are subject to the exclusion criteria.  !
+  summarize( acc = sum(correct_response, na.rm = TRUE) / length( !is.na(correct_response) ) ) |>
+  filter( acc < .7 ) |>
+  pull( id ) -> loss$exclude_par
 
-raw_d |> 
-  mutate(congruent = case_when(diag_tap==inducer_tap ~ "congruent",
-                               T ~ "Incongruent")) -> test
+loss[["exclude_par_trials"]] <- length( d$rt[d$id == loss$exclude_par] )
+loss[["exclude_par_pct"]]    <- length( d$rt[d$id == loss$exclude_par] ) / loss$data_trials * 100
 
-test |> 
-  filter(!inducer_run==0) |>
-  group_by(id,  congruent) |>
-  summarize(rt = mean(rt,na.rm=T), 
-            pct= mean(correct_response,na.rm=T)) -> test2
-test2 |> 
-  pivot_wider(names_from=congruent, values_from=c(rt,pct)) -> test3
-test3 |> 
+d |> filter( !(id %in% loss$exclude_par) ) -> d
+```
+
+```{r due to high SD & NA responses }
+#| include: FALSE
+
+# Removing trials deviating more than 2.5 SD from each participants mean. 
+# Also remove NA responses
+d |>
   group_by(id) |>
-  summarise()
+  mutate(
+    # Calculate: rt + SD * 2.5
+    rt_crit = ifelse( 
+      trial_info == "Diagnostic trial",
+      mean( rt, na.rm = TRUE ) + sd( rt, na.rm = TRUE ) * 2.5,
+      NA ),
+      # Trials to retain/remove: 
+      retain_trials = ifelse(
+        # Remove trials deviating **more** than 2.5 SD
+        (rt > rt_crit & trial_info == "Diagnostic trial") | # **OR**
+          # Remove slow (i.e., NA) responses
+          (is.na(rt) & trial_info == "Diagnostic trial"),
+        # !! Supposed to be *not* missing !! 
+        0, 1 ) 
+    ) -> d
 
-t.test(test3$rt_Incongruent, test3$rt_congruent, paired=T)
-t.test(test3$pct_Incongruent, test3$pct_congruent, paired=T)
+# IMPORTANT NOTE: 
+  #' Removing null RT responses are, in all theory, not preregistered. 
+  #' While there is a solution to "non-responses" for error (count them as wrong), 
+  #' there is no stated solution to response time. Generally, this leads to problems 
+  #' because a trial can be considered wrong under error conditions, while the accompanied 
+  #' "error" for response time is not obvious. Should the RT be 2000ms (max trial length)? 
+  #' Or should it be closer to infinity? 
+  #' 
+  #' Assuming a max trial length of 2000ms would highly likely yield exclusion based on 
+  #' the max rt * 2.5 SD (but that is not a given). 
+  #' 
+  #' It is not obvious what to do in such a case, and the simplest solution will 
+  #' be to exclude (remove) these trials). Even though this may be assumed from
+  #' the preregistration, it is *not* preregistered.
 
-test2 |> 
-  ggplot(aes(x=congruent, rt, fill=congruent))+
-  stat_summary(geom="col")+
-  stat_summary(aes(group=id), position=position_dodge(.4))+
-  stat_summary(aes(group=id), position=position_dodge(.4), geom="line")+
-  coord_cartesian(ylim=c(500,1000))
-  
-test2 |> 
-  ggplot(aes(x=congruent, pct, fill=congruent))+
-  stat_summary(geom="col")+
-  stat_summary(aes(group=id), position=position_dodge(.4))+
-  stat_summary(aes(group=id), position=position_dodge(.4), geom="line")+
-  coord_cartesian(ylim=c(0.6,1))
+sum(d$retain_trials == 0) -> loss[["rt_sd_trials"]]
+sum(d$retain_trials == 0) / loss$data_trials * 100 -> loss[["rt_sd_pct"]]
 
-test |> 
-  pivot_wider(names_from=congruent, values_from=c(rt,pct)) #-> test2
-
-t.test(test2$rt_congruent, test2$rt_Incongruent, paired=T)
-test2 
+d |> 
+  filter( retain_trials == 1 ) -> d
 ```
+
+```{r only correct inducers}
+#| include: FALSE
+d |>
+  mutate( valid_trials = case_when( trial_info=="Inducer trial" & correct_response==1 ~ 1,
+                                    trial_info=="Inducer trial" & correct_response==0 ~ 0,
+                                    trial_info=="Inducer trial" & is.na(correct_response) ~ 0,
+                                      # non-responses count as a wrong response
+                                    T ~ NA ) ) |>
+  fill(valid_trials, .direction = "up") -> d
+
+sum(d$valid_trials==0) -> loss[["inducer_fail_trials"]]
+sum(d$valid_trials==0) / loss$data_trials * 100 -> loss[["inducer_fail_pct"]]
+
+d |> filter( valid_trials == 1 ) -> d
+```
+
+
+# Exploratory
 
 
 
@@ -275,15 +203,15 @@ d |>
 
 d |>
   filter(trial_info=="Diagnostic trial") |>
-  group_by(id, congruent) |>
+  group_by(id, con) |>
   summarize(rt = mean(rt, na.rm = TRUE),
             pe = 1 - mean(correct_response) ) -> lisas_ind
-  #pivot_wider( names_from = congruent, values_from = c(rt, pe) ) -> lisas_ind
+  #pivot_wider( names_from = con, values_from = c(rt, pe) ) -> lisas_ind
 
 lisas <- 
   lisas_ind |>
   left_join(lisas_grand, by="id") |> ungroup() |>
-  # group_by(id, congruent) |>
+  # group_by(id, con) |>
   mutate(lisas   = rt + (g_rt_sd/g_pe_sd) * pe, 
          lisas  = ifelse(is.nan(lisas), rt, lisas))
   
@@ -300,7 +228,7 @@ Table XXX
 
 w_lisas <- 
   lisas |> 
-  pivot_wider(names_from=congruent, values_from=c(everything(), -congruent,-id)) 
+  pivot_wider(names_from=con, values_from=c(everything(), -con,-id)) 
 
 t_lisas  <- t.test( w_lisas$lisas_FALSE, w_lisas$lisas_TRUE, paired=T)
 b_lisas  <- ttestBF(w_lisas$lisas_FALSE, w_lisas$lisas_TRUE, paired=T)
@@ -403,8 +331,8 @@ Figure XX
 #| message: false
 
 lisas |> 
-  mutate(congruent = ifelse(congruent==FALSE, "Incongruent", "Congruent")) |>
-  ggplot(aes(factor(congruent), lisas, col = congruent))+
+  mutate(con = ifelse(con==FALSE, "Incongruent", "Congruent")) |>
+  ggplot(aes(factor(con), lisas, col = con))+
   geom_point(aes(group=id), position = position_dodge(.1), alpha = .4)+
   geom_line(aes(group=id), position = position_dodge(.1), alpha = .4)+
   stat_summary(fun.data=mean_se)+
@@ -434,16 +362,16 @@ d |>
 
 d |>
   filter(trial_info=="Diagnostic trial") |>
-  group_by(id, congruent) |>
+  group_by(id, con) |>
   summarize(rt = mean(rt, na.rm = TRUE),
             pe = mean(correct_response) ) -> ind_bis # |>
-  #pivot_wider( names_from = congruent, values_from = c(rt, pe) ) -> ind_bis
+  #pivot_wider( names_from = con, values_from = c(rt, pe) ) -> ind_bis
 
 BIS <- 
   ind_bis  |>
   cbind(g_bis) |> 
-  mutate(congruent = ifelse(congruent==FALSE, "Incongruent", "Congruent")) |>
-  group_by(id, congruent) |>
+  mutate(con = ifelse(con==FALSE, "Incongruent", "Congruent")) |>
+  group_by(id, con) |>
   mutate(BIS  = ( (pe - g_pe) / g_pe_sd ) - ( (rt - g_rt) / g_rt_sd ) )
 
 ```
@@ -456,12 +384,12 @@ BIS <-
 bis__lisas <- 
   lisas |> 
   ungroup() |>
-  mutate(congruent = ifelse(congruent==FALSE, "Incongruent", "Congruent"), 
+  mutate(con = ifelse(con==FALSE, "Incongruent", "Congruent"), 
             # item values 
          # lisas_s = scale( lisas ) ) #|>
             # standardize: would have to be done at calculation to yield informative output? 
   ) |>
-  left_join(BIS, by=c("id", "congruent")) |>
+  left_join(BIS, by=c("id", "con")) |>
       # join by two conds. 
   # select(!name) |> 
   mutate(BIS_inv = -1*BIS,
@@ -470,7 +398,7 @@ bis__lisas <-
           # Inverse & RT correct
          ) |>
   rename(rt = rt.x, pe = pe.x) |>
-  select(id, congruent, rt, pe, lisas, BIS_lisas, BIS) 
+  select(id, con, rt, pe, lisas, BIS_lisas, BIS) 
 
 ```
 
@@ -482,7 +410,7 @@ bis__lisas <-
 comb_table <- 
   bis__lisas |> 
   pivot_longer(c(rt,pe,lisas,BIS,BIS_lisas))  |>
-  pivot_wider(names_from=congruent, values_from=value ) |>
+  pivot_wider(names_from=con, values_from=value ) |>
   rowwise() |>
   mutate(diff = Incongruent - Congruent) |> 
   group_by(name) |>
@@ -538,7 +466,7 @@ comb_table |>
 
 bis__lisas |>
   pivot_longer(c(BIS_lisas, lisas)) |>
-  ggplot(aes(congruent, value, col=name, group = interaction(name, id)))+
+  ggplot(aes(con, value, col=name, group = interaction(name, id)))+
   # geom_point( position=position_dodge(.1), alpha = .3)+
   # geom_line( position=position_dodge(.1), alpha = .3)+
   stat_summary(aes(group=name), fun.data=mean_se, position=position_dodge(.1))+
@@ -559,7 +487,7 @@ Combined BIS + LISAS
 
 bis__lisas |>
   pivot_longer(c(BIS_lisas, lisas)) |>
-  ggplot(aes(congruent, value, col=name, group = interaction(name, id)))+
+  ggplot(aes(con, value, col=name, group = interaction(name, id)))+
       # We can do -1* BIS to inverse the scale to make it overlap with the LISAS;
   geom_point( position=position_dodge(.1), alpha = .3)+
   geom_line( position=position_dodge(.1), alpha = .3)+
@@ -582,40 +510,57 @@ bis__lisas |>
 
 d_ind <- 
   data |> 
+  filter(!(id %in% loss$exclude_par)) |>
   select(id, trial_info, inducer_run, correct_response, rt) |>
   filter(trial_info == "Inducer trial" | trial_info=="Inducer instructions" ) |>
   filter(inducer_run > 0) |>
   pivot_wider(names_from = trial_info, values_from = c(correct_response, rt)) |> 
   mutate(instructions = ifelse(is.na(`rt_Inducer instructions`), 20000, `rt_Inducer instructions`),
-         trial        = ifelse(is.na(`rt_Inducer trial`), 2000, `rt_Inducer trial` ))
+         trial        = ifelse(is.na(`rt_Inducer trial`), 2000, `rt_Inducer trial` ),
+           # In this case we can set the values of instruction and trial to their max, 
+           # because that is the end of the trial (a non-response does count as a wrong response).
+           # None of this is preregistered and should be interpreted carefully. 
+         inducer_run  = as.numeric(inducer_run))
 ```
 
 #### Table
-
 Grand correlation, encoding time (ms) and response time (ms) for the inducer task
 ```{r total table}
 #| echo: false
 d_ind |> 
-  summarize(cor = cor(instructions, trial),
-            encoding =  mean(instructions),
-            encoding_sd =  sd(instructions),
-            skew = moments::skewness(instructions),
-            trial = mean(trial),
-            trial_sd = sd(trial, na.rm = TRUE) )
-              #?
+  summarize(
+    name = "Corrected",
+    cor = cor(instructions, trial),
+    encoding =  mean(instructions),
+    encoding_sd =  sd(instructions),
+    skew = moments::skewness(instructions),
+    trial = mean(trial),
+    trial_sd = sd(trial, na.rm = TRUE) ) |>
+  rbind(
+    d_ind |> 
+      filter(!is.na(`rt_Inducer instructions`)) |> 
+      filter(!is.na(`rt_Inducer trial`)) |> 
+      summarise(
+        name = "Removed",
+        cor = cor(instructions, trial),
+        encoding =  mean(instructions),
+        encoding_sd =  sd(instructions),
+        skew = moments::skewness(instructions),
+        trial = mean(trial),
+        trial_sd = sd(trial, na.rm = TRUE) )
+  )
+
 ```
 
-#### Figure
-
+#### Figure overall cor (corrected)
 ```{r total plot}
 #| fig-dpi: 300
 #| echo: false
 #| error: false
 #| warning: false
+#| fig-width: 6
 
 d_ind |> 
-  filter( !is.na(`rt_Inducer trial`) ) |>
-  mutate(instructions = ifelse(is.na(`rt_Inducer instructions`)>20000, 20000, `rt_Inducer instructions`)) |>
   ggplot(aes(instructions, trial)) +
   geom_point(alpha=.2) +
   geom_smooth(method=lm, col="indianred2", linewidth=1) +
@@ -626,16 +571,38 @@ d_ind |>
   coord_cartesian(ylim=c(0,2000)) 
 ```
 
-#### Figure: ind
+#### Figure overall corr (removed)
+```{r total plot}
+#| fig-dpi: 300
+#| echo: false
+#| error: false
+#| warning: false
+#| fig-width: 6
+
+d_ind |> 
+  filter( !is.na(`rt_Inducer trial`) ) |>
+  filter( !is.na(`rt_Inducer instructions`) ) |>
+  ggplot(aes(instructions, trial)) +
+  geom_point(alpha=.2) +
+  geom_smooth(method=lm, col="indianred2", linewidth=1) +
+  scale_x_continuous(breaks=seq(0,20000,1000)) +
+  scale_y_continuous(breaks=seq(0,2000,250)) +
+  labs(y = "Trial response time (ms)", x = "Instruction response time (ms)")+
+  theme(legend.position = "none")+
+  coord_cartesian(ylim=c(0,2000)) 
+```
+
+#### Figure individual correlation
 ```{r}
 #| fig-dpi: 300
 #| echo: false
 #| error: false
 #| warning: false
+#| fig-width: 6
 
 d_ind |> 
   filter( !is.na(`rt_Inducer trial`) ) |>
-  mutate(instructions = ifelse(is.na(`rt_Inducer instructions`)>20000, 20000, `rt_Inducer instructions`)) |>
+  filter( !is.na(`rt_Inducer instructions`) ) |>
   ggplot(aes(instructions, trial, group=id, col=id)) +
   geom_point(alpha=.2) +
   geom_smooth(method=lm, linewidth=1, alpha = .05) +
@@ -646,15 +613,30 @@ d_ind |>
   coord_cartesian(ylim = c(0,2000)) 
 ```
 
+Some "fast" instructions 
+```{r}
+#| echo: false
+d_ind |>
+  filter(!is.na(id)) |>
+  filter(`rt_Inducer instructions`<500)
+```
+Some participants read the inducer instruction fast (one should be close to impossible @ 99ms)
+
+
+
 ## Strategy & feedback
 ```{r}
+#| echo: false
 data |> 
   filter(stimulus == "feedback") |> 
   select(id, response) |>
   mutate(
     strat = map(response, fromJSON) |> map_chr(1),
     open = map(response, fromJSON) |> map_chr(2), ) |>
-  select(-response)
+  select(-response) |>
+  mutate(
+    exclu = ifelse(id %in% loss$exclude_par, TRUE,FALSE)
+  ) |> select(id, exclu, everything()) 
 ```
 
 
@@ -665,17 +647,18 @@ Individual correlation, encoding time (ms) and response time (ms)
 #| echo: false
 
 d |>
-  left_join(d_ind, by= c("id", "inducer_run")) ->
+  left_join(d_ind |> select(id, inducer_run, instructions,trial),
+            by= c("id", "inducer_run")) ->
   an_d
 
-mod1 <- lmer(rt ~ congruent + (1|id), 
+mod1 <- lmer(rt ~ con + (con|id), 
              an_d |> filter(trial_info=="Diagnostic trial") )
 
-mod2 <- lmer(rt ~ congruent*`rt_Inducer trial` + (1|id),
+mod2 <- lmer(rt ~ con * trial + (con*trial|id),
              an_d |> filter(trial_info=="Diagnostic trial") )
 # Test whether inducer RT interact with congruency 
-
-# mod3 <- lmer(rt ~ congruent*`rt_Inducer instructions` + (1|id), 
+mod2 |> summary()
+# mod3 <- lmer(rt ~ con*`rt_Inducer instructions` + (1|id), 
 #              test |> filter(trial_info=="Diagnostic trial") )
 # # People might take a greater break on certain instruction runs, hence RT on the 
   # inducer might be a better variable. 
@@ -698,6 +681,7 @@ summary(mod2)
 library(brms)
 library(cmdstanr)
 library(bayesplot)
+
 bayes_plot <- function( data_list, variables = NULL ){
   int <- variables(data_list)[str_detect(variables(data_list), "Intercept")]
   remove_list <- c(c("disc","lp__", "lprior"),variables,int)
@@ -721,15 +705,15 @@ bayes_plot <- function( data_list, variables = NULL ){
 d |>
   left_join(d_ind, by= c("id", "inducer_run")) ->
   an_d
-
-b_mod1 <- brm(rt ~ congruent + (1|id),
-            an_d |> filter(trial_info=="Diagnostic trial"),
-            chains = 6, iter = 4000, backend="cmdstanr", init=0, cores=6
-            )
-b_mod2 <- brm(rt ~ congruent * `rt_Inducer trial` + (1|id),
-            an_d |> filter(trial_info=="Diagnostic trial"),
-            chains = 6, iter = 4000, backend="cmdstanr", init=0, cores=6
-            )
+# 
+# b_mod1 <- brm(rt ~ con + (1|id),
+#             an_d |> filter(trial_info=="Diagnostic trial"),
+#             chains = 6, iter = 4000, backend="cmdstanr", init=0, cores=6
+#             )
+# b_mod2 <- brm(rt ~ con * `rt_Inducer trial` + (1|id),
+#             an_d |> filter(trial_info=="Diagnostic trial"),
+#             chains = 6, iter = 4000, backend="cmdstanr", init=0, cores=6
+#             )
 
 bayes_plot(b_mod1) 
 bayes_plot(b_mod2)
