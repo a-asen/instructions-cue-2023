@@ -127,6 +127,13 @@ fmt_APA_p_table_fig <- function(p, crit = 0.05, div = 5){
 
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ###
 
+set_p_star <- function(p){
+  ifelse(p < .001, "***",
+         ifelse(p<.01, "**",
+                ifelse(p<.05, "*","")))
+}
+### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ###
+
 generate_diagnostic_lengths <- function(len = 100, d_min = 4, d_max = 16){
   #'  Randomly generate diagnostic lengths for the experiment parameters
   #'
