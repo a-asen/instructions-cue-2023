@@ -1,0 +1,484 @@
+---
+title: "Experiment 1 - Exploratory"
+format: docx
+lang: en-GB
+editor: 
+  markdown:
+      wrap: 62
+---
+
+```{r libraries }
+#| include: FALSE
+library(tidyverse)
+library(ggpp)
+library(gt)
+library(patchwork)
+library(BayesFactor)
+library(bayestestR)
+library(lsr)
+library(lme4)
+library(jsonlite)
+source("../lib/helper_functions.R")
+```
+
+
+```{r load data }
+#| include: FALSE
+
+list.files("../data/raw/experiment1/task", pattern = "*.csv", full.names = T) -> fnames
+
+map_df(fnames, \(x){
+  read_csv(x)
+}) -> data
+
+read_csv("../data/raw/experiment1/demographics/demo.csv") -> demo
+```
+
+```{r transformation}
+#| include: FALSE
+# Pre-transformation
+data |>
+  mutate(rt = as.integer(ifelse( rt == "null", NA, rt ))) -> data
+```
+
+```{r base data }
+#| include: false
+# Select the relevant columns & rows
+# Remove the first inducer_run (i.e., 0th)
+data |>
+  select(id, trial_info, inducer_run, diagnostic_run, correct_response, rt, congruent) |>
+    # note. Congruent has a conding error. Recalculating congruency is done below
+  filter(trial_info == "Diagnostic trial" | trial_info == "Inducer trial") |>
+  # Filter the first inducer run (combined practice)
+  filter(inducer_run != 0) -> d
+```
+
+```{r recalculating the congruency effect}
+#| include: false
+
+#' Due to a typo in the task script, the congruency output would (for some participants)
+#' be the opposite. 
+
+raw_d <- 
+  data |> 
+  select(id, trial_info, diagnostic_run, italic, inducer_run, stimulus, congruent, correct_diag_response_side, response, correct_response,rt) |>
+  filter(trial_info=="Diagnostic trial" | trial_info=="Inducer instructions" | trial_info =="Diagnostic instructions") |>
+  mutate(inducer_run = as.numeric(inducer_run),
+         italic = ifelse(italic=="true", TRUE, FALSE)) |>
+  fill(inducer_run, .direction = "up") |>
+  group_by(id) |>
+  mutate( 
+    diag_ins = stimulus[trial_info=="Diagnostic instructions"],
+    if_italic = str_split(diag_ins, " ") |> map_chr(4) ) |> 
+  ungroup() |>
+  group_by(id, inducer_run) |> 
+  # reframe(ins = stimulus[trial_info=="Inducer instructions"] ) 
+  mutate(
+    response_side = ifelse(response=="j", "RIGHT", "LEFT"),
+    #
+    indu_ins = stimulus[trial_info=="Inducer instructions"], 
+    ins_left = str_split(indu_ins, " | ") |> map_chr(2),
+    ins_right = str_split(indu_ins, " | ") |> map_chr(7),
+    ins_resp = str_split(indu_ins, " | ") |> map_chr(4),
+    #
+    inducer_tap  = ifelse(stimulus==ins_left, ins_resp, ifelse(ins_resp=="LEFT", "RIGHT", "LEFT")),
+    diag_tap     = ifelse(italic, if_italic, ifelse(if_italic=="LEFT", "RIGHT","LEFT") ) ) |>
+  filter(trial_info=="Diagnostic trial") |> 
+  ungroup() |>
+  mutate(con = ifelse(inducer_tap==diag_tap, T,F)) |>
+  select(id, inducer_run, diagnostic_run, con)
+
+d <- 
+  d |> 
+  mutate(inducer_run = as.numeric(inducer_run)) |>
+  left_join(raw_d, by=c("id","inducer_run", "diagnostic_run"))
+```
+
+## Exclusion
+```{r exclusion start - accuracy}
+#| include: FALSE
+loss <- list()
+loss$data_trials <- nrow(d)
+
+### Overall accuracy      ====
+d |>
+  filter( trial_info == "Diagnostic trial" | trial_info == "Inducer trial" ) |>
+  group_by( id ) |>
+  mutate( correct_response = ifelse( trial_info=="Inducer trial" & is.na(rt), 0, correct_response) ) |>
+    #' !  Non-responses count as a wrong response & are subject to the exclusion criteria.  !
+  summarize( acc = sum(correct_response, na.rm = TRUE) / length( !is.na(correct_response) ) ) |>
+  filter( acc < .7 ) |>
+  pull( id ) -> loss$exclude_par
+
+loss[["exclude_par_trials"]] <- length( d$rt[d$id == loss$exclude_par] )
+loss[["exclude_par_pct"]]    <- length( d$rt[d$id == loss$exclude_par] ) / loss$data_trials * 100
+
+d |> filter( !(id %in% loss$exclude_par) ) -> d
+```
+
+```{r due to high SD & NA responses }
+#| include: FALSE
+
+# Removing trials deviating more than 2.5 SD from each participants mean. 
+# Also remove NA responses
+d |>
+  group_by(id) |>
+  mutate(
+    # Calculate: rt + SD * 2.5
+    rt_crit = ifelse( 
+      trial_info == "Diagnostic trial",
+      mean( rt, na.rm = TRUE ) + sd( rt, na.rm = TRUE ) * 2.5,
+      NA ),
+      # Trials to retain/remove: 
+      retain_trials = ifelse(
+        # Remove trials deviating **more** than 2.5 SD
+        (rt > rt_crit & trial_info == "Diagnostic trial") | # **OR**
+          # Remove slow (i.e., NA) responses
+          (is.na(rt) & trial_info == "Diagnostic trial"),
+        # !! Supposed to be *not* missing !! 
+        0, 1 ) 
+    ) -> d
+
+# IMPORTANT NOTE: 
+  #' Removing null RT responses are, in all theory, not preregistered. 
+  #' While there is a solution to "non-responses" for error (count them as wrong), 
+  #' there is no stated solution to response time. Generally, this leads to problems 
+  #' because a trial can be considered wrong under error conditions, while the accompanied 
+  #' "error" for response time is not obvious. Should the RT be 2000ms (max trial length)? 
+  #' Or should it be closer to infinity? 
+  #' 
+  #' Assuming a max trial length of 2000ms would highly likely yield exclusion based on 
+  #' the max rt * 2.5 SD (but that is not a given). 
+  #' 
+  #' It is not obvious what to do in such a case, and the simplest solution will 
+  #' be to exclude (remove) these trials). Even though this may be assumed from
+  #' the preregistration, it is *not* preregistered.
+
+sum(d$retain_trials == 0) -> loss[["rt_sd_trials"]]
+sum(d$retain_trials == 0) / loss$data_trials * 100 -> loss[["rt_sd_pct"]]
+
+d |> 
+  filter( retain_trials == 1 ) -> d
+```
+
+```{r only correct inducers}
+#| include: FALSE
+d |>
+  mutate( valid_trials = case_when( trial_info=="Inducer trial" & correct_response==1 ~ 1,
+                                    trial_info=="Inducer trial" & correct_response==0 ~ 0,
+                                    trial_info=="Inducer trial" & is.na(correct_response) ~ 0,
+                                      # non-responses count as a wrong response
+                                    T ~ NA ) ) |>
+  fill(valid_trials, .direction = "up") -> d
+
+sum(d$valid_trials==0) -> loss[["inducer_fail_trials"]]
+sum(d$valid_trials==0) / loss$data_trials * 100 -> loss[["inducer_fail_pct"]]
+
+d |> filter( valid_trials == 1 ) -> d
+```
+
+## LISAS 
+
+```{r lisas calculation}
+#| echo: false
+#| warning: false
+#| message: false
+
+# Linear integrated speed-accuracy score (LISAS) 
+# See Vandierendonck 2017 @ https://doi.org/10.3758/s13428-016-0721-5
+
+d |>
+  filter(trial_info=="Diagnostic trial") |>
+  group_by(id) |>
+  summarize(g_rt = mean(rt, na.rm = TRUE),
+            g_rt_sd = sd(rt),
+            g_pe = 1 - mean(correct_response),
+            g_pe_sd =  sd(correct_response)) ->  lisas_grand
+
+d |>
+  filter(trial_info=="Diagnostic trial") |>
+  group_by(id, con) |>
+  summarize(rt = mean(rt, na.rm = TRUE),
+            pe = 1 - mean(correct_response) ) -> lisas_ind
+  #pivot_wider( names_from = con, values_from = c(rt, pe) ) -> lisas_ind
+
+lisas <- 
+  lisas_ind |>
+  left_join(lisas_grand, by="id") |> ungroup() |>
+  # group_by(id, con) |>
+  mutate(lisas   = rt + (g_rt_sd/g_pe_sd) * pe, 
+         lisas  = ifelse(is.nan(lisas), rt, lisas))
+  
+```
+
+```{r}
+#| echo: false
+#| warning: false
+#| message: false
+
+w_lisas <- 
+  lisas |> 
+  pivot_wider(names_from=con, values_from=c(everything(), -con,-id)) 
+
+t_lisas  <- t.test( w_lisas$lisas_FALSE, w_lisas$lisas_TRUE, paired=T)
+b_lisas  <- ttestBF(w_lisas$lisas_FALSE, w_lisas$lisas_TRUE, paired=T)
+b_lisas2 <- ttestBF(w_lisas$lisas_FALSE, w_lisas$lisas_TRUE, paired=T, posterior = T, iterations = 10000)
+
+w_lisas |>
+  rowwise() |>
+  mutate(l_diff = lisas_FALSE - lisas_TRUE) |> 
+  ungroup() |> 
+  summarize(
+    m_incongruent   = fmt_APA_numbers( mean(lisas_FALSE) ),
+    m_congruent     = fmt_APA_numbers( mean(lisas_TRUE) ),
+    p               = t_lisas$p.value,
+    ps              = set_p_star(p),
+    t               = t_lisas$statistic,
+    df              = t_lisas$parameter,
+    Mdiff           = paste0( fmt_APA_numbers( mean(l_diff) ), ps),
+    b.est           = fmt_APA_numbers( mean( b_lisas2[,"mu"] ) ), 
+    bf              = fmt_APA_numbers( extractBF(b_lisas)$bf ), 
+    hdi             = paste0("[", fmt_APA_numbers( hdi(b_lisas)[3] ), ", ", 
+                                  fmt_APA_numbers( hdi(b_lisas)[4] ), "]" ), 
+    d               = fmt_APA_numbers( cohensD(lisas_FALSE, lisas_TRUE, method="corrected") )
+    ) -> lisas_t
+
+```
+
+
+## BIS 
+Balanced integration score (BIS)
+```{r}
+#| echo: false
+
+# Calculation: 
+# See Liesefeld & Janczyk 2019 @ https://doi.org/10.3758/s13428-018-1076-x
+
+d |>
+  filter(trial_info=="Diagnostic trial") |>
+  ungroup() |>
+  summarize(g_rt = mean(rt, na.rm = TRUE),
+            g_rt_sd = sd(rt),
+            g_pe = mean(correct_response),
+            g_pe_sd =  sd(correct_response),) -> g_bis
+
+d |>
+  filter(trial_info=="Diagnostic trial") |>
+  group_by(id, con) |>
+  summarize(rt = mean(rt, na.rm = TRUE),
+            pe = mean(correct_response) ) -> ind_bis # |>
+  #pivot_wider( names_from = con, values_from = c(rt, pe) ) -> ind_bis
+
+BIS <- 
+  ind_bis  |>
+  cbind(g_bis) |> 
+  mutate(con = ifelse(con==FALSE, "Incongruent", "Congruent")) |>
+  group_by(id, con) |>
+  mutate(BIS  = ( (pe - g_pe) / g_pe_sd ) - ( (rt - g_rt) / g_rt_sd ) )
+
+```
+
+```{r}
+#| echo: false
+bis__lisas <- 
+  lisas |> 
+  ungroup() |>
+  mutate(con = ifelse(con==FALSE, "Incongruent", "Congruent"), 
+            # item values 
+         # lisas_s = scale( lisas ) ) #|>
+            # standardize: would have to be done at calculation to yield informative output? 
+  ) |>
+  left_join(BIS, by=c("id", "con")) |>
+      # join by two conds. 
+  # select(!name) |> 
+  mutate(BIS_inv = -1*BIS,
+          # inverse
+         BIS_lisas = (-1*BIS) * g_rt_sd.y + g_rt.y ,
+          # Inverse & RT correct
+         ) |>
+  rename(rt = rt.x, pe = pe.x) |>
+  select(id, con, rt, pe, lisas, BIS_lisas, BIS) 
+
+```
+
+## Table: LISAS+BIS
+```{r}
+#| echo: false
+comb_table <- 
+  bis__lisas |> 
+  pivot_longer(c(rt,pe,lisas,BIS,BIS_lisas))  |>
+  pivot_wider(names_from=con, values_from=value ) |>
+  rowwise() |>
+  mutate(diff = Incongruent - Congruent) |> 
+  group_by(name) |>
+  reframe(
+    m_incon   = mean(Incongruent),
+    sd_incon  = sd(Incongruent),
+    m_con     = mean(Congruent),
+    sd_con    = sd(Congruent),
+    mdiff     = mean(Incongruent-Congruent),
+    t.val     = t.test(Incongruent, Congruent, paired=T)$statistic,
+    df        = t.test(Incongruent, Congruent, paired=T)$parameter,
+    p.val     = t.test(Incongruent, Congruent, paired=T)$p.value  |> fmt_APA_numbers(p = T), 
+    b.est     = mean( ttestBF(Incongruent, Congruent, paired=T, posterior=T, iterations=5000)[,"mu"] ),
+    b         = extractBF( ttestBF(Incongruent, Congruent, paired=T) )$bf,
+    hdi       = paste0("[",
+      hdi( ttestBF(Incongruent, Congruent, paired=T, posterior=T, iterations=5000) )[1,3:4] |> 
+            map(fmt_APA_numbers)  |> 
+            paste0(collapse=", "), 
+      "]", sep="" ),
+    d         = cohensD(Incongruent, Congruent, method = "corrected"),
+  ) |> 
+  mutate( across( where(is.numeric), fmt_APA_numbers) ) 
+  
+comb_table |> 
+  mutate(name = factor(name, levels=c("rt","pe","lisas","BIS_lisas","BIS") ), 
+         e1="",e2="",e3="", e4="") |>
+  arrange(name) |>
+  gt() |>
+  cols_move(e1, sd_incon) |>
+  cols_move(e2, sd_con) |>
+  cols_move(e3, p.val) |>
+  cols_move(e4, hdi) |>
+  tab_spanner("Incongruent", c(m_incon, sd_incon) ) |>
+  tab_spanner("Bayesian", c(b.est, b,hdi)) |>
+  #tab_spanner("Congruent", C(m_con, sd_con) )
+    # why u not wrk? 
+  cols_label(m_incon = md("*M*"), sd_incon = md("*SD*"), m_con = md("*M*"), sd_con = md("*SD*"),
+             mdiff = md("*M*~diff~"), p.val = md("*p*"), b = md("BF~10~"), b.est = md("B~est~"), 
+             hdi = "HDI", d = md("*d*"), e1="",e2="",e3="", e4="") |>
+  tab_spanner("Congruent", c(m_con, sd_con) ) |>
+  cols_hide( c(t.val, df)) |>
+  cols_align("center" ) 
+
+```
+
+## Correlation
+Grand correlation, encoding time (ms) and response time (ms) for the inducer task
+```{r total table}
+#| echo: false
+d_ind <- 
+  data |> 
+  filter(!(id %in% loss$exclude_par)) |>
+  select(id, trial_info, inducer_run, correct_response, rt) |>
+  filter(trial_info == "Inducer trial" | trial_info=="Inducer instructions" ) |>
+  filter(inducer_run > 0) |>
+  pivot_wider(names_from = trial_info, values_from = c(correct_response, rt)) |> 
+  mutate(instructions = ifelse(is.na(`rt_Inducer instructions`), 20000, `rt_Inducer instructions`),
+         trial        = ifelse(is.na(`rt_Inducer trial`), 2000, `rt_Inducer trial` ),
+           # In this case we can set the values of instruction and trial to their max, 
+           # because that is the end of the trial (a non-response does count as a wrong response).
+           # None of this is preregistered and should be interpreted carefully. 
+         inducer_run  = as.numeric(inducer_run))
+d_ind |> 
+  summarize(
+    name = "Corrected",
+    cor = cor(instructions, trial),
+    encoding =  mean(instructions),
+    encoding_sd =  sd(instructions),
+    skew = moments::skewness(instructions),
+    trial = mean(trial),
+    trial_sd = sd(trial, na.rm = TRUE) ) |>
+  rbind(
+    d_ind |> 
+      filter(!is.na(`rt_Inducer instructions`)) |> 
+      filter(!is.na(`rt_Inducer trial`)) |> 
+      summarise(
+        name = "Removed",
+        cor = cor(instructions, trial),
+        encoding =  mean(instructions),
+        encoding_sd =  sd(instructions),
+        skew = moments::skewness(instructions),
+        trial = mean(trial),
+        trial_sd = sd(trial, na.rm = TRUE) )
+  )
+```
+
+#### Figure (corrected)
+```{r total plot}
+#| fig-dpi: 300
+#| echo: false
+#| error: false
+#| warning: false
+#| fig-width: 12
+
+p1 <-
+  d_ind |> 
+  ggplot(aes(instructions, trial)) +
+  geom_point(alpha=.1) +
+  geom_smooth(method=lm, col="indianred2", linewidth=1) +
+  scale_x_continuous(breaks=seq(0,20000,2000)) +
+  scale_y_continuous(breaks=seq(0,2000,250)) +
+  labs(y = "Trial response time (ms)", x = "Instruction response time (ms)")+
+  theme(legend.position = "none")+
+  coord_cartesian(ylim=c(0,2000))+
+  labs(title="Corrected")+
+  theme_minimal()
+
+p2 <- 
+  d_ind |> 
+  filter( !is.na(`rt_Inducer trial`) ) |>
+  filter( !is.na(`rt_Inducer instructions`) ) |>
+  ggplot(aes(instructions, trial)) +
+  geom_point(alpha=.1) +
+  geom_smooth(method=lm, col="indianred2", linewidth=1) +
+  scale_x_continuous(breaks=seq(0,20000,2000)) +
+  scale_y_continuous(breaks=seq(0,2000,250)) +
+  labs(y = "Trial response time (ms)", x = "Instruction response time (ms)")+
+  theme(legend.position = "none")+
+  coord_cartesian(ylim=c(0,2000))+
+  labs(title="Removed")+
+  theme_minimal()
+
+p1+p2
+```
+
+## Strategy & feedback
+```{r}
+#| echo: false
+data |> 
+  filter(stimulus == "feedback") |> 
+  select(id, response) |>
+  mutate(
+    strat = map(response, fromJSON) |> map_chr(1),
+    open = map(response, fromJSON) |> map_chr(2), ) |>
+  select(-response) |>
+  mutate(
+    exclu = ifelse(id %in% loss$exclude_par, TRUE,FALSE)
+  ) |> select(id, exclu, everything()) |>
+  gt()
+```
+
+
+
+## ANCOVA:  Inducer RT * Congruency 
+Individual correlation, encoding time (ms) and response time (ms)
+```{r within table}
+#| echo: false
+
+d |>
+  left_join(d_ind |> select(id, inducer_run, instructions,trial),
+            by= c("id", "inducer_run")) ->
+  an_d
+
+mod1 <- lmer(rt ~ con + (1|id), 
+             an_d |> filter(trial_info=="Diagnostic trial") )
+mod2 <- lmer(rt ~ con * trial + (1|id),
+             an_d |> filter(trial_info=="Diagnostic trial") )
+mod3 <- lmer(rt ~ con * instructions + (1|id),
+             an_d |> filter(trial_info=="Diagnostic trial") )
+# anova(mod1, mod2)
+# anova(mod1, mod3)
+# anova(mod2, mod3)
+
+# summary(mod1)
+summary(mod2)
+  # rt is adjusted by inducer RT by 0.05 * inducer_rt
+summary(mod3)
+  # rt is adjusted by instruction time by 0.005 * instructions
+
+#' No interaction between congruency and instruction/inducer rt. Suggesting that
+#' more preparation/inducer rt generally slows RT on the diagnostic task.
+```
+
+No interaction between congruency and instruction/inducer rt. Suggesting that more preparation/inducer rt generally slows RT on the diagnostic task.
