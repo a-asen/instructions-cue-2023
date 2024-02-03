@@ -31,21 +31,6 @@ map_df(fnames, \(x){
 read_csv("../data/raw/experiment1/demographics/demo.csv") -> demo
 ```
 
-```{r}
-demo |> 
-  mutate(s = ifelse(Sex=="Male", 1,0)) |> 
-  summarize(
-    age = mean(Age),
-    age_sd = sd(Age),
-    male = sum(s==1),
-    female = sum(s==0),
-    sex = mean(s),
-    sex_s = sd(s)
-  ) |> round(2) -> dem
-```
-
-We recruited `r length(dem$age)` participants (`r age$female` females) with a mean age of `r dem$age` (SD = `r dem$age_sd`) from the United Kingdom via Prolific. 
-
 
 ```{r transformation}
 #| include: FALSE
@@ -54,15 +39,87 @@ data |>
   mutate(rt = as.integer(ifelse( rt == "null", NA, rt ))) -> data
 ```
 
+# Demographics
 ```{r}
+#| include: false
+demo |> 
+  mutate(s = ifelse(Sex=="Male", 1,0)) |> 
+  summarize(
+    n = length(Age),
+    age = mean(Age),
+    age_sd = sd(Age),
+    male = sum(s==1),
+    female = sum(s==0),
+    sex = mean(s),
+    sex_s = sd(s)
+  ) |> round(2) -> dem
+dem$age
+```
+
+We recruited `r length(demo$Age)+4`, participants from the United Kingdom via Prolific. Due to a coding mistake, four participants did not generate any data. This left us with a mean age of `r dem$age` (SD = `r dem$age_sd`; `r dem$females` females) from the United Kingdom via Prolific. Note that two participants were excluded from the data analysis, but cannot be removed from the demographics due to non-connections between data points and demographics variables. 
+
+
+
+
+
+
+# Data 
+```{r base data }
+#| include: false
 # Select the relevant columns & rows
 # Remove the first inducer_run (i.e., 0th)
 data |>
   select(id, trial_info, inducer_run, diagnostic_run, correct_response, rt, congruent) |>
+    # note. Congruent has a conding error. Recalculating congruency is done below
   filter(trial_info == "Diagnostic trial" | trial_info == "Inducer trial") |>
   # Filter the first inducer run (combined practice)
   filter(inducer_run != 0) -> d
 ```
+
+
+```{r recalculating the congruency effect}
+#| include: false
+
+#' Due to a typo in the task script, the congruency output would (for some participants)
+#' be the opposite. 
+
+raw_d <- 
+  data |> 
+  select(id, trial_info, diagnostic_run, italic, inducer_run, stimulus, congruent, correct_diag_response_side, response, correct_response,rt) |>
+  filter(trial_info=="Diagnostic trial" | trial_info=="Inducer instructions" | trial_info =="Diagnostic instructions") |>
+  mutate(inducer_run = as.numeric(inducer_run),
+         italic = ifelse(italic=="true", TRUE, FALSE)) |>
+  fill(inducer_run, .direction = "up") |>
+  group_by(id) |>
+  mutate( 
+    diag_ins = stimulus[trial_info=="Diagnostic instructions"],
+    if_italic = str_split(diag_ins, " ") |> map_chr(4) ) |> 
+  ungroup() |>
+  group_by(id, inducer_run) |> 
+  # reframe(ins = stimulus[trial_info=="Inducer instructions"] ) 
+  mutate(
+    response_side = ifelse(response=="j", "RIGHT", "LEFT"),
+    #
+    indu_ins = stimulus[trial_info=="Inducer instructions"], 
+    ins_left = str_split(indu_ins, " | ") |> map_chr(2),
+    ins_right = str_split(indu_ins, " | ") |> map_chr(7),
+    ins_resp = str_split(indu_ins, " | ") |> map_chr(4),
+    #
+    inducer_tap  = ifelse(stimulus==ins_left, ins_resp, ifelse(ins_resp=="LEFT", "RIGHT", "LEFT")),
+    diag_tap     = ifelse(italic, if_italic, ifelse(if_italic=="LEFT", "RIGHT","LEFT") ) ) |>
+  filter(trial_info=="Diagnostic trial") |> 
+  ungroup() |>
+  mutate(con = ifelse(inducer_tap==diag_tap, T,F)) |>
+  select(id, inducer_run, diagnostic_run, con)
+
+
+d <- 
+  d |> 
+  mutate(inducer_run = as.numeric(inducer_run)) |>
+  left_join(raw_d, by=c("id","inducer_run", "diagnostic_run"))
+```
+
+## Exclusion
 
 ```{r exclusion start - accuracy}
 #| include: FALSE
@@ -87,7 +144,7 @@ d |> filter( !(id %in% loss$exclude_par) ) -> d
 
 In total, `r length(loss[["exclude_par"]])`
 `r ifelse(length(loss[["data_trials"]]) > 1, "participants", "participant")`
-where excluded due to low accuracy (> 70%). Resulting in a
+where excluded due to low accuracy (> 70%). Resulting in a 
 loss of `r loss[["exclude_par_pct"]]` percent of the data.
 
 ```{r due to high SD & NA responses }
@@ -119,13 +176,14 @@ d |>
   #' there is no stated solution to response time. Generally, this leads to problems 
   #' because a trial can be considered wrong under error conditions, while the accompanied 
   #' "error" for response time is not obvious. Should the RT be 2000ms (max trial length)? 
-  #' Or as an infinity RT? 
+  #' Or should it be closer to infinity? 
   #' 
   #' Assuming a max trial length of 2000ms would highly likely yield exclusion based on 
   #' the max rt * 2.5 SD (but that is not a given). 
   #' 
-  #' The simplest solution is to exclude these trials as missing.
-  #' Importantly, this is not preregistered. 
+  #' It is not obvious what to do in such a case, and the simplest solution will 
+  #' be to exclude (remove) these trials). Even though this may be assumed from
+  #' the preregistration, it is *not* preregistered.
 
 sum(d$retain_trials == 0) -> loss[["rt_sd_trials"]]
 sum(d$retain_trials == 0) / loss$data_trials * 100 -> loss[["rt_sd_pct"]]
@@ -162,30 +220,30 @@ Representing a loss of
 `r round(loss[["inducer_fail_pct"]], 2)` percent of the data.
 
 A total of
-`r loss$exclude_par_trials + loss$rt_sd_trials + loss$inducer_fail_trials`
+`r loss$exclude_par_trials + loss$rt_sd_trials + loss$inducer_fail_trials` (ignoring excluded participants, we are left with: `r loss$rt_sd_trials + loss$inducer_fail_trials`)
 trials were lost. Representing a loss of
-`r round(loss$exclude_par_pct + loss$rt_sd_pct + loss$inducer_fail_pct, 2)`
+`r round(loss$exclude_par_pct + loss$rt_sd_pct + loss$inducer_fail_pct, 2)` (or `r round(loss$rt_sd_pct + loss$inducer_fail_pct, 2)`)
 percent of the data.
 
-# Diagnostic 
+## Summary
 
 ```{r}
 #| include: FALSE
 # data summary
-d |>
+d |> 
+  ungroup() |>
   filter(trial_info=="Diagnostic trial") |>
-  group_by(id, congruent) |>
-  mutate(correct_response = ifelse(is.na(correct_response), 0, correct_response)) |>
-    # non-response are counted as missing 
+  group_by(id, con) |>
   summarize(rt = mean(rt),
             pct = mean(correct_response)) |>
+  ungroup() |>
     #' na.rm is not necessary, because problems related to missing trials 
     #' should be handled by the above criteria.
-  pivot_wider( names_from = congruent, values_from = c(rt, pct) ) |>
+  pivot_wider( names_from = con, values_from = c(rt, pct) ) |>
   ungroup() -> d2
 ```
 
-## Table
+### Table
 ```{r RT tables}
 #| echo: false
 
@@ -287,8 +345,8 @@ of the means, HDI = highest density interval, *d* = Effect size.
 
 **remove extra zeros**
 
-## Figures
-### Linerange
+### Figures
+#### Linerange
 ```{r}
 #| echo: false
 #| warning: false
@@ -301,17 +359,17 @@ of the means, HDI = highest density interval, *d* = Effect size.
 # change in data (congruent/incongruent), but summary score should not be used with it
 
 d |>
-  filter(!is.na(congruent)) |>
-  group_by(id, congruent) |>
+  filter(!is.na(con)) |>
+  group_by(id, con) |>
     # ????????????????  inducer_run
   summarize(rt = mean(rt)) |>
     # Summarize the proportion of correct per block
   ungroup() |>  
-  mutate(con = ifelse(congruent==T,1,0)) |>
+  mutate(con2 = ifelse(con==T,1,0)) |>
   #mutate(con = ifelse(congruent==TRUE,1,0)) |>
-  ggplot(aes(x = con, y = rt, group=id, col = factor(con)))+
-  stat_summary(aes(col=NULL), position=position_dodge(.1), geom = "point", fun = mean, alpha = .3)+
-  stat_summary(aes(col=NULL), position=position_dodge(.1), geom = "line", fun = mean, alpha = .3)+
+  ggplot(aes(x = con2, y = rt, group=id, col = factor(con2)))+
+  stat_summary(aes(col=NULL), position=position_dodge(.1), geom = "point", fun = mean, alpha = .1)+
+  stat_summary(aes(col=NULL), position=position_dodge(.1), geom = "line", fun = mean, alpha = .1)+
   stat_summary(aes(group=NULL), fun.data = mean_se, geom = "errorbar", width=.2, size = 1.5, alpha = .8)+
   stat_summary(aes(group=NULL, col=NULL), fun.data = mean_se, geom = "point", size = 1.5)+
   scale_x_continuous(breaks = c(0,1), labels = c("Incongruent", "Congruent"), name="",
@@ -325,23 +383,21 @@ d |>
 
 
 d |>
-  filter(!is.na(congruent)) |>
-  group_by(id, congruent) |>
-    # ????????????????  inducer_run
+  filter(!is.na(con)) |>
+  group_by(id, con) |>
   summarize(pct = mean(correct_response)) |>
     # Summarize the proportion of correct per block
   ungroup() |>  
-  mutate(con = ifelse(congruent==T,1,0)) |>
-  #mutate(con = ifelse(congruent==TRUE,1,0)) |>
-  ggplot(aes(x = con, y = pct, group=id, col = factor(con)))+
-  stat_summary(aes(col=NULL), position=position_dodge(.1), geom = "point", fun = mean, alpha = .2)+
-  stat_summary(aes(col=NULL), position=position_dodge(.1), geom = "line", fun = mean, alpha = .2)+
+  mutate(con2 = ifelse(con==T,1,0)) |>
+  ggplot(aes(x = con2, y = pct, group=id, col = factor(con)))+
+  stat_summary(aes(col=NULL), position=position_dodge(.1), geom = "point", fun = mean, alpha = .1)+
+  stat_summary(aes(col=NULL), position=position_dodge(.1), geom = "line", fun = mean, alpha = .1)+
   stat_summary(aes(group=NULL), fun.data = mean_se, geom = "errorbar", width=.2, size = 1.5, alpha = .8)+
   stat_summary(aes(group=NULL, col=NULL), fun.data = mean_se, geom = "point", size = 1.5)+
   scale_x_continuous(breaks = c(0,1), labels = c("Incongruent", "Congruent"), name="",
                      expand = c(.2,.2), minor_breaks = NULL)+
   scale_y_continuous(breaks = seq(0,1,.05), minor_breaks = NULL)+
-  coord_cartesian(ylim = c(.60, 1.01))+
+  coord_cartesian(ylim = c(.65, 1.01))+
                       # Adjust
   theme_minimal()+
   theme(axis.text.x = element_text(size = 10), legend.position = "none")+
@@ -351,7 +407,7 @@ p1+p2
 ```
 
 
-### Bar plot
+#### Bar plot
 ```{r}
 #| echo: false
 #| warning: false
@@ -360,22 +416,21 @@ p1+p2
 #| fig-dpi: 300
 #| fig-width: 6
 
+
 d |>
-  filter(!is.na(congruent)) |>
-  group_by(id, congruent) |>
-    # ????????????????  inducer_run
+  filter(!is.na(con)) |>
+  group_by(id, con) |>
   summarize(rt = mean(rt)) |>
     # Summarize the proportion of correct per block
   ungroup() |>  
-  mutate(con = ifelse(congruent==T,1,0)) |>
-  #mutate(con = ifelse(congruent==TRUE,1,0)) |>
-  ggplot(aes(x = con, y = rt,fill = factor(con)))+
+  mutate(con2 = ifelse(con==T,1,0)) |>
+  ggplot(aes(x = con2, y = rt,fill = factor(con)))+
   stat_summary(fun = mean, geom = "col")+
   stat_summary(fun.data = mean_se, geom = "errorbar", width = .2, size = 1.5, alpha = 1)+
   scale_x_continuous(breaks = c(0,1), labels = c("Incongruent", "Congruent"), name="",
                      expand = c(.2,.2), minor_breaks = NULL)+
   scale_y_continuous(breaks = seq(0,2000,50), minor_breaks = NULL)+
-  coord_cartesian(ylim = c(450, 760))+
+  coord_cartesian(ylim = c(600, 700))+
                         # Adjust? 
   theme_minimal()+
   theme(axis.text.x = element_text(size = 10), legend.position = "none")+
@@ -383,21 +438,21 @@ d |>
 
 
 d |>
-  filter(!is.na(congruent)) |>
-  group_by(id, congruent) |>
+  filter(!is.na(con)) |>
+  group_by(id, con) |>
     # ????????????????  inducer_run
   summarize(pct = mean(correct_response)) |>
     # Summarize the proportion of correct per block
   ungroup() |>  
-  mutate(con = ifelse(congruent==T,1,0)) |>
+  mutate(con2 = ifelse(con==T,1,0)) |>
   #mutate(con = ifelse(congruent==TRUE,1,0)) |>
-  ggplot(aes(x = con, y = pct, fill = factor(con)))+
+  ggplot(aes(x = con2, y = pct, fill = factor(con2)))+
   stat_summary(fun=mean, geom="col")+
   stat_summary(aes(group=NULL), fun.data = mean_se, geom = "errorbar", width=.2, size = 1.5)+
   scale_x_continuous(breaks = c(0,1), labels = c("Incongruent", "Congruent"), name="",
                      expand = c(.2,.2), minor_breaks = NULL)+
-  scale_y_continuous(breaks = seq(0,1,.05), minor_breaks = NULL)+
-  coord_cartesian(ylim = c(.75, 1.01))+
+  scale_y_continuous(breaks = seq(0,1,.01), minor_breaks = NULL)+
+  coord_cartesian(ylim = c(.9, 1.01))+
                         # Adjust? 
   theme_minimal()+
   theme(axis.text.x = element_text(size = 10), legend.position = "none")+
