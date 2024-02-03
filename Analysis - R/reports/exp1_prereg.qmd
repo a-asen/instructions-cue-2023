@@ -144,8 +144,8 @@ d |> filter( !(id %in% loss$exclude_par) ) -> d
 
 In total, `r length(loss[["exclude_par"]])`
 `r ifelse(length(loss[["data_trials"]]) > 1, "participants", "participant")`
-where excluded due to low accuracy (> 70%). Resulting in a 
-loss of `r loss[["exclude_par_pct"]]` percent of the data.
+where excluded due to low accuracy (> 70%). 
+<!-- Does not result in any loss of data, since they are replaced --> 
 
 ```{r due to high SD & NA responses }
 #| include: FALSE
@@ -220,10 +220,9 @@ Representing a loss of
 `r round(loss[["inducer_fail_pct"]], 2)` percent of the data.
 
 A total of
-`r loss$exclude_par_trials + loss$rt_sd_trials + loss$inducer_fail_trials` (ignoring excluded participants, we are left with: `r loss$rt_sd_trials + loss$inducer_fail_trials`)
+`r loss$rt_sd_trials + loss$inducer_fail_trials` (ignoring excluded participants, we are left with: `r loss$rt_sd_trials + loss$inducer_fail_trials`)
 trials were lost. Representing a loss of
-`r round(loss$exclude_par_pct + loss$rt_sd_pct + loss$inducer_fail_pct, 2)` (or `r round(loss$rt_sd_pct + loss$inducer_fail_pct, 2)`)
-percent of the data.
+`r round(loss$rt_sd_pct + loss$inducer_fail_pct, 2)`percent of the data.
 
 ## Summary
 
