@@ -208,13 +208,7 @@ lisas <-
   # group_by(id, con) |>
   mutate(lisas   = rt + (g_rt_sd/g_pe_sd) * pe, 
          lisas  = ifelse(is.nan(lisas), rt, lisas))
-  
-```
 
-```{r}
-#| echo: false
-#| warning: false
-#| message: false
 
 w_lisas <- 
   lisas |> 
@@ -245,15 +239,13 @@ w_lisas |>
 
 ```
 
-
-## BIS 
-Balanced integration score (BIS)
-```{r}
+```{r  BIS calc}
 #| echo: false
+
+# Balanced integration score (BIS) 
 
 # Calculation: 
 # See Liesefeld & Janczyk 2019 @ https://doi.org/10.3758/s13428-018-1076-x
-
 d |>
   filter(trial_info=="Diagnostic trial") |>
   ungroup() |>
@@ -276,10 +268,6 @@ BIS <-
   group_by(id, con) |>
   mutate(BIS  = ( (pe - g_pe) / g_pe_sd ) - ( (rt - g_rt) / g_rt_sd ) )
 
-```
-
-```{r}
-#| echo: false
 bis__lisas <- 
   lisas |> 
   ungroup() |>
@@ -298,12 +286,13 @@ bis__lisas <-
          ) |>
   rename(rt = rt.x, pe = pe.x) |>
   select(id, con, rt, pe, lisas, BIS_lisas, BIS) 
-
 ```
+
 
 ## Table: LISAS+BIS
 ```{r}
 #| echo: false
+
 comb_table <- 
   bis__lisas |> 
   pivot_longer(c(rt,pe,lisas,BIS,BIS_lisas))  |>
@@ -350,7 +339,6 @@ comb_table |>
   tab_spanner("Congruent", c(m_con, sd_con) ) |>
   cols_hide( c(t.val, df)) |>
   cols_align("center" ) 
-
 ```
 
 ## Correlation
@@ -391,7 +379,7 @@ d_ind |>
         skew = moments::skewness(instructions),
         trial = mean(trial),
         trial_sd = sd(trial, na.rm = TRUE) )
-  )
+  ) |> gt()
 ```
 
 #### Figure (corrected)
@@ -450,8 +438,7 @@ data |>
 ```
 
 
-
-## ANCOVA:  Inducer RT * Congruency 
+## ANCOVA: congruency and inducer
 Individual correlation, encoding time (ms) and response time (ms)
 ```{r within table}
 #| echo: false

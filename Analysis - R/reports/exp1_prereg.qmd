@@ -116,7 +116,6 @@ d <-
 ```
 
 ## Exclusion
-
 ```{r exclusion start - accuracy}
 #| include: FALSE
 loss <- list()
@@ -128,7 +127,7 @@ d |>
   group_by( id ) |>
   mutate( correct_response = ifelse( trial_info=="Inducer trial" & is.na(rt), 0, correct_response) ) |>
     #' !  Non-responses count as a wrong response & are subject to the exclusion criteria.  !
-  summarize( acc = sum(correct_response, na.rm = TRUE) / length( !is.na(correct_response) ) ) |>
+  summarise( acc = sum(correct_response, na.rm = TRUE) / length( !is.na(correct_response) ) ) |>
   filter( acc < .7 ) |>
   pull( id ) -> loss$exclude_par
 
@@ -216,8 +215,7 @@ Representing a loss of
 `r round(loss[["inducer_fail_pct"]], 2)` percent of the data.
 
 A total of
-`r loss$rt_sd_trials + loss$inducer_fail_trials` (ignoring excluded participants, we are left with: `r loss$rt_sd_trials + loss$inducer_fail_trials`)
-trials were lost. Representing a loss of
+`r loss$rt_sd_trials + loss$inducer_fail_trials` trials were lost. Representing a loss of
 `r round(loss$rt_sd_pct + loss$inducer_fail_pct, 2)`percent of the data.
 
 ## Summary
@@ -333,8 +331,8 @@ b |>
   cols_move(    "em3", hdi) 
 
 ```
-*Note.* The tests have `r  d2_df` degrees of freedom.  \n
-`r fmt_APA_p_table_fig(p_min)` \n
+*Note.* The tests have `r  d2_df` degrees of freedom.  <br/>
+`r fmt_APA_p_table_fig(p_min)` <br/>
 *M* = Mean, *SD* = standard deviation, *M*~diff~ = Differences
 of the means, HDI = highest density interval, *d* = Effect size.
 

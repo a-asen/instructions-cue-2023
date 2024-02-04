@@ -546,7 +546,8 @@ d_ind |>
         skew = moments::skewness(instructions),
         trial = mean(trial),
         trial_sd = sd(trial, na.rm = TRUE) )
-  )
+  ) |>
+  gt()
 ```
 
 #### Figure overall cor (corrected)
