@@ -48,9 +48,9 @@ const experiment_colours = ["blue", "green", "yellow"]      // Inducer colour ra
     // This is also what is DISPLAYED to participants. Should therefore be a readable name. 
 
 // Inducer pre-cue
-const pre_cue_max = 4
-const pre_cue_min = 1
-const pre_cue_duration = 750        // How long is the pre-cue present for? 
+const pre_cue_max = 5
+const pre_cue_min = 0
+const pre_cue_duration = 1000        // How long is the pre-cue present for? 
 
 
 ////    Diagnostic parameters   ////
@@ -241,6 +241,27 @@ const too_slow_trial = {
     }
 }
 
+// Pre cue trial
+const pre_cue_trial = {
+    type: jsPsychCanvasKeyboardResponse,
+    canvas_size: [300, 300],
+    stimulus: draw_up_arrow,
+    prompt: ``,
+    choices: "NO_KEYS",
+    trial_duration: pre_cue_duration,
+    data: {
+        stimulus: "pre-cue", 
+        inducer_run: exp_block,                   // Inducer run number (i.e., block)
+        diagnostic_run: exp_diag,                 // Diagnostic trial number
+        inducer_trial: false,                     // Not an inducer trial
+        trial_info:"Pre cue"},
+    on_finish: (data) => {
+        // Current window size
+        data.width = window.innerWidth
+        data.height = window.innerHeight
+    }
+}
+
 
 ///////////////////////////////////////////////////////////////////////////////////////
 // Set background to a light gray
@@ -306,7 +327,7 @@ if(sum_diags != max_diagnostic_trials){
 }
 
 
-// Generate inducer pre-cue
+// Generate inducer pre-cue array
 let pre_cue_arr = Array.from(Array(pre_cue_max-pre_cue_min+1), (x, i) => i + pre_cue_min) 
 if(debug){ console.log("Pre-cue array:", pre_cue_arr) }
 
@@ -715,26 +736,7 @@ for(let exp_block = 0; exp_block < number_of_inducers; exp_block++){ // less tha
         timeline.push(short_fixation)
 
         if(exp_diag==cue_trial_num){
-            // Pre cue trial
-            var pre_cue_trial = {
-                type: jsPsychCanvasKeyboardResponse,
-                canvas_size: [300, 300],
-                stimulus: draw_up_arrow,
-                prompt: ``,
-                choices: "NO_KEYS",
-                trial_duration: pre_cue_duration,
-                data: {
-                    stimulus: "pre-cue", 
-                    inducer_run: exp_block,                   // Inducer run number (i.e., block)
-                    diagnostic_run: exp_diag,                 // Diagnostic trial number
-                    inducer_trial: false,                     // Not an inducer trial
-                    trial_info:"Pre cue"},
-                on_finish: (data) => {
-                    // Current window size
-                    data.width = window.innerWidth
-                    data.height = window.innerHeight
-                }
-            }
+            
             timeline.push(pre_cue_trial)
             
             // Fixation,
