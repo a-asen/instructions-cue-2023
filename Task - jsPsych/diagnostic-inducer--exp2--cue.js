@@ -55,11 +55,11 @@ const inducer_colours = ["red", "yellow", "blue", "green", "purple"]      // Ind
     // This is also what is DISPLAYED (i.e., text) to participants. Should therefore be a readable name. 
 
 ////    Diagnostic parameters   ////
-const number_of_inducers = 2;       // Number of inducers 
+const number_of_inducers = 2//24;       // Number of inducers 
     // !!! CHANGE max trials !!! 
 const diagnostic_min_length = 4         // Min run length
 const diagnostic_max_length = 16        // Max run length
-const max_diagnostic_trials = 24     // Total max diagnostic trials
+const max_diagnostic_trials = 24//240     // Total max diagnostic trials
     // max/2 * number_of_inducers
 
 ////    Practice parameters     ////
@@ -131,6 +131,7 @@ function changeBackground(colour) {
     document.body.style.background = colour;
 }
 
+
 // Draw arrow
 // function draw_up_arrow(c){
 //     var ctx = c.getContext('2d');
@@ -149,7 +150,8 @@ function changeBackground(colour) {
 // }
 
 
-
+//// Draw cues: 
+// square
 function draw_square(c){
     var ctx = c.getContext('2d');
     ctx.fillStyle = rnd_cue_col
@@ -159,7 +161,7 @@ function draw_square(c){
     ctx.fill();
     ctx.closePath();
 }
-
+// triangle
 function draw_triangle(c){
     var ctx = c.getContext('2d');
     ctx.fillStyle = rnd_cue_col
@@ -171,7 +173,7 @@ function draw_triangle(c){
     ctx.fill();
     ctx.closePath();
 }
-
+// circle
 function draw_circle(c){
     var ctx = c.getContext('2d');
     // var can = c.getElementId("")
@@ -183,8 +185,7 @@ function draw_circle(c){
     ctx.closePath();
 }
 
-
-// Pre cue trial
+// Cue trial
 function cue_trial_f(inducer, diag){
     var v = {
         type: jsPsychCanvasKeyboardResponse,
@@ -337,21 +338,6 @@ if(debug) { console.log("Randomized stimuli list:", rnd_stimuli) }
 let rnd_inducer_colour = jsPsych.randomization.sampleWithReplacement(inducer_colours, 1)[0]
 if(debug){ console.log("Inducer colour: ", rnd_inducer_colour) }
 
-//// CUE  ///
-// Cue colour
-let r_col = inducer_colours.filter(item => item !== rnd_inducer_colour);
-let rnd_cue_col = jsPsych.randomization.sampleWithReplacement(r_col, 1)[0]
-if(debug) { console.log("Inducer colour: ", rnd_inducer_colour, " |  Pre-cue colour: ", rnd_cue_col)}
-
-// Cue stimulus
-const rnd_cue_stimulus = jsPsych.randomization.sampleWithReplacement([draw_circle,draw_square,draw_triangle], 1)[0]
-if(debug){ console.log(rnd_cue_stimulus) }
-
-// Pre-inducer cue trial length
-let cue_array = Array.from(Array(cue_max_length-cue_min_length+1), (x, i) => i + cue_min_length) 
-if(debug){ console.log("Pre-cue array:", cue_array) }
-
-
 
 //// Diagnostic stuff ////
 // Generate diagnostic length range
@@ -400,6 +386,39 @@ if(sum_diags != max_diagnostic_trials){
     if(debug){ console.log("Fixed diagnostic lengths:", rnd_diagnostic_length) }
     if(break_count >= 500){ "WARNING: COULD NOT EQUALIZE DIAGNOSTIC LENGTHS, CHECK PARAMETERS" }
 }
+
+
+//// CUE  ///
+// Cue colour
+let r_col = inducer_colours.filter(item => item !== rnd_inducer_colour);
+let rnd_cue_col = jsPsych.randomization.sampleWithReplacement(r_col, 1)[0]
+if(debug) { console.log("Inducer colour: ", rnd_inducer_colour, " |  Pre-cue colour: ", rnd_cue_col)}
+
+// Cue stimulus
+const rnd_cue_stimulus = jsPsych.randomization.sampleWithReplacement([draw_circle,draw_square,draw_triangle], 1)[0]
+if(debug){ console.log(rnd_cue_stimulus) }
+
+// Pre-inducer cue trial length
+let cue_array = Array.from(Array(cue_max_length-cue_min_length+1), (x, i) => i + cue_min_length) 
+if(debug){ console.log("Pre-cue array:", cue_array) }
+
+// Randomly sample cue lengths. 
+let rnd_cue_diag_length = [];
+// We randomy sample "number_of_inducer" times from the "diagnostic_range"
+for(let i = 0; i < number_of_inducers; i++){
+    while(true){
+        var l = jsPsych.randomization.sampleWithReplacement(cue_array, 1)[0] 
+            // sample a length
+    
+        // test if length exceed the diagnostic length (i.e., cue of 5 on a diagnostic of 4 would not work)
+        var t = rnd_diagnostic_length[i]  - l 
+        if(t >= 3){
+            rnd_cue_diag_length.push(l)
+            break;
+        }
+    }
+}
+if(debug){ console.log("Cue length list:", rnd_cue_diag_length) }
 
 
 
@@ -853,10 +872,8 @@ for(let exp_block = 0; exp_block < number_of_inducers; exp_block++){ // less tha
 
 
     ///////////// Cue appearance
-    // (For each run, we) Sample a length from the cue length (predetermin )
-    let rnd_cue_length = jsPsych.randomization.sampleWithReplacement(cue_array, 1)[0];
     // (and adds that a condition to that diag run) 
-    let cue_diag_num = rnd_diagnostic_length[exp_block] - rnd_cue_length;
+    let cue_diag_num = rnd_cue_diag_length[exp_block];
 
     ////        Inducer instruction         ////
     let inducer_instruction = { 
@@ -993,10 +1010,6 @@ for(let exp_block = 0; exp_block < number_of_inducers; exp_block++){ // less tha
             }
         },
         on_finish: (data) => {
-            // Current window size
-            data.width = window.innerWidth
-            data.height = window.innerHeight
-            
             // Check the correct response key: 
             // Associate correct key from response sides
             if(data.correct_indu_response_side == response_sides[0]) 
@@ -1103,10 +1116,9 @@ timeline.push({
     fullscreen_mode: false,    
     on_finish: () => {
         window.location = redirect_link
-        if(debug){ console.log("Linking") }
+        if(debug){ console.log("Redirecting") }
     }
 }); 
-
 
 timeline.push( {type: jsPsychHtmlKeyboardResponse, stimulus: ""} )
 
