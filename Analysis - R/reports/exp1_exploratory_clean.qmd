@@ -224,7 +224,9 @@ w_lisas |>
   ungroup() |> 
   summarize(
     m_incongruent   = fmt_APA_numbers( mean(lisas_FALSE) ),
+    sd_incongruent   = fmt_APA_numbers( sd(lisas_FALSE) ),
     m_congruent     = fmt_APA_numbers( mean(lisas_TRUE) ),
+    sd_congruent     = fmt_APA_numbers( sd(lisas_TRUE) ),
     p               = t_lisas$p.value,
     ps              = set_p_star(p),
     t               = t_lisas$statistic,
@@ -407,7 +409,7 @@ p2 <-
   d_ind |> 
   filter( !is.na(`rt_Inducer trial`) ) |>
   filter( !is.na(`rt_Inducer instructions`) ) |>
-  ggplot(aes(instructions, trial)) +
+  ggplot(aes(instructions, trial, col=)) +
   geom_point(alpha=.1) +
   geom_smooth(method=lm, col="indianred2", linewidth=1) +
   scale_x_continuous(breaks=seq(0,20000,2000)) +
@@ -419,6 +421,128 @@ p2 <-
   theme_minimal()
 
 p1+p2
+```
+
+## ANCOVA: congruency and inducer
+Individual correlation, encoding time (ms) and response time (ms)
+```{r within table}
+#| echo: false
+
+d |>
+  left_join(d_ind |> dplyr::select(id, inducer_run, instructions,trial),
+            by= c("id", "inducer_run")) ->
+  an_d
+
+an_d |>
+  filter( trial_info=="Diagnostic trial" ) |>
+  ggplot(aes(instructions, rt, col=con))+
+  geom_point(alpha=.1)+
+  geom_smooth(method="lm")
+
+```
+
+```{r}
+#' linear mixed model: 
+#' RT -> log scaled (normalize distribution)
+#' instructions -> log scaled (normalize distribution)
+#' 
+
+r_mod1 <- 
+  an_d |>
+  filter( trial_info=="Diagnostic trial" ) |>
+  mutate( instructions = log(instructions),
+          rt = log(rt)) |>
+  lmer( rt ~ con + (1|id), data = _, REML=F)
+  
+r_mod2 <- 
+  an_d |> 
+  filter( trial_info=="Diagnostic trial" ) |>
+  mutate( instructions = log(instructions),
+          rt = log(rt) ) |>
+  lmer( rt ~ con + instructions + (1|id), data = _, REML =F)
+
+anova(r_mod1, r_mod2)
+  # mod2 better
+
+# Interaction term
+r_mod3 <- 
+  an_d |> 
+  filter( trial_info=="Diagnostic trial" ) |>
+  mutate( instructions = log(instructions),
+          rt = log(rt) ) |>
+  lmer( rt ~ con * instructions + (1|id), data = _, REML =F)
+
+anova(r_mod2, r_mod3)
+  # n.s.
+summary(r_mod3)
+
+# transformed values: 
+exp( getME(r_mod2, "fixef")[1:2] ) 
+exp( exp( getME(r_mod2, "fixef")[3:4] ) )
+  # conTRUE only predicts 1 ms faster RT ??? 
+exp( getME(r_mod3, "fixef")[1:2] )
+exp( exp( getME(r_mod3, "fixef")[3:4] ) )
+  # For any 1 increase in 
+```
+
+Spending more time on the instructions predicted slower inducer RT. 
+No interaction was found, suggesting that more time spend reading/preparing for the instructions did not influence the congruency effect. 
+
+
+```{r}
+#| echo: false
+
+#' For correct response: 
+#' Outcome is dichotomous -> We use the logit family. 
+#' Factor -> correct_response
+
+p_mod1 <- 
+  an_d |>
+  filter(trial_info=="Diagnostic trial") |>
+  mutate(instructions = log(instructions),
+         correct_response = factor(correct_response)) |>
+  glmer(correct_response ~ con + (1|id), data = _,
+        family = binomial(link="logit"))
+
+p_mod2 <- 
+  an_d |>
+  filter(trial_info=="Diagnostic trial") |>
+  mutate(instructions = log(instructions),
+         correct_response = factor(correct_response)) |>
+  glmer(correct_response ~ con + instructions + (1|id), data = _,
+        family = binomial(link="logit"))
+
+anova(p_mod1, p_mod2)
+  # n.s. 
+
+summary( p_mod1 )
+
+exp( getME(p_mod1, "fixef")[1:2] )
+
+```
+
+
+
+```{r}
+#| echo: false
+
+# Scaled instructions reading
+library(multcomp)
+r_mod4 <- lmer(rt ~ con * instructions + (1|id),
+             an_d |> 
+               filter(trial_info=="Diagnostic trial") |>
+               mutate(instructions = scale(instructions)) )
+
+summary(mod4)
+p_mod4 <- lmer(rt ~ con * instructions + (1|id),
+             an_d |> 
+               filter(trial_info=="Diagnostic trial") |>
+               mutate(instructions = scale(instructions)) )
+summary(mod4)
+
+glht(mod4, linfct =c("instructions = 0",
+                     "conTRUE = 0",
+                     "conTRUE:instructions = 0")) |> summary()
 ```
 
 ## Strategy & feedback
@@ -438,34 +562,5 @@ data |>
 ```
 
 
-## ANCOVA: congruency and inducer
-Individual correlation, encoding time (ms) and response time (ms)
-```{r within table}
-#| echo: false
 
-d |>
-  left_join(d_ind |> select(id, inducer_run, instructions,trial),
-            by= c("id", "inducer_run")) ->
-  an_d
 
-mod1 <- lmer(rt ~ con + (1|id), 
-             an_d |> filter(trial_info=="Diagnostic trial") )
-mod2 <- lmer(rt ~ con * trial + (1|id),
-             an_d |> filter(trial_info=="Diagnostic trial") )
-mod3 <- lmer(rt ~ con * instructions + (1|id),
-             an_d |> filter(trial_info=="Diagnostic trial") )
-# anova(mod1, mod2)
-# anova(mod1, mod3)
-# anova(mod2, mod3)
-
-# summary(mod1)
-summary(mod2)
-  # rt is adjusted by inducer RT by 0.05 * inducer_rt
-summary(mod3)
-  # rt is adjusted by instruction time by 0.005 * instructions
-
-#' No interaction between congruency and instruction/inducer rt. Suggesting that
-#' more preparation/inducer rt generally slows RT on the diagnostic task.
-```
-
-No interaction between congruency and instruction/inducer rt. Suggesting that more preparation/inducer rt generally slows RT on the diagnostic task.
