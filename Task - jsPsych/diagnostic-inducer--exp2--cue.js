@@ -866,6 +866,15 @@ let inducer_task_instruction_description = {
 timeline.push( inducer_task_instruction_description )
 
 for(let i = 0; i < prac_inducer_rounds; i++){
+    // Randomly decide whether the stimulus should appear in italic or not.
+    if(force_equal){
+        let prac_dia = Array(  Array(Math.floor(run_diagnostic_length/2)).fill(1) ,  Array( Math.ceil(run_diagnostic_length/2) ).fill(0)  ).flat()
+        // Split half and half practice diagnostic length
+        
+        rnd_prac_dia = jsPsych.randomization.shuffle(prac_dia)
+        // Randomize half/half split 
+    }
+
     // Diagnostic practice trials
     let run_stimuli = [rnd_stimuli[0], rnd_stimuli[1]]
     // Remove added inducer stimuli from the main list 
@@ -884,7 +893,7 @@ let cue_instructions = {
 
 
         "Q"HOEH#OHJIR"#OO"#Rrjio
-        
+
         <br><br>
         Every new round will present two new 3-letter non-words. <br>
         These relate to the non-words presented in 
