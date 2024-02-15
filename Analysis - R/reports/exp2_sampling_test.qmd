@@ -1,8 +1,11 @@
 ---
-title: "Experiment 2 sampling"
+title: "Experiment 2 post-cue sampling"
 format: docx
+lang: en-GB
+editor: 
+  markdown:
+      wrap: 62
 ---
-
 
 # Sample from data 
 ```{r}
@@ -18,7 +21,7 @@ library(lsr)
 d <-
   data |>
   dplyr::select(id, trial_info, inducer_run, diagnostic_run, correct_response, rt, con) |>
-  mutate(rt = as.numeric( ifelse(rt=="nulL", NA, rt)) ) |>
+  mutate(rt = as.numeric( ifelse(rt=="null", NA, rt)) ) |>
   filter(trial_info == "Diagnostic trial" | trial_info == "Inducer trial") |>
   filter(!is.na(correct_response))
 ```
@@ -27,7 +30,7 @@ d <-
 #| echo: false
 d |>
   filter(diagnostic_run <5) |>
-  group_by(id, con) |>
+  dplyr::group_by(id, con) |>
   summarise(rt = mean(rt, na.rm=T),
             pct = mean(correct_response,na.rm=T)) |>
   pivot_longer(c(rt,pct)) |>
@@ -222,7 +225,8 @@ gen_data |>
   mutate(eff = factor(as.character(eff))) |>
   pivot_longer(c(rt.p, pct.p)) |>
   ggplot(aes(n, rt.d, col = eff, group=eff ))+
-  stat_summary(geom="line")
+  stat_summary(geom="line")+
+  geom_smooth(method="lm", alpha =.2)
   #scale_y_log10()
 ```
 
@@ -245,6 +249,7 @@ Let us sample multiple times with 60 diagnostic trials:
 
 ```{r}
 #| echo: false
+#| message: false
 map_df(seq(0,.5, .05), \(y){
   map_df(1:1000, \(x){
     gen_sample(27, 60, y) |>
@@ -300,4 +305,52 @@ This means we should be able to detect both response time and accuracy with a hi
 
 
 
+Testing slightly less trials, due to loss at the first inducer block: 
+```{r}
+#| echo: false
+#| message: false
+map_df(seq(0,.5, .05), \(y){
+  map_df(1:1000, \(x){
+    gen_sample(27, 55, y) |>
+      summarise(
+        eff = y,
+        count = x,
+        size = 55, 
+        rt.con = mean(rt_con, na.rm=T),
+        rt.incon = mean(rt_inc, na.rm=T),
+        rt.est  = mean(rt_inc-rt_con, na.rm=T),
+        rt.t  = t.test(rt_inc, rt_con, paried=T, na.rm=T)$statistic,
+        rt.p  = t.test(rt_inc, rt_con, paried=T, na.rm=T)$p.value,
+        rt.d = cohensD(rt_inc, rt_con, method="corrected"),
+        pct.con = mean(pct_con, na.rm=T),
+        pct.incon = mean(pct_inc, na.rm=T),
+        pct.est  = mean(pct_inc-pct_con, na.rm=T),
+        pct.t  = t.test(pct_inc, pct_con, paried=T, na.rm=T)$statistic,
+        pct.p  = t.test(pct_inc, pct_con, paried=T, na.rm=T)$p.value,
+        pct.d = cohensD(pct_inc, pct_con, method="corrected")
+      )
+  })
+}) -> gen_data3
 
+gen_data3 |>
+  filter(eff>.1) |>
+  mutate(eff = factor(as.character(eff))) |>
+  pivot_longer(c(rt.p, pct.p)) |>
+  ggplot(aes(count, value, col = eff, group=eff ))+
+  facet_wrap(~name, scales="free")+
+  stat_summary(geom="line", alpha = .4)+
+  geom_smooth(method="lm")+
+  scale_y_log10()+
+  geom_hline(yintercept=0.05)
+```
+
+```{r}
+#| echo: false
+
+gen_data3 |>
+  group_by(eff) |>
+  summarise(power.rt = mean(rt.p<.05), power.pct = mean(pct.p<.05)) |>
+  gt()
+```
+
+Still results in rather similar outcomes. A solid > 98% power at an effect size of .15. 
