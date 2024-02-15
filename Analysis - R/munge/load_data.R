@@ -10,7 +10,8 @@ map_df(fnames, \(x){
 # Fix congrunecy:
 raw_d <-
   data |>
-  select(id, trial_info, diagnostic_run, italic, inducer_run, stimulus, congruent, correct_diag_response_side, response, correct_response,rt) |>
+  dplyr::select(id, trial_info, diagnostic_run, italic, inducer_run, stimulus,
+                congruent, correct_diag_response_side, response, correct_response,rt) |>
   filter(trial_info=="Diagnostic trial" | trial_info=="Inducer instructions" | trial_info =="Diagnostic instructions") |>
   mutate(inducer_run = as.numeric(inducer_run),
          italic = ifelse(italic=="true", TRUE, FALSE)) |>
@@ -35,7 +36,7 @@ raw_d <-
   filter(trial_info=="Diagnostic trial") |>
   ungroup() |>
   mutate(con = ifelse(inducer_tap==diag_tap, T,F)) |>
-  select(id, inducer_run, diagnostic_run, con)
+  dplyr::select(id, inducer_run, diagnostic_run, con)
 
 # Add new congruency to data
 data <-
