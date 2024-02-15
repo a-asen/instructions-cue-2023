@@ -5,11 +5,11 @@ list.files("data/raw/experiment1/task", pattern = "*.csv", full.names = T) -> fn
 
 map_df(fnames, \(x){
   read_csv(x)
-}) -> data
+}) -> exp1_d
 
 # Fix congrunecy:
 raw_d <-
-  data |>
+  exp1_d |>
   dplyr::select(id, trial_info, diagnostic_run, italic, inducer_run, stimulus,
                 congruent, correct_diag_response_side, response, correct_response,rt) |>
   filter(trial_info=="Diagnostic trial" | trial_info=="Inducer instructions" | trial_info =="Diagnostic instructions") |>
@@ -39,8 +39,9 @@ raw_d <-
   dplyr::select(id, inducer_run, diagnostic_run, con)
 
 # Add new congruency to data
-data <-
-  data |>
+exp1_d <-
+  exp1_d |>
   mutate(inducer_run = as.numeric(inducer_run)) |>
   left_join(raw_d, by=c("id","inducer_run", "diagnostic_run"))
 
+#save(exp1_d, file="data/trans/exp1_data.rdata")
