@@ -28,7 +28,7 @@ map_df(fnames, \(x){
   read_csv(x)
 }) -> data
 
-read_csv("../data/raw/experiment1/demographics/demo.csv") -> demo
+read_csv("../data/raw/experiment1/exp1_demo.csv") -> demo
 ```
 
 ```{r transformation}
