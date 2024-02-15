@@ -1,0 +1,303 @@
+---
+title: "Experiment 2 sampling"
+format: docx
+---
+
+
+# Sample from data 
+```{r}
+#| echo: false
+load("../data/trans/exp1_data.rdata")
+
+library(tidyverse)
+library(lsr)
+```
+
+```{r}
+#| echo: false
+d <-
+  data |>
+  dplyr::select(id, trial_info, inducer_run, diagnostic_run, correct_response, rt, con) |>
+  mutate(rt = as.numeric( ifelse(rt=="nulL", NA, rt)) ) |>
+  filter(trial_info == "Diagnostic trial" | trial_info == "Inducer trial") |>
+  filter(!is.na(correct_response))
+```
+
+```{r}
+#| echo: false
+d |>
+  filter(diagnostic_run <5) |>
+  group_by(id, con) |>
+  summarise(rt = mean(rt, na.rm=T),
+            pct = mean(correct_response,na.rm=T)) |>
+  pivot_longer(c(rt,pct)) |>
+  ggplot(aes(con, value))+
+  facet_wrap(~name, scales ="free")+
+  stat_summary()
+```
+Congruency present for raw data.
+
+```{r}
+#| echo: false
+diag_trials <-
+  d |>
+  filter(diagnostic_run<17) |>
+  ungroup()
+```
+
+
+First, I will test how many diagnostic trials we need to find a sig difference, based on the results we already have. 
+```{r}
+map_df(seq_along(1:16), \(x){
+  diag_trials |>
+    filter(diagnostic_run<x) |>
+    group_by(id, con) |>
+    summarise(
+      rt = mean(rt),
+      pct = mean(correct_response)
+    ) |> ungroup() |>
+    summarise(
+      n = x,
+      est = t.test(rt~con, paired=T)$estimate,
+      t = t.test(rt ~ con, paired=T)$statistic,
+      p = t.test(rt ~ con, paired=T)$p.value,
+      df = t.test(rt ~ con, paired=T)$parameter,)
+}) -> n_back_test
+n_back_test |>
+  ggplot(aes(n, p))+
+  geom_line()+
+  geom_hline(yintercept=.05)
+```
+Sampling from all blocks, across all participants, we appear to need between 8-10 trials (per block) to find a significant congruency effect. 
+
+
+Now I will attempt to see how many diagnostic trials are necessary to find the congruency effect through random sampling of the data from experiment 1. 
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+#| error: false
+stat_test <- function(n){
+  # n = size 
+  
+  slice_sample(diag_trials, by = c(id, con), n = size) |>
+    group_by(id, con) |>
+    summarise(l = length(rt),
+              rt = mean(rt),
+              pct = mean(correct_response)) |>
+    ungroup() |>
+    pivot_wider(names_from=con, values_from=c(l, rt,pct)) |>
+    reframe(
+      n = n,
+      rt_con = mean(rt_TRUE, na.rm=T),
+      rt_incon = mean(rt_FALSE, na.rm=T),
+      rt_est  = mean(rt_FALSE-rt_TRUE, na.rm=T),
+      rt_t  = t.test(rt_FALSE, rt_TRUE, paried=T, na.rm=T)$statistic,
+      rt_p  = t.test(rt_FALSE, rt_TRUE, paried=T, na.rm=T)$p.value,
+      rt_d = cohensD(rt_FALSE, rt_TRUE, method="corrected"),
+      pct_con = mean(pct_TRUE, na.rm=T),
+      pct_incon = mean(pct_FALSE, na.rm=T),
+      pct_est  = mean(pct_FALSE-pct_TRUE, na.rm=T),
+      pct_t  = t.test(pct_FALSE, pct_TRUE, paried=T, na.rm=T)$statistic,
+      pct_p  = t.test(pct_FALSE, pct_TRUE, paried=T, na.rm=T)$p.value,
+      pct_d = cohensD(pct_FALSE, pct_TRUE, method="corrected")
+    )
+}
+map_df(1:50, \(x){
+  stat_test(x)
+}) -> sample1 
+
+sample1 |>
+  ggplot(aes(n, rt_p))+
+  geom_line()
+```
+
+Generally this appears to be unstable. The increase in diagnostic trials does not appear to change the significance at all. Weird.
+
+To solve this, we can repeat each sampling of a particular size a couple of times to average the differences.
+```{r}
+#| echo: false
+#| error: false
+#| warning: false
+#| message: false
+rep_test <- function(maxdiag, rep){
+  # range = number of diagnostics
+  # rep = how many times we repeat the same sampling
+
+  map_df(1:maxdiag, \(x){
+    # for each diag we repeat the diag length "rep" times
+    map_df(1:rep, \(y){
+      stat_test(x)
+    })
+  })
+}
+rep_test(50, 30) -> sample2
+  # From 1 to 50 diagnostic trials, repeat each 20 times. 
+sample2 |>
+  ggplot(aes(n, rt_p))+
+  stat_summary()
+  geom_line()
+```
+
+
+```{r}
+sample2 |>
+  ggplot(aes(n, rt_d))+
+  stat_summary()
+  geom_line()
+```
+This did not appear to solve the problem at all. 
+
+I suspect there is some unequalness with the sampling... 
+We can move over to generated data to see how increased samples "should" trend the data towards more significant differences. 
+
+# Sampling from generated data 
+
+Generate normal distributions with a mean of 0 and a standard deviation of 1.
+Effect.size adjusts the effect on the congruent trials by "eff.size" difference.
+For our purposes here "rt" and "pct" can be on the same scale.
+```{r}
+gen_sample <- function(N, OBS, eff.size){
+  #' @param N Number of subjects
+  #' @param OBS Number of observation per N
+  #' @param eff.size Effect size difference between incongruent and congruent trials
+
+  tibble(
+    id = rep(1:N, each=OBS),
+    rt_inc  = rnorm(N*OBS, 0, 1),
+    rt_con  = rnorm(N*OBS, 0 + eff.size, 1),
+    pct_inc = rnorm(N*OBS, 0, 1),
+    pct_con = rnorm(N*OBS, 0 + eff.size, 1) )
+}
+```
+
+
+We can then generate random data related to each effect size with different diagnostic lengths.
+In this case, effect size in steps of .05 from 0 to .5. Moreover, we use 30 to 70 diagnostic trials.
+60 trials would correspond to an average of 2.5 trials in each block, and what would correspond to a range of 0 to 5 trials (post-cue trials).
+
+```{r}
+#| echo: false
+map_df(seq(0,.5, .05), \(y){
+  map_df(30:70, \(x){
+    gen_sample(27, x, y) |>
+      summarise(
+        eff = y,
+        count = x,
+        size = x,
+        rt.con = mean(rt_con, na.rm=T),
+        rt.incon = mean(rt_inc, na.rm=T),
+        rt.est  = mean(rt_inc-rt_con, na.rm=T),
+        rt.t  = t.test(rt_inc, rt_con, paried=T, na.rm=T)$statistic,
+        rt.p  = t.test(rt_inc, rt_con, paried=T, na.rm=T)$p.value,
+        rt.d = cohensD(rt_inc, rt_con, method="corrected"),
+        pct.con = mean(pct_con, na.rm=T),
+        pct.incon = mean(pct_inc, na.rm=T),
+        pct.est  = mean(pct_inc-pct_con, na.rm=T),
+        pct.t  = t.test(pct_inc, pct_con, paried=T, na.rm=T)$statistic,
+        pct.p  = t.test(pct_inc, pct_con, paried=T, na.rm=T)$p.value,
+        pct.d = cohensD(pct_inc, pct_con, method="corrected")
+      )
+  })
+}) -> gen_data
+
+gen_data |>
+  filter(eff>.1) |>
+  mutate(eff = factor(as.character(eff))) |>
+  pivot_longer(c(rt.p, pct.p)) |>
+  ggplot(aes(n, value, col = eff, group=eff ))+
+  facet_wrap(~name, scales="free")+
+  stat_summary(geom="line")+
+  geom_smooth(method="lm")+
+  scale_y_log10()+
+  geom_hline(yintercept=0.05)+
+  geom_vline(xintercept=60)
+```
+
+In this graph we see a clear increase in p for increasing diagnostic lengths. 
+
+```{r}
+gen_data |>
+  filter(eff>.1) |>
+  mutate(eff = factor(as.character(eff))) |>
+  pivot_longer(c(rt.p, pct.p)) |>
+  ggplot(aes(n, rt.d, col = eff, group=eff ))+
+  stat_summary(geom="line")
+  #scale_y_log10()
+```
+
+Similarly, the effect size seems to be rather stable for all diagnostic lengths. 
+
+
+From the generated data, we can calculate the power for each effect size: 
+
+```{r}
+#| echo: false
+
+gen_data |>
+  group_by(eff) |>
+  summarise(power.rt = mean(rt.p<.05), power.pct = mean(pct.p<.05)) |>
+  gt()
+```
+
+
+Let us sample multiple times with 60 diagnostic trials:
+
+```{r}
+#| echo: false
+map_df(seq(0,.5, .05), \(y){
+  map_df(1:1000, \(x){
+    gen_sample(27, 60, y) |>
+      summarise(
+        eff = y,
+        count = x,
+        size = 60, 
+        rt.con = mean(rt_con, na.rm=T),
+        rt.incon = mean(rt_inc, na.rm=T),
+        rt.est  = mean(rt_inc-rt_con, na.rm=T),
+        rt.t  = t.test(rt_inc, rt_con, paried=T, na.rm=T)$statistic,
+        rt.p  = t.test(rt_inc, rt_con, paried=T, na.rm=T)$p.value,
+        rt.d = cohensD(rt_inc, rt_con, method="corrected"),
+        pct.con = mean(pct_con, na.rm=T),
+        pct.incon = mean(pct_inc, na.rm=T),
+        pct.est  = mean(pct_inc-pct_con, na.rm=T),
+        pct.t  = t.test(pct_inc, pct_con, paried=T, na.rm=T)$statistic,
+        pct.p  = t.test(pct_inc, pct_con, paried=T, na.rm=T)$p.value,
+        pct.d = cohensD(pct_inc, pct_con, method="corrected")
+      )
+  })
+}) -> gen_data2
+
+
+gen_data2 |>
+  filter(eff>.1) |>
+  mutate(eff = factor(as.character(eff))) |>
+  pivot_longer(c(rt.p, pct.p)) |>
+  ggplot(aes(count, value, col = eff, group=eff ))+
+  facet_wrap(~name, scales="free")+
+  stat_summary(geom="line", alpha = .4)+
+  geom_smooth(method="lm")+
+  scale_y_log10()+
+  geom_hline(yintercept=0.05)
+```
+
+This yields a very nicely coloured graph. At any rate, we can see that there is some variation around each effect size, but that it is generally stable over time.
+
+From this, we can calculate the power for each effect size:
+```{r}
+#| echo: false
+
+gen_data2 |>
+  group_by(eff) |>
+  summarise(power.rt = mean(rt.p<.05), power.pct = mean(pct.p<.05)) |>
+  gt()
+```
+
+With an effect size of at least .10, we will get a power of 80%.
+
+In line with our results, we found .17 for rt and .70 with accuracy. 
+This means we should be able to detect both response time and accuracy with a high than 98% power. 
+
+
+
+
