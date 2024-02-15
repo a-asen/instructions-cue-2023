@@ -7,7 +7,7 @@ editor:
       wrap: 62
 ---
 
-```{r libraries }
+```{r libraries and load data}
 #| include: FALSE
 library(tidyverse)
 library(ggpp)
@@ -16,25 +16,16 @@ library(patchwork)
 library(BayesFactor)
 library(bayestestR)
 library(lsr)
+
 source("../lib/helper_functions.R")
-```
-
-```{r load data }
-#| include: FALSE
-
-list.files("../data/raw/experiment2/task", pattern = "*.csv", full.names = T) -> fnames
-
-map_df(fnames, \(x){
-  read_csv(x)
-}) -> data
-
-read_csv("../data/raw/experiment2/demographics/demo.csv") -> demo
+load("../data/trans/exp2_data.rdata")
+read_csv("../data/raw/experiment2/exp2_demo.csv") -> demo
 ```
 
 ```{r transformation}
 #| include: FALSE
 # Pre-transformation
-data |>
+exp2_d |>
   mutate(rt = as.integer(ifelse( rt == "null", NA, rt ))) -> data
 ```
 
@@ -58,13 +49,12 @@ dem$age
 We recruited `r length(demo$Age)+4`, participants from the United Kingdom via Prolific. Due to a coding mistake, four participants did not generate any data. This left us with a mean age of `r dem$age` (SD = `r dem$age_sd`; `r dem$females` females) from the United Kingdom via Prolific. Note that two participants were excluded from the data analysis, but cannot be removed from the demographics due to non-connections between data points and demographics variables. 
 
 
-
 # Data 
 ```{r base data }
 #| include: false
 # Select the relevant columns & rows
 # Remove the first inducer_run (i.e., 0th)
-data |>
+exp2_d
   select(id, trial_info, inducer_run, diagnostic_run, correct_response, rt, congruent) |>
     # note. Congruent has a conding error. Recalculating congruency is done below
   filter(trial_info == "Diagnostic trial" | trial_info == "Inducer trial") |>
@@ -80,7 +70,7 @@ data |>
 #' be the opposite. 
 
 raw_d <- 
-  data |> 
+  exp2_d |> 
   select(id, trial_info, diagnostic_run, italic, inducer_run, stimulus, congruent, correct_diag_response_side, response, correct_response,rt) |>
   filter(trial_info=="Diagnostic trial" | trial_info=="Inducer instructions" | trial_info =="Diagnostic instructions") |>
   mutate(inducer_run = as.numeric(inducer_run),
