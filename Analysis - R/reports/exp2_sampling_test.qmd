@@ -19,7 +19,7 @@ library(lsr)
 ```{r}
 #| echo: false
 d <-
-  data |>
+  exp1_d |>
   dplyr::select(id, trial_info, inducer_run, diagnostic_run, correct_response, rt, con) |>
   mutate(rt = as.numeric( ifelse(rt=="null", NA, rt)) ) |>
   filter(trial_info == "Diagnostic trial" | trial_info == "Inducer trial") |>
@@ -39,6 +39,7 @@ d |>
   stat_summary()
 ```
 Congruency present for raw data.
+
 
 ```{r}
 #| echo: false
@@ -354,3 +355,26 @@ gen_data3 |>
 ```
 
 Still results in rather similar outcomes. A solid > 98% power at an effect size of .15. 
+
+
+# Congruency check 
+A last notion relates to whether we need to or should force an equal number of diagnostic trials. 
+
+```{r}
+d |>
+  filter(!is.na(con)) |>
+  group_by(id, con) |>
+  count() |>
+  mutate(trials = n - 30) |>
+  ggplot(aes(trials))+
+  geom_histogram(alpha = .4)+
+  geom_histogram(aes(x=n, fill="all data"), alpha=.4)+
+  scale_x_continuous(breaks = seq(5,200, 5))
+```
+
+In relation to the simulated data above, removing 30 trials does not lead to problems with regards to finding a congruency effect. 
+With at least 75 trials for some conditions. 
+
+The general conclusion from this is that we do not need to force an equal number of right/left diagnostic trials for the **pre-cue**, but to be sure we receive enough trials for the **post-cue** we will force that to be equal. 
+
+
