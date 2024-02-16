@@ -378,3 +378,96 @@ With at least 75 trials for some conditions.
 The general conclusion from this is that we do not need to force an equal number of right/left diagnostic trials for the **pre-cue**, but to be sure we receive enough trials for the **post-cue** we will force that to be equal. 
 
 
+
+
+
+```{r}
+ANOVA_design("2c*2p",)
+
+ANOVA_power()
+```
+
+
+
+
+
+
+# Simulating experiment 2.
+
+```{r}
+
+
+exp2_sim <- function(N, blocks, block.len, eff.con, eff.cue, eff.csi){
+  #' @param N Number of subjects
+  #' @param blocks Number of blocks 
+  #' @param block.len Length of each block
+  #' @param eff.con Effect size of the congruency effect
+  #' @param eff.cue Effect size of the pre-post cue
+  #' @param eff.csi Effect size of the short-long cue appearance
+
+  eff.con <- eff.con+1
+  eff.cue <- eff.cue+1
+  eff.csi <- eff.csi+1
+  cue_rep = 2 
+  tibble(
+    id     = rep(1:N, each = blocks * block.len * cue_rep),
+    csi    = rep.int( rep(c("short", "long"), each = (blocks * block.len * cue_rep)/2), N),
+    block  = rep.int( rep(1:blocks, each = block.len * cue_rep), N),
+    cue    = rep.int( rep(c("pre", "post"), each = block.len), blocks * N),
+    con    = rep.int( c("con", "incon"), N * blocks * block.len),
+    rt     = rnorm(N * blocks * block.len * cue_rep, 0, 1)
+  ) |>
+    mutate(rt = case_when(
+      csi == "short" & cue == "pre" & con == "con"    ~ rt * eff.con,
+      csi == "short" & cue == "pre" & con == "incon"  ~ rt,
+      csi == "short" & cue == "post" & con == "con"   ~ rt * eff.con * eff.cue,
+      csi == "short" & cue == "post" & con == "incon" ~ rt * eff.cue,
+      csi == "long" & cue == "pre" & con == "con"     ~ rt * eff.con,
+      csi == "long" & cue == "pre" & con == "incon"   ~ rt * eff.csi,
+      csi == "long" & cue == "post" & con == "con"    ~ rt * eff.con * eff.cue * eff.csi,
+      csi == "long" & cue == "post" & con == "incon"  ~ rt * eff.cue * eff.csi,
+    ))
+}
+
+exp2_sim(26, 24, 12, .4, .2, .1) -> test
+    
+test |>
+  # # group_by(id,csi,cue,con) |>
+  # # summarise(rt = mean(rt)) #|> #ungroup() |>
+  # mutate(across(where(is.character), factor)) |>
+  afex::aov_car(rt ~ con * cue * csi + Error(id), data = _, within=c("con","cue", "csi"))
+test |>
+  # group_by(id,csi,cue,con) |>
+  # summarise(rt = mean(rt)) |> ungroup() |>
+  # mutate(across(where(is.character), factor)) |>
+  lme4::lmer(rt ~ con * cue * csi + (1|id), data = _) -> lmtest
+summary(lmtest)
+
+test |>
+  # group_by(id,csi,cue,con) |>
+  # summarise(rt = mean(rt)) |> 
+  ggplot(aes(con, rt))+
+  facet_wrap(cue~csi)+
+ stat_summary()
+   geom_point()
+   
+  
+    lm(rt ~ con * cue * csi, data = _) -> test3
+    aov(rt ~ con * cue * csi + (1|id), data = _) -> test2
+    
+    anova(lmtest, type="III")
+    
+  summary(test4)
+  plot(test2)
+  aov(rt ~ con * cue * csi + (1|id), test) |> summary()
+    
+    incong  = rnorm(N*OBS, 0, 1),
+    cong = rnorm(N*OBS, 0 + eff.size, 1),
+    pct_inc = rnorm(N*OBS, 0, 1),
+    pct_con = rnorm(N*OBS, 0 + eff.size, 1) )
+}
+```
+
+
+
+
