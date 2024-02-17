@@ -384,7 +384,7 @@ The general conclusion from this is that we do not need to force an equal number
 
 
 
-# Simulating experiment 2: cong * cue
+# Simulation 2x2 rmANOVA (Congruency X cue)
 
 We can simulate the tests for the experiment by adding an additional factor (cue).
 We have two main effects, congruency and cue, including an interaction congruency*cue.
@@ -525,7 +525,7 @@ eachPar500 |>
   geom_hline(yintercept=.05)+
   geom_smooth(method="lm",  linewidth=.5, alpha=.2)+
   scale_y_continuous(breaks=seq(0,1,.05))+
-  labs(y="ges", x="Sample size")
+  labs(y="ges", x="Sample size", col="Effect")
 ```
 
 The effect size seems to slightly decrease with increasing sample size.
@@ -547,5 +547,135 @@ par30 |>
   stat_summary(aes(group=cue), linewidth=1.5, position=position_dodge(.1))
 ```
 The plot illustrates the expected interaction simulated 30 times. 
+
+
+# Simulation 2x2x2 rmANOVA (congruency X cue X CSI ) 
+
+```{r}
+exp2_sim2x2x2 <- function(N, blocks, block.len, e.con, e.cue, e.cue.long, short.post.con, long.post.con){
+  #' @param N              Number of subjects
+  #' @param blocks         Number of blocks 
+  #' @param block.len      Length of each block
+  #' @param e.con          What is the effect on RT before the *cue* during the *short CSI*?
+  #' @param e.cue          What is the effect on RT after the *cue* during the *short CSI*?
+  #' @param e.cue.long     What is the effect on RT after the *cue* during the *long CSI*?
+  #' @param short.post.con What is the effect on congruency after the *cue* for the *short CSI*?
+  #' @param long.post.con  What is the effect on congruency after the *cue* for the *short CSI*?
+  
+  cue_rep = 2 
+  tibble(
+    id     = rep(1:N, each = blocks * block.len * cue_rep),
+    csi    = rep.int( rep(c("short", "long"), each = (blocks * block.len * cue_rep)/2), N),
+    block  = rep.int( rep(1:blocks, each = block.len * cue_rep), N),
+    cue    = rep.int( rep(c("pre", "post"), each = block.len), blocks * N),
+    con    = rep.int( c("con", "incon"), N * blocks * block.len),
+    rt     = rnorm(   N * blocks * block.len * cue_rep, 
+                      0 +
+                        # Main effect of con:
+                          # i.e., what is the effect on  pre-cue during the short CSI?
+                        - as.integer(con=="con") * e.con +
+                        # Main effect of cue:  
+                          # i.e., what happens after the cue appears?
+                        + as.integer(cue=="post") * eff.cue +
+                        
+                        # Interaction between CSI & CUE: 
+                          # I.e., what happens after the cue with long CSI?
+                        as.integer(cue=="post" & csi =="long") * e.cue.long + 
+                        
+                        # Interaction between con-post over CSI: 
+                        # Primary interest of the investigation:
+                          # I.e., what happens to the congruency after the cue for the different CSI?
+                        - as.integer(con=="con" & csi=="short" & cue=="post") * short.post.con + # Reduce some RT more
+                        - as.integer(con=="con" & csi=="long"  & cue=="post") * long.post.con
+    )) -> d
+  
+  # Here we remove some post trials equal to half 
+  # First we take all the pre trials: 
+  d |> 
+    filter(cue=="pre") |>
+    # Then we combine the filtered post trials: 
+    rbind(
+      d |> 
+        # We filter in such a way that we slice the first trials for each id in each trial:
+        filter(cue=="post") |>
+        group_by(id, block) |>
+        slice_head(n = floor( block.len/2/2 ) )
+    )
+}
+```
+
+
+```{r}
+pblapply(1:30, \(i) exp2_sim2x2x2(30, 24, 20, .02, .05, 0.07, .13, .17) |> mutate(v=i) ) |> 
+  map_df(~.x) -> par30_csi
+
+par30_csi |> 
+  group_by(id, csi, cue, con) |>
+  summarise(rt=mean(rt)) -> par30_csi_sum
+
+par30_csi_sum |> 
+  ggplot(aes(con, rt, col = interaction(csi, cue), group=interaction(csi, cue)))+
+  stat_summary(geom="line")+
+  stat_summary()
+
+par30_csi
+
+exp2_sim2x2x2(30, 24, 20, .02, .05, 0.07, .13, .17) |>
+  aov_car(rt ~ csi*cue*con + Error(id/(csi*cue*con)), data = _,) -> test
+test
+
+par30_csi |>
+  ggplot(aes(con, rt, col=cue, group=interaction(v,cue)))+
+  stat_summary(aes(col=NULL), alpha=.2, position=position_dodge(.1))+
+  stat_summary(aes(col=NULL), alpha=.2, geom="line", position=position_dodge(.1))+
+  stat_summary(aes(group=cue), geom="line", linewidth=1.5, position=position_dodge(.1))+
+  stat_summary(aes(group=cue), linewidth=1.5, position=position_dodge(.1))
+```
+
+
+
+```{r simulate experiment 2}
+#| echo: false
+
+# Create a "cluster" to simulate faster
+# Take half the computers cores 
+makeCluster( floor(detectCores() - detectCores() * 1/2) ) -> cl
+# Export the local function
+clusterExport(cl, varlist = c("exp2_sim2x2"))
+# Initiate libraries in clusters
+clusterEvalQ(cl, {
+  library(tidyverse)
+  library(pbapply)
+  library(afex)
+})
+
+# Apply function across "cl"
+pblapply(10:100, \(x){
+  # apply *x* participants...
+  purrr::map_df(1:500, \(y){
+    # repeat each par-size 100 times
+    exp2_sim2x2x2(30, 24, 20, .02, .05, 0.07, .13, .17) -> d
+    d |> 
+      aov_car(rt ~ csi*cue*con + Error(id/(csi*cue*con)), data = _,) -> res
+
+    tibble(
+      size = x,
+      itr = y,
+      name = c(names(res$Anova$SSP[2]),names(res$Anova$SSP[3]), names(res$Anova$SSP[4])),
+      ges = res[["anova_table"]][["ges"]],
+      p = res[["anova_table"]][["Pr(>F)"]],
+    ) |> pivot_wider(names_from = name, values_from =c(ges, p))
+  }) |> summarise(size = unique(size),
+                  itr = max(itr),
+                  pow.con = mean(p_con<.05),
+                  pow.cue = mean(p_cue<.05),
+                  pow.con.cue = mean(`p_con:cue`<.05),
+                  across(contains("_"), mean))
+}, cl = cl) |>
+  map_df(~.x) -> eachPar500
+
+# stop cluster
+stopCluster(cl)
+```
 
 
