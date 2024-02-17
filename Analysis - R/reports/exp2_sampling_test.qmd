@@ -1,4 +1,4 @@
----
+  ---
 title: "Experiment 2 post-cue sampling"
 format: docx
 lang: en-GB
@@ -14,6 +14,9 @@ load("../data/trans/exp1_data.rdata")
 
 library(tidyverse)
 library(lsr)
+library(pbapply)
+library(afex)
+
 ```
 
 ```{r}
@@ -81,7 +84,7 @@ Now I will attempt to see how many diagnostic trials are necessary to find the c
 #| message: false
 #| warning: false
 #| error: false
-stat_test <- function(n){
+stat_test <- function(size){
   # n = size 
   
   slice_sample(diag_trials, by = c(id, con), n = size) |>
@@ -92,7 +95,7 @@ stat_test <- function(n){
     ungroup() |>
     pivot_wider(names_from=con, values_from=c(l, rt,pct)) |>
     reframe(
-      n = n,
+      n = size,
       rt_con = mean(rt_TRUE, na.rm=T),
       rt_incon = mean(rt_FALSE, na.rm=T),
       rt_est  = mean(rt_FALSE-rt_TRUE, na.rm=T),
@@ -381,93 +384,168 @@ The general conclusion from this is that we do not need to force an equal number
 
 
 
+# Simulating experiment 2: cong * cue
+
+We can simulate the tests for the experiment by adding an additional factor (cue).
+We have two main effects, congruency and cue, including an interaction congruency*cue.
+We hypothesize an interaction between the cue and the congruency, while the main effect of congruency will remain weak if existent. 
+We do not hypothesize an effect of the cue, but we expect it to interact with the congruency. 
+In this way, we expect a congruency effect ONLY for trials AFTER the cue.
+
+In the function below we can generate the experimental setup: 
 ```{r}
-ANOVA_design("2c*2p",)
-
-ANOVA_power()
-```
-
-
-
-
-
-
-# Simulating experiment 2.
-
-```{r}
-
-
-exp2_sim <- function(N, blocks, block.len, eff.con, eff.cue, eff.csi){
+exp2_sim2x2 <- function(N, blocks, block.len, eff.con.pre, eff.con.post, eff.con.cue.intr){
   #' @param N Number of subjects
   #' @param blocks Number of blocks 
-  #' @param block.len Length of each block
-  #' @param eff.con Effect size of the congruency effect
-  #' @param eff.cue Effect size of the pre-post cue
-  #' @param eff.csi Effect size of the short-long cue appearance
+  #' @param block.len Length of each block -- this is split, half the trials are pre and half are post
+  #' @param eff.con.pre Effect size of the congruency effect
+  #' @param eff.cue.post Effect size of the pre-post cue
+  #' @param eff.con.cue.intr Effect size of the interaction
 
-  eff.con <- eff.con+1
-  eff.cue <- eff.cue+1
-  eff.csi <- eff.csi+1
-  cue_rep = 2 
   tibble(
-    id     = rep(1:N, each = blocks * block.len * cue_rep),
-    csi    = rep.int( rep(c("short", "long"), each = (blocks * block.len * cue_rep)/2), N),
-    block  = rep.int( rep(1:blocks, each = block.len * cue_rep), N),
-    cue    = rep.int( rep(c("pre", "post"), each = block.len), blocks * N),
-    con    = rep.int( c("con", "incon"), N * blocks * block.len),
-    rt     = rnorm(N * blocks * block.len * cue_rep, 0, 1)
-  ) |>
-    mutate(rt = case_when(
-      csi == "short" & cue == "pre" & con == "con"    ~ rt * eff.con,
-      csi == "short" & cue == "pre" & con == "incon"  ~ rt,
-      csi == "short" & cue == "post" & con == "con"   ~ rt * eff.con * eff.cue,
-      csi == "short" & cue == "post" & con == "incon" ~ rt * eff.cue,
-      csi == "long" & cue == "pre" & con == "con"     ~ rt * eff.con,
-      csi == "long" & cue == "pre" & con == "incon"   ~ rt * eff.csi,
-      csi == "long" & cue == "post" & con == "con"    ~ rt * eff.con * eff.cue * eff.csi,
-      csi == "long" & cue == "post" & con == "incon"  ~ rt * eff.cue * eff.csi,
-    ))
-}
-
-exp2_sim(26, 24, 12, .4, .2, .1) -> test
-    
-test |>
-  # # group_by(id,csi,cue,con) |>
-  # # summarise(rt = mean(rt)) #|> #ungroup() |>
-  # mutate(across(where(is.character), factor)) |>
-  afex::aov_car(rt ~ con * cue * csi + Error(id), data = _, within=c("con","cue", "csi"))
-test |>
-  # group_by(id,csi,cue,con) |>
-  # summarise(rt = mean(rt)) |> ungroup() |>
-  # mutate(across(where(is.character), factor)) |>
-  lme4::lmer(rt ~ con * cue * csi + (1|id), data = _) -> lmtest
-summary(lmtest)
-
-test |>
-  # group_by(id,csi,cue,con) |>
-  # summarise(rt = mean(rt)) |> 
-  ggplot(aes(con, rt))+
-  facet_wrap(cue~csi)+
- stat_summary()
-   geom_point()
-   
+    id     = rep(1:N, each = blocks * block.len),
+    block  = rep.int( rep(1:blocks, each = block.len), N),
+    cue    = rep.int( rep(c("pre", "post"), each = block.len/2), blocks * N),
+    con    = rep.int( c("con", "incon"), N * blocks * block.len/2),
+    rt     = rnorm(N * blocks * block.len, 
+                   0 - as.integer(con=="con") * eff.con.pre + 
+                          # Main effect of congruency ! on the pre trials ! 
+                       as.integer(cue=="post") * eff.con.post + 
+                          # Main effect of "cue"
+                          # We do not really believe the cue will influence RT, but that it will interact with congruency
+                       -as.integer(con=="con" & cue=="post") * eff.con.cue.intr,
+                          # Interaction between congruency and cue
+                          # We believe that the post-cue will interact with the congruency
+                   1)
+  ) -> d
   
-    lm(rt ~ con * cue * csi, data = _) -> test3
-    aov(rt ~ con * cue * csi + (1|id), data = _) -> test2
-    
-    anova(lmtest, type="III")
-    
-  summary(test4)
-  plot(test2)
-  aov(rt ~ con * cue * csi + (1|id), test) |> summary()
-    
-    incong  = rnorm(N*OBS, 0, 1),
-    cong = rnorm(N*OBS, 0 + eff.size, 1),
-    pct_inc = rnorm(N*OBS, 0, 1),
-    pct_con = rnorm(N*OBS, 0 + eff.size, 1) )
+  # Here we remove some post trials equal to half 
+  # First we take all the pre trials: 
+  d |> 
+    filter(cue=="pre") |>
+  # Then we combine the filtered post trials: 
+  rbind(
+    d |> 
+      # We filter in such a way that we slice the first trials for each id in each trial:
+      filter(cue=="post") |>
+      group_by(id, block) |>
+      slice_head(n = floor( block.len/2/2 ) )
+  )
 }
 ```
 
+```{r simulate experiment 2}
+#| echo: false
 
+# Create a "cluster" to simulate faster
+# Take half the computers cores 
+makeCluster( floor(detectCores() - detectCores() * 1/2) ) -> cl
+# Export the local function
+clusterExport(cl, varlist = c("exp2_sim2x2"))
+# Initiate libraries in clusters
+clusterEvalQ(cl, {
+  library(tidyverse)
+  library(pbapply)
+  library(afex)
+})
+
+# Apply function across "cl"
+pblapply(10:100, \(x){
+  # apply *x* participants...
+  purrr::map_df(1:500, \(y){
+    # repeat each par-size 100 times
+    exp2_sim2x2(x, 24, 12, .05, .008, .17) -> d
+    d |> 
+      aov_car(rt ~ con*cue + Error(id/(con*cue)), data = _, fun_aggregate=mean) -> 
+      res
+    tibble(
+      size = x,
+      itr = y,
+      name = c(names(res$Anova$SSP[2]),names(res$Anova$SSP[3]), names(res$Anova$SSP[4])),
+      ges = res[["anova_table"]][["ges"]],
+      p = res[["anova_table"]][["Pr(>F)"]],
+    ) |> pivot_wider(names_from = name, values_from =c(ges, p))
+  }) |> summarise(size = unique(size),
+                  itr = max(itr),
+                  pow.con = mean(p_con<.05),
+                  pow.cue = mean(p_cue<.05),
+                  pow.con.cue = mean(`p_con:cue`<.05),
+                  across(contains("_"), mean))
+}, cl = cl) |>
+  map_df(~.x) -> eachPar500
+
+# stop cluster
+stopCluster(cl)
+```
+
+```{r}
+#| echo: false
+eachPar500 |> 
+  pivot_longer(c(p_con, p_cue, `p_con:cue`)) |>
+  ggplot(aes(size, value, col=name, group=name))+
+  geom_line()+
+  geom_hline(yintercept=.05)+
+  geom_vline(xintercept=27)+
+  scale_x_continuous(breaks=seq(0,200,10))+
+  annotate("text",x = 37, y=.09, label = "27 participants")+
+  labs(y="p value", x="Sample size", col = "Effects")
+```
+
+Generally, recruiting around 25 participants seems to suffice to find a significant effect.
+
+```{r}
+#| echo: false
+
+eachPar500 |> 
+  pivot_longer(c(pow.p, pow.c, pow.p.c)) |>
+  mutate(name = str_replace_all(name, "pow.", "")) |>
+  ggplot(aes(size, value, col=name)) +
+  labs(y="Power", x="Sample size", col="Effect")+
+  coord_cartesian(ylim=c(.6, 1), xlim=c(10, 50))+
+  scale_x_continuous(breaks=seq(0,200,10))+
+  geom_line()+
+  geom_hline(yintercept=.95, col ="darkblue", linetype="dashed")+
+  geom_vline(xintercept = 30, col = "darkblue", linetype="dashed")+
+  annotate("text",x = 35, y=.92, label = "30 participants", col="darkblue")+
+  geom_hline(yintercept=.8, col="purple")+
+  geom_vline(xintercept = 20, col = "purple")+
+  annotate("text",x = 25, y=.77, label = "20 participants", col="purple")
+```
+
+As for the power, we can obtain a solid power (95%) for the interaction between cue and congruency with 30 participants.
+
+```{r}
+#| echo: false
+#| message: false
+eachPar500 |> 
+  pivot_longer(c(ges_con, ges_cue, `ges_con:cue`)) |> 
+  mutate(name = str_replace_all(name, "ges_", "")) |>
+  ggplot(aes(size, value, col=name, group=name))+
+  geom_line()+
+  geom_hline(yintercept=.05)+
+  geom_smooth(method="lm",  linewidth=.5, alpha=.2)+
+  scale_y_continuous(breaks=seq(0,1,.05))+
+  labs(y="ges", x="Sample size")
+```
+
+The effect size seems to slightly decrease with increasing sample size.
+
+
+## Visualize the expected difference
+```{r}
+#| echo: false
+#| message: false
+
+pblapply(1:30, \(i) exp2_sim2x2(30,24,12, .05, .008, .17) |> mutate(v=i) ) |> 
+  map_df(~.x) -> par30
+
+par30 |>
+  ggplot(aes(con, rt, col=cue, group=interaction(v,cue)))+
+  stat_summary(aes(col=NULL), alpha=.2, position=position_dodge(.1))+
+  stat_summary(aes(col=NULL), alpha=.2, geom="line", position=position_dodge(.1))+
+  stat_summary(aes(group=cue), geom="line", linewidth=1.5, position=position_dodge(.1))+
+  stat_summary(aes(group=cue), linewidth=1.5, position=position_dodge(.1))
+```
+The plot illustrates the expected interaction simulated 30 times. 
 
 
