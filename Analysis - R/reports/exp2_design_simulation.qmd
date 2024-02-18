@@ -7,6 +7,99 @@ editor:
     wrap: 62
 ---
 
+```{r}
+#| include: false
+
+load("../data/trans/exp1_data.rdata")
+
+library(tidyverse)
+library(lsr)
+library(pbapply)
+library(afex)
+library(gt)
+
+```
+
+## Exclusion
+```{r exclusion start - accuracy}
+#| include: FALSE
+
+d <-
+  exp1_d |>
+  dplyr::select(id, trial_info, inducer_run, diagnostic_run, correct_response, rt, con) |>
+  mutate(rt = as.numeric( ifelse(rt=="null", NA, rt)) ) |>
+  filter(trial_info == "Diagnostic trial" | trial_info == "Inducer trial") |>
+  filter(!is.na(correct_response))
+
+loss <- list()
+loss$data_trials <- nrow(d)
+
+### Overall accuracy      ====
+exp1_d |>
+  filter( trial_info == "Diagnostic trial" | trial_info == "Inducer trial" ) |>
+  group_by( id ) |>
+  mutate( correct_response = ifelse( trial_info=="Inducer trial" & is.na(rt), 0, correct_response) ) |>
+  summarize( acc = sum(correct_response, na.rm = TRUE) / length( !is.na(correct_response) ) ) |>
+  filter( acc < .7 ) |>
+  pull( id ) -> loss$exclude_par
+
+loss[["exclude_par_trials"]] <- length( d$rt[d$id == loss$exclude_par] )
+loss[["exclude_par_pct"]]    <- length( d$rt[d$id == loss$exclude_par] ) / loss$data_trials * 100
+
+d |> filter( !(id %in% loss$exclude_par) ) -> d
+#id
+d |>
+  group_by(id) |>
+  mutate(
+    rt_crit = ifelse( 
+      trial_info == "Diagnostic trial",
+      mean( rt, na.rm = TRUE ) + sd( rt, na.rm = TRUE ) * 2.5,
+      NA ),
+      retain_trials = ifelse(
+        (rt > rt_crit & trial_info == "Diagnostic trial") | # **OR**
+          (is.na(rt) & trial_info == "Diagnostic trial"),
+        0, 1 ) 
+    ) -> d
+
+sum(d$retain_trials == 0) -> loss[["rt_sd_trials"]]
+sum(d$retain_trials == 0) / loss$data_trials * 100 -> loss[["rt_sd_pct"]]
+
+d |> 
+  filter( retain_trials == 1 ) -> d
+d |>
+  mutate( valid_trials = case_when( trial_info=="Inducer trial" & correct_response==1 ~ 1,
+                                    trial_info=="Inducer trial" & correct_response==0 ~ 0,
+                                    trial_info=="Inducer trial" & is.na(correct_response) ~ 0,
+                                      # non-responses count as a wrong response
+                                    T ~ NA ) ) |>
+  fill(valid_trials, .direction = "up") -> d
+
+sum(d$valid_trials==0) -> loss[["inducer_fail_trials"]]
+sum(d$valid_trials==0) / loss$data_trials * 100 -> loss[["inducer_fail_pct"]]
+
+d |> filter( valid_trials == 1 ) -> d
+```
+
+
+# Estimating effect size for ANOVA: 
+```{r}
+#| message: false
+d |>
+  filter(!is.na(con)) |>
+  group_by(id, con) |> 
+  summarise(rt = mean(rt)) |>
+  aov(rt ~ con + Error(id/con), data=_ ) |>
+  EtaSq(x=_, type=1)
+```
+Partial eta square of .21 (Lakens, 2013)
+
+According to gpower, an effect size of .14 correspond to an effect size of .4:
+```{r}
+con_eff <- .21
+gpow_eff <- .14
+```
+
+
 # Simulation 2x2 rmANOVA (Congruency X cue)
 
 We can simulate the tests for the experiment by adding an additional factor (cue).
@@ -31,14 +124,10 @@ exp2_sim2x2 <- function(N, blocks, block.len, eff.con.pre, eff.con.post, eff.con
     cue    = rep.int( rep(c("pre", "post"), each = block.len/2), blocks * N),
     con    = rep.int( c("con", "incon"), N * blocks * block.len/2),
     rt     = rnorm(N * blocks * block.len, 
-                   0 - as.integer(con=="con") * eff.con.pre + 
-                          # Main effect of congruency ! on the pre trials ! 
-                       as.integer(cue=="post") * eff.con.post + 
-                          # Main effect of "cue"
-                          # We do not really believe the cue will influence RT, but that it will interact with congruency
-                       -as.integer(con=="con" & cue=="post") * eff.con.cue.intr,
-                          # Interaction between congruency and cue
-                          # We believe that the post-cue will interact with the congruency
+                   0 + 
+                     - as.integer(con=="con") * eff.con.pre + 
+                     + as.integer(cue=="post") * eff.con.post + 
+                     - as.integer(con=="con" & cue=="post") * eff.con.cue.intr,
                    1)
   ) -> d
   
@@ -57,7 +146,9 @@ exp2_sim2x2 <- function(N, blocks, block.len, eff.con.pre, eff.con.post, eff.con
 }
 ```
 
-We assume an effect of congruency before the cue to be 0.05 (partial eta square)
+
+## Effect based on estimate
+Here we assume the effect as calculated by the one-way ANOVA (.21 post-cue , and .07 pre-cue)
 
 ```{r simulate experiment 2}
 #| echo: false
@@ -66,7 +157,7 @@ We assume an effect of congruency before the cue to be 0.05 (partial eta square)
 # Take half the computers cores 
 makeCluster( floor(detectCores() - detectCores() * 1/2) ) -> cl
 # Export the local function
-clusterExport(cl, varlist = c("exp2_sim2x2"))
+clusterExport(cl, varlist = c("exp2_sim2x2", "con_eff"))
 # Initiate libraries in clusters
 clusterEvalQ(cl, {
   library(tidyverse)
@@ -79,7 +170,7 @@ pblapply(10:100, \(x){
   # apply *x* participants...
   purrr::map_df(1:500, \(y){
     # repeat each par-size 100 times
-    exp2_sim2x2(x, 24, 20, .05, .008, .17) -> d
+    exp2_sim2x2(x, 24, 20, con_eff/3, .008, con_eff) -> d
     d |> 
       aov_car(rt ~ con*cue + Error(id/(con*cue)), data = _, fun_aggregate=mean) -> 
       res
@@ -97,7 +188,7 @@ pblapply(10:100, \(x){
                   pow.con.cue = mean(`p_con:cue`<.05),
                   across(contains("_"), mean))
 }, cl = cl) |>
-  map_df(~.x) -> eachPar500
+  map_df(~.x) -> est.eff_sim500
 
 # stop cluster
 stopCluster(cl)
@@ -105,24 +196,24 @@ stopCluster(cl)
 
 ```{r}
 #| echo: false
-eachPar500 |> 
+est.eff_sim500 |> 
   pivot_longer(c(p_con, p_cue, `p_con:cue`)) |>
   ggplot(aes(size, value, col=name, group=name))+
   geom_line()+
   geom_hline(yintercept=.05)+
-  geom_vline(xintercept=27)+
+  geom_vline(xintercept=12)+
   scale_x_continuous(breaks=seq(0,200,10))+
-  annotate("text",x = 37, y=.09, label = "27 participants")+
+  annotate("text",x = 24, y=.09, label = "12 participants")+
   labs(y="p value", x="Sample size", col = "Effects")
 ```
 
 Generally, recruiting around 25 participants seems to suffice to find a significant effect.
-
+### Power
 ```{r}
 #| echo: false
 
-eachPar500 |> 
-  pivot_longer(c(pow.p, pow.c, pow.p.c)) |>
+est.eff_sim500 |> 
+  pivot_longer(c(pow.cue, pow.con, pow.con.cue)) |>
   mutate(name = str_replace_all(name, "pow.", "")) |>
   ggplot(aes(size, value, col=name)) +
   labs(y="Power", x="Sample size", col="Effect")+
@@ -130,19 +221,16 @@ eachPar500 |>
   scale_x_continuous(breaks=seq(0,200,10))+
   geom_line()+
   geom_hline(yintercept=.95, col ="darkblue", linetype="dashed")+
-  geom_vline(xintercept = 30, col = "darkblue", linetype="dashed")+
-  annotate("text",x = 35, y=.92, label = "30 participants", col="darkblue")+
-  geom_hline(yintercept=.8, col="purple")+
-  geom_vline(xintercept = 20, col = "purple")+
-  annotate("text",x = 25, y=.77, label = "20 participants", col="purple")
+  geom_vline(xintercept = 20, col = "darkblue", linetype="dashed")+
+  annotate("text",x = 25, y=.92, label = "30 participants", col="darkblue")
 ```
 
-As for the power, we can obtain a solid power (95%) for the interaction between cue and congruency with 30 participants.
+With an partial eta squared of .21, we can a power of 95% for the Congruency*CUE interaction with 20 participants.
 
 ```{r}
 #| echo: false
 #| message: false
-eachPar500 |> 
+est.eff_sim500 |> 
   pivot_longer(c(ges_con, ges_cue, `ges_con:cue`)) |> 
   mutate(name = str_replace_all(name, "ges_", "")) |>
   ggplot(aes(size, value, col=name, group=name))+
@@ -155,8 +243,7 @@ eachPar500 |>
 
 The effect size seems to slightly decrease with increasing sample size.
 
-
-## Visualize the expected difference
+### Visualize the expected difference
 ```{r}
 #| echo: false
 #| message: false
@@ -171,7 +258,83 @@ par30 |>
   stat_summary(aes(group=cue), geom="line", linewidth=1.5, position=position_dodge(.1))+
   stat_summary(aes(group=cue), linewidth=1.5, position=position_dodge(.1))
 ```
-The plot illustrates the expected interaction simulated 30 times. 
+The plot illustrates the interaction, simulated 30 times.
+
+
+
+## Effect based on estimate
+Here we assume the effect as calculated by GPower .14 ~ .4 d: (.14 post-cue , and .046 pre-cue)
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+# Create a "cluster" to simulate faster
+# Take half the computers cores 
+makeCluster( floor(detectCores() - detectCores() * 1/2) ) -> cl
+# Export the local function
+clusterExport(cl, varlist = c("exp2_sim2x2", "gpow_eff"))
+# Initiate libraries in clusters
+clusterEvalQ(cl, {
+  library(tidyverse)
+  library(pbapply)
+  library(afex)
+})
+
+# Apply function across "cl"
+pblapply(10:100, \(x){
+  # apply *x* participants...
+  purrr::map_df(1:500, \(y){
+    # repeat each par-size 100 times
+    exp2_sim2x2(x, 24, 20, gpow_eff/3, .008, gpow_eff) -> d
+    d |> 
+      aov_car(rt ~ con*cue + Error(id/(con*cue)), data = _, fun_aggregate=mean) -> 
+      res
+    tibble(
+      size = x,
+      itr = y,
+      name = c(names(res$Anova$SSP[2]),names(res$Anova$SSP[3]), names(res$Anova$SSP[4])),
+      ges = res[["anova_table"]][["ges"]],
+      p = res[["anova_table"]][["Pr(>F)"]],
+    ) |> pivot_wider(names_from = name, values_from =c(ges, p))
+  }) |> summarise(size = unique(size),
+                  itr = max(itr),
+                  pow.con = mean(p_con<.05),
+                  pow.cue = mean(p_cue<.05),
+                  pow.con.cue = mean(`p_con:cue`<.05),
+                  across(contains("_"), mean))
+}, cl = cl) |>
+  map_df(~.x) -> gpow.eff_sim500
+
+# stop cluster
+stopCluster(cl)
+""
+```
+
+
+### Power
+```{r}
+#| echo: false
+
+gpow.eff_sim500 |> 
+  pivot_longer(c(pow.cue, pow.con, pow.con.cue)) |>
+  mutate(name = str_replace_all(name, "pow.", "")) |>
+  ggplot(aes(size, value, col=name)) +
+  labs(y="Power", x="Sample size", col="Effect")+
+  coord_cartesian(ylim=c(.6, 1), xlim=c(10, 50))+
+  scale_x_continuous(breaks=seq(0,200,10))+
+  geom_line()+
+  geom_hline(yintercept=.95, col ="darkblue", linetype="dashed")+
+  geom_vline(xintercept = 36, col = "darkblue", linetype="dashed")+
+  annotate("text",x = 41, y=.88, label = "36 participants", col="darkblue")+
+  geom_hline(yintercept=.90, col ="indianred")+
+  geom_vline(xintercept = 30, col = "indianred")+
+  annotate("text", x = 22, y=.88, label = "30 participants", col="indianred")
+```
+
+To have 95% power for the interaction between congruency and cue with the gpower estimate (.14), we require about 36 participants.
+Alternatively, we can have 90% power with 30 participants.
 
 
 # Simulation 2x2x2 rmANOVA (congruency X cue X CSI ) 
@@ -225,10 +388,12 @@ exp2_sim2x2x2 <- function(N, blocks, block.len, e.con, short.post.con, long.post
 ```
 
 First let us test whether the function simulates the data in the expected directions: 
+
+(For this we stick with GPower effect size to be conservative)
 ```{r}
 #| echo: false
 #| message: false
-exp2_sim2x2x2(30, 24, 20, .02, .09, .17) -> test_sim
+exp2_sim2x2x2(30, 24, 20, gpow_eff/5, gpow_eff/2, gpow_eff) -> test_sim
 
 test_sim |>
   ggplot(aes(con, rt, col=interaction(csi,cue), group=interaction(csi,cue)))+
@@ -262,26 +427,19 @@ test_sim |>
 This generally seems to be correct.
 
 
-
-
-
-
+### Test Sim: 30 repeat
 ```{r generate 2x2x2 data}
 #| echo: false
-pblapply(1:30, \(i) exp2_sim2x2x2(30, 24, 20, .02, .09, .17) |> mutate(simulation=i) ) |> 
+pblapply(1:30, \(i) exp2_sim2x2x2(30, 24, 20, gpow_eff/5, gpow_eff/2, gpow_eff) |> mutate(simulation=i) ) |> 
   map_df(~.x) -> par30_2x2x2
 ```
 
-Within-subject ANOVA (type 3) 
 ```{r anova table}
 #| echo: false
 par30_2x2x2 |> 
   filter(simulation==1) |> 
   aov_car(rt ~ csi*cue*con + Error(id/(csi*cue*con)), data = _,fun_aggregate = mean) |> 
   summary()
-
-EtaSq(test)
-test
 ```
 
 ```{r single vis}  
@@ -326,15 +484,19 @@ par30_2x2x2 |>
   labs(col="Congruency")
 ```
 
+
+### Big Sim: 10:100 participants each 500 
 With that, we can calculate the power needed to detect a three-way and a two way interaction: 
 ```{r simulate experiment 2}
 #| echo: false
+#| warning: false
+#| message: false
 
 # Create a "cluster" to simulate faster
 # Take half the computers cores 
 makeCluster( floor(detectCores() - detectCores() * 1/2) ) -> cl
 # Export the local function
-clusterExport(cl, varlist = c("exp2_sim2x2x2"))
+clusterExport(cl, varlist = c("exp2_sim2x2x2", "gpow_eff"))
 # Initiate libraries in clusters
 clusterEvalQ(cl, {
   library(tidyverse)
@@ -347,7 +509,7 @@ pblapply(10:100, \(x){
   # apply *x* participants...
   purrr::map_df(1:500, \(y){
     # repeat each par-size 100 times
-    exp2_sim2x2x2(x, 24, 20, .02, .09, .17) -> d
+    exp2_sim2x2x2(x, 24, 20, gpow_eff/5, gpow_eff/2, gpow_eff) -> d
     d |> 
       aov_car(rt ~ csi*cue*con + Error(id/(csi*cue*con)), data = _, fun_aggregate=mean) -> res
     
@@ -360,9 +522,13 @@ pblapply(10:100, \(x){
     ) |> pivot_wider(names_from = name, values_from =c(ges, p))
   }) |> summarise(size = unique(size),
                   itr = max(itr),
+                  p.cs.cu = mean(`p_csi:cue`<.05),
+                  p.cs.co = mean(`p_csi:con`<.05),
+                  p.cu.co = mean(`p_cue:con`<.05),
+                  p.co.cu.cs = mean(`p_csi:cue:con`<.05),
                   across(contains("_"), mean))
 }, cl = cl) |>
-  map_df(~.x) -> ..2x2x2_eachPar500
+  map_df(~.x) -> g.eff_2x2x2_sim500
 
 # stop cluster
 stopCluster(cl)
@@ -370,10 +536,8 @@ stopCluster(cl)
 
 
 ```{r}
-..2x2x2_eachPar500 |> 
-  # group_by(size) |> 
-  # summarise(across(is.double, ~ mean(.x))) |> ungroup() |>
-  pivot_longer(c(`p_csi:cue:con`, `p_cue:con`, `p_csi:cue`, `p_csi:con`)) |>
+g.eff_2x2x2_sim500 |> 
+  pivot_longer(c(`p_csi:cue:con`, `p_cue:con`)) |>
   ggplot(aes(size, value, col=name, group=interaction(itr, name)))+
   geom_line()+
   geom_hline(yintercept=.05)
