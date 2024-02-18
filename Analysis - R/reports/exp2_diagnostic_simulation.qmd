@@ -12,7 +12,7 @@ editor:
 First we can sample effects from experiment 1.
 
 ```{r}
-#| echo: false
+#| include: false
 load("../data/trans/exp1_data.rdata")
 
 library(tidyverse)
