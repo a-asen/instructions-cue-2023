@@ -11,6 +11,8 @@ editor:
 #| include: false
 
 load("../data/trans/exp1_data.rdata")
+load("../data/sim/exp2_estimate_effect_500.rdata")
+load("../data/sim/exp2_gpower_effect_500.rdata")
 
 library(tidyverse)
 library(lsr)
@@ -192,6 +194,7 @@ pblapply(10:100, \(x){
 
 # stop cluster
 stopCluster(cl)
+#save(est.eff_sim500, file="../data/sim/exp2_estimate_effect_500.rdata")
 ```
 
 ```{r}
@@ -309,7 +312,7 @@ pblapply(10:100, \(x){
 
 # stop cluster
 stopCluster(cl)
-""
+#save(gpow.eff_sim500, file="../data/sim/exp2_gpower_effect_500.rdata")
 ```
 
 
@@ -532,6 +535,7 @@ pblapply(10:100, \(x){
 
 # stop cluster
 stopCluster(cl)
+#save(g.eff_2x2x2_sim500, file="../data/sim/design_2x2x2_gpower_eff.rdata") # not correct fix
 ```
 
 
