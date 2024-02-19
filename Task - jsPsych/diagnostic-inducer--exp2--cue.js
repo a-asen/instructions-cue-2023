@@ -50,7 +50,8 @@ const response_sides = ["LEFT","RIGHT"];  // What participants will RESPOND to (
     // i.e., f (or whatever key) should correspond to the response side (left)
 
 ////    Inducer parameters     ////
-const inducer_colours = ["red", "yellow", "blue", "green", "purple"]      // Inducer colour randomize between participants (if more than 1)
+const inducer_colours      = ["red", "yellow", "blue", "green", "purple"]      // Inducer colour randomize between participants (if more than 1)
+const inducer_colour_names = ["red", "yellow", "blue", "green", "purple"]      // Inducer colour randomize between participants (if more than 1)
     // ["darkred", "yellow", "purple"] 
     // This is also what is DISPLAYED (i.e., text) to participants. Should therefore be a readable name. 
 
@@ -65,7 +66,7 @@ const max_diagnostic_trials = 240     // Total max diagnostic trials
 ////    Inducer CUE      ////
 const cue_size = 70
 const cue_force_equal = true    // Force equal number of right/left trials 
-const cue_duration = 750        // How long is the pre-cue present for? 
+const cue_duration = 1250        // How long is the pre-cue present for? 
 
 const cue_min_length = 0
 const cue_max_length = 5
@@ -662,8 +663,12 @@ let rnd_cue_col = jsPsych.randomization.sampleWithReplacement(r_col, 1)[0]
 if(debug) { console.log("Inducer colour: ", rnd_inducer_colour, " |  Pre-cue colour: ", rnd_cue_col)}
 
 // Cue stimulus
-const rnd_cue_stimulus = jsPsych.randomization.sampleWithReplacement([draw_circle,draw_square,draw_triangle], 1)[0]
-if(debug){ console.log(rnd_cue_stimulus) }
+
+const rnd_cue_picker = jsPsych.randomization.sampleWithReplacement([0,1,2], 1)[0]
+const rnd_cue_stimulus = [draw_circle,draw_square,draw_triangle][rnd_cue_picker]
+const cue_stimulus_name = ["Circle", "Square", "Triangle"][rnd_cue_picker]
+
+if(debug){ console.log("Random cue stimulus:", rnd_cue_stimulus) }
 
 // Pre-inducer cue trial length
 let cue_array = Array.from(Array(cue_max_length - cue_min_length+1), (x, i) => i + cue_min_length) 
@@ -671,6 +676,7 @@ if(debug){ console.log("Pre-cue array:", cue_array) }
 
 var rnd_cue_array=[];
 // We randomy sample "number_of_inducer" times from the "diagnostic_range"
+// Including a test of fit
 for(let i = 0; i < number_of_inducers; i++){
     while(true){
         // Sample a cue length
@@ -686,7 +692,8 @@ for(let i = 0; i < number_of_inducers; i++){
 // Sum total diagnostic trials
 const sum_rnd_cue_array = rnd_cue_array.reduce((list, i) => list + i, 0);
 if(debug){ console.log("Total post-cue diag trials:", sum_rnd_cue_array) }
-        
+
+// If different than max length, adjust and test for fit:
 if(sum_rnd_cue_array != cue_n_trials){
     let operation = (sum_rnd_cue_array < cue_n_trials) ? "+" : "-";
     let diff = Math.abs(sum_rnd_cue_array - cue_n_trials)
@@ -732,13 +739,14 @@ if(sum_rnd_cue_array != cue_n_trials){
         
     } while( diff > 0 ) 
 
-    if(debug){ console.log("Fixed diagnostic lengths:", rnd_cue_array) }
-    if(break_count >= 500){ "WARNING: COULD NOT EQUALIZE DIAGNOSTIC LENGTHS, CHECK PARAMETERS" }
+    if(debug){ console.log("Fixed post-cue diagnostic lengths:", rnd_cue_array) }
 }
 
 
+// Shuffle left/right for each participants (remains the same throughout)
+let rnd_response_sides = jsPsych.randomization.shuffle(response_sides); 
 
-if(debug){ console.log("Cue length list:", rnd_cue_array) }
+let run_stimuli;
 
 
 /////////////////////////////////////////////////////////////////////////////////////////////
@@ -863,10 +871,6 @@ if( !skip_instructions ){
     });
 }
 
-// Shuffle left/right for each participants (remains the same throughout)
-let rnd_response_sides = jsPsych.randomization.shuffle(response_sides); 
-
-let run_stimuli;
 
 /////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////
@@ -1004,26 +1008,22 @@ let cue_instructions = {
         <br><br>
         Every new round will present two new 3-letter non-words. <br>
         These relate to the non-words presented in 
-        <b><span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour.toLowerCase()+ " colour"}</span></b>. 
+        <b><span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour.toLowerCase() + " colour"}</span></b>. 
         
         <br><br>
         Before the 
-        <b><span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour.toLowerCase()+ " coloured"}</span></b> 
+        <b><span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour.toLowerCase() + " coloured"}</span></b> 
         non-word appears, some <b>black coloured</b> non-words will be presented. <br>
 
         <br><br>
-        In addition, a "COLOURed" "CUE INSERT HERE THX" will be presented at some point in the round.
+        In addition, a <b><span style="color:${rnd_cue_col}"> ${rnd_cue_col} coloured ${cue_stimulus_name.toLowerCase() }</span></b> will appear before the 
+        <b><span style="color: ${rnd_inducer_colour}"> ${rnd_inducer_colour.toLowerCase()+ " coloured"}</span></b> non-word.  
         <br>
-        The "NAME HERE" indicate that the 
+        The <b><span style="color:${rnd_cue_col}"> ${rnd_cue_col} ${cue_stimulus_name.toLowerCase() }</span></b> indicate that the
         <b><span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour.toLowerCase()+ " coloured"}</span></b> 
-        non-word will <b>soon</b> appear.  
+        non-word will appear within a couple of screen.
         <br>
-        The "CUE" does not necessarily mean the next screen will be the 
-        <b><span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour.toLowerCase()+ " coloured"}</span></b> non-word
-        but the <b><span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour.toLowerCase()+ " coloured"}</span></b> non-word
-        will appear within some screens. 
-        <br>
-        The "CUE" cannot be responded to. 
+        The <b><span style="color:${rnd_cue_col}"> ${rnd_cue_col} ${cue_stimulus_name.toLowerCase() }</span></b> cannot be responded to. 
 
         </div>`
     }, 
