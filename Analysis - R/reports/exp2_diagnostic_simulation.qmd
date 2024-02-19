@@ -147,7 +147,6 @@ rep_test(50, 30) -> sample2
 sample2 |>
   ggplot(aes(n, rt_p))+
   stat_summary()
-  geom_line()
 ```
 
 
@@ -155,7 +154,6 @@ sample2 |>
 sample2 |>
   ggplot(aes(n, rt_d))+
   stat_summary()
-  geom_line()
 ```
 This did not appear to solve the problem at all. 
 
@@ -168,17 +166,18 @@ Generate normal distributions with a mean of 0 and a standard deviation of 1.
 Effect.size adjusts the effect on the congruent trials by "eff.size" difference.
 For our purposes here "rt" and "pct" can be on the same scale.
 ```{r}
-gen_sample <- function(N, OBS, eff.size){
+gen_sample <- function(N, OBS, eff.rt, eff.pct){
   #' @param N Number of subjects
   #' @param OBS Number of observation per N
-  #' @param eff.size Effect size difference between incongruent and congruent trials
+  #' @param eff.rt  Effect size of congruency on response time
+  #' @param eff.pct Effect size of congruency on proportion of correct trials 
 
   tibble(
-    id = rep(1:N, each=OBS),
-    rt_inc  = rnorm(N*OBS, 0, 1),
-    rt_con  = rnorm(N*OBS, 0 + eff.size, 1),
-    pct_inc = rnorm(N*OBS, 0, 1),
-    pct_con = rnorm(N*OBS, 0 + eff.size, 1) )
+    id = rep(1:N, each = OBS*2),
+    con = rep.int( c("con","incon"), N*OBS),
+    rt = rnorm(N*OBS*2, 0 + as.integer(con=="con") * eff.rt, 1),
+    pct = rnorm(N*OBS*2, 0 + as.integer(con=="con") * eff.pct, 1),
+  ) 
 }
 ```
 
@@ -189,34 +188,66 @@ In this case, effect size in steps of .05 from 0 to .5. Moreover, we use 30 to 7
 
 ```{r}
 #| echo: false
-map_df(seq(0,.5, .05), \(y){
-  map_df(30:70, \(x){
-    gen_sample(27, x, y) |>
-      summarise(
-        eff = y,
-        count = x,
-        size = x,
-        rt.con = mean(rt_con, na.rm=T),
-        rt.incon = mean(rt_inc, na.rm=T),
-        rt.est  = mean(rt_inc-rt_con, na.rm=T),
-        rt.t  = t.test(rt_inc, rt_con, paried=T, na.rm=T)$statistic,
-        rt.p  = t.test(rt_inc, rt_con, paried=T, na.rm=T)$p.value,
-        rt.d = cohensD(rt_inc, rt_con, method="corrected"),
-        pct.con = mean(pct_con, na.rm=T),
-        pct.incon = mean(pct_inc, na.rm=T),
-        pct.est  = mean(pct_inc-pct_con, na.rm=T),
-        pct.t  = t.test(pct_inc, pct_con, paried=T, na.rm=T)$statistic,
-        pct.p  = t.test(pct_inc, pct_con, paried=T, na.rm=T)$p.value,
-        pct.d = cohensD(pct_inc, pct_con, method="corrected")
-      )
+
+library(pbapply)
+library(parallel)
+
+# Create a "cluster" to simulate faster
+# Take half the computers cores 
+makeCluster( floor(detectCores() - detectCores() * 1/2) ) -> cl
+# Export the local function
+clusterExport(cl, varlist = c("gen_sample"))
+# Initiate libraries in clusters
+clusterEvalQ(cl, {
+  library(tidyverse)
+  library(pbapply)
+  library(lsr)
+})
+
+
+# For each different effect size (*y*)...
+pblapply(seq(0,.75, .05), \(y){
+  
+  # Sequence over each sample size (*i*)...
+  map_df(10:90, \(i){
+    # Sequence diagnostic lengths (*x*)....
+    map_df(30:120, \(x){
+      
+      # Generate...
+      gen_sample(i, x, y/4, y) |> 
+        group_by(id) |> 
+        mutate( n = rep(1:(length(rt)/2), each=2) ) |> 
+        pivot_wider(names_from=con, values_from = c(rt,pct))  |> 
+        ungroup() |> 
+        summarise(
+          eff = y, 
+          size = i,
+          dia.len = x,
+          rt.con = mean(rt_con),
+          rt.incon = mean(rt_incon),
+          rt.di = mean(rt_incon-rt_con),
+          rt.p = t.test(rt_incon, rt_con, paired=T)$p.value,
+          rt.t = t.test(rt_incon, rt_con, paired=T)$statistic,
+          rt.d = cohensD(rt_incon, rt_con, method = "paired"),
+          pct.con = mean(pct_con),
+          pct.incon = mean(pct_incon),
+          pct.di = mean(pct_incon-pct_con),
+          pct.p = t.test(pct_incon, pct_con, paired=T)$p.value,
+          pct.t = t.test(pct_incon, pct_con, paired=T)$statistic,
+          pct.d = cohensD(pct_incon, pct_con, method = "paired"),)
+    })
   })
-}) -> gen_data
+}, cl = cl) |>
+  map_df(~.x) -> gen_data
+
+# stop cluster
+stopCluster(cl)
 
 gen_data |>
   filter(eff>.1) |>
   mutate(eff = factor(as.character(eff))) |>
   pivot_longer(c(rt.p, pct.p)) |>
-  ggplot(aes(n, value, col = eff, group=eff ))+
+  ggplot(aes(size, value, col = eff, group=eff ))+
   facet_wrap(~name, scales="free")+
   stat_summary(geom="line")+
   geom_smooth(method="lm")+
