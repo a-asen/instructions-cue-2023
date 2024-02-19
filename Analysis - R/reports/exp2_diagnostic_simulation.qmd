@@ -240,9 +240,14 @@ pblapply(seq(0,.75, .05), \(y){
 }, cl = cl) |>
   map_df(~.x) -> gen_data
 
+# save(gen_data, file = "../data/sim/diagnostic_length_simulation.rdata")
+
 # stop cluster
 stopCluster(cl)
+```
 
+
+```{r}
 gen_data |>
   filter(eff>.1) |>
   mutate(eff = factor(as.character(eff))) |>
