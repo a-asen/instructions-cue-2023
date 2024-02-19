@@ -149,7 +149,8 @@ exp2_sim2x2 <- function(N, blocks, block.len, eff.con.pre, eff.con.post, eff.con
 ```
 
 
-## Effect based on estimate
+
+### Effect based on estimate
 Here we assume the effect as calculated by the one-way ANOVA (.21 post-cue , and .07 pre-cue)
 
 ```{r simulate experiment 2}
@@ -211,7 +212,7 @@ est.eff_sim500 |>
 ```
 
 Generally, recruiting around 25 participants seems to suffice to find a significant effect.
-### Power
+#### Power
 ```{r}
 #| echo: false
 
@@ -246,7 +247,7 @@ est.eff_sim500 |>
 
 The effect size seems to slightly decrease with increasing sample size.
 
-### Visualize the expected difference
+#### Visualize the expected difference
 ```{r}
 #| echo: false
 #| message: false
@@ -265,7 +266,7 @@ The plot illustrates the interaction, simulated 30 times.
 
 
 
-## Effect based on estimate
+## Effect based on GPower
 Here we assume the effect as calculated by GPower .14 ~ .4 d: (.14 post-cue , and .046 pre-cue)
 
 ```{r}
@@ -433,26 +434,29 @@ This generally seems to be correct.
 ### Test Sim: 30 repeat
 ```{r generate 2x2x2 data}
 #| echo: false
-pblapply(1:30, \(i) exp2_sim2x2x2(30, 24, 20, gpow_eff/5, gpow_eff/2, gpow_eff) |> mutate(simulation=i) ) |> 
+
+# To flexibly adapt
+# eff_est <- gpow_eff
+eff_est <- .4
+
+pblapply(1:30, \(i) exp2_sim2x2x2(30, 24, 20, eff_est/5, eff_est/2, eff_est) |> 
+           mutate(simulation=i) ) |> 
   map_df(~.x) -> par30_2x2x2
 ```
 
 ```{r anova table}
 #| echo: false
+
 par30_2x2x2 |> 
   filter(simulation==1) |> 
   aov_car(rt ~ csi*cue*con + Error(id/(csi*cue*con)), data = _,fun_aggregate = mean) |> 
   summary()
-```
-
-```{r single vis}  
-#| echo: false
 
 par30_2x2x2 |> 
-  filter(simulation==1) |>
-  ggplot(aes(con, rt, col = interaction(csi, cue), group=interaction(csi, cue)))+
-  stat_summary(geom="line")+
-  stat_summary()
+  filter(simulation==1) |> 
+  aov(rt ~ csi*cue*con + (1 | id), data=_) |> 
+  summary()
+
 ```
 
 ```{r}
@@ -494,6 +498,7 @@ With that, we can calculate the power needed to detect a three-way and a two way
 #| echo: false
 #| warning: false
 #| message: false
+
 
 # Create a "cluster" to simulate faster
 # Take half the computers cores 
@@ -540,10 +545,17 @@ stopCluster(cl)
 
 
 ```{r}
-g.eff_2x2x2_sim500 |> 
+g.eff_2x2x2_sim500  |> 
   pivot_longer(c(`p_csi:cue:con`, `p_cue:con`)) |>
   ggplot(aes(size, value, col=name, group=interaction(itr, name)))+
   geom_line()+
-  geom_hline(yintercept=.05)
+  geom_hline(yintercept=.10)
 ```
 
+```{r}
+g.eff_2x2x2_sim500  |> 
+  pivot_longer(c(p.cu.co, p.co.cu.cs)) |>
+  ggplot(aes(size, value, col=name, group=interaction(itr, name)))+
+  geom_line()+
+  geom_hline(yintercept=.9)
+```
