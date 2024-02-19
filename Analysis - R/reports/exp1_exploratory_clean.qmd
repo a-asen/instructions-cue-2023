@@ -484,6 +484,19 @@ an_d |>
 ```
 
 
+Here we log transform the response time variable due to non-normality. 
+```{r}
+#| echo: false
+#| message: false
+reg_d <- 
+  an_d |>
+  filter( trial_info=="Diagnostic trial" ) |>
+  group_by(id, inducer_run, con) |>
+  summarise(rt = mean(rt), instructions = unique(instructions), pct = mean(correct_response)) |>
+  mutate( instructions = log(instructions),
+          rt = log(rt),)
+```
+
 
 ## Impact of Encoding on RT
 ### rmANOVA:
@@ -506,29 +519,16 @@ aov(rt ~ con * instructions + Error(id), reg_d) ->
   ancova_test2
 
 anova(rmanova$Within, ancova_test1$Within, ancova_test2$Within)
+summary(ancova_test1$Within)
 ```
 
-Note that this is a comparison of ANOVAs, and not of linear mixed-models. The latter may be prefered over the former. 
+Note that this is a comparison of ANOVAs, not linear mixed-models, which might be preferred.
 
 
 ### Linear mixed-model:
 
 We can do a linear mixed model to investigate whether encoding interacted with congruency. 
 I.e., more time encoding the instructions lead to stronger congruency effect. 
-
-Here we log transform the response time variable due to non-normality. 
-```{r}
-#| echo: false
-#| message: false
-reg_d <- 
-  an_d |>
-  filter( trial_info=="Diagnostic trial" ) |>
-  group_by(id, inducer_run, con) |>
-  summarise(rt = mean(rt), instructions = unique(instructions), pct = mean(correct_response)) |>
-  mutate( instructions = log(instructions),
-          rt = log(rt),)
-  
-```
 
 Here we only include a random intercept for each participant: 
 ```{r}
@@ -546,7 +546,11 @@ r_mod3 <-
   lmer(rt ~ con * instructions + (1 | id), data = _, REML=F)
 
 anova(r_mod1, r_mod2, r_mod3)
+summary(r_mod3)
+exp(fixef(r_mod3))
+glht()
 ```
+
 Results suggest that only the model that include encoding, but no the interaction, is a significant improvement compared to the former model. 
 
 This suggest that encoding time did not influence the congruency effect. 
@@ -605,7 +609,7 @@ This suggest that congruency does not interact with encoding.
 This should not be interpreted as a major finding. Our main investigation did not encompass the interaction between encoding and congruency, but is meant as exploratory. 
 
 
-### Trend in congruency across block
+### Vis: Trend in congruency across block
 Change in RT over blocks split by congruency. 
 ```{r}
 #| echo: false
@@ -623,38 +627,37 @@ an_d |>
 In this way, including a random intercept for each block explains more variance. 
 
 
-
 ## Impact of Encoding on  PCT
 
 ### Linear mixed model
 ```{r}
 #| echo: false
-
-reg_d |> 
-  ggplot(aes(pct))+
-  geom_histogram()
-
-reg_d |> 
-  betareg::betareg(pct ~ con | id, data = _)
-p_mod1 <- 
-  reg_d |>
-  glmer(pct ~ con + (1 | id), data = _,
-        family = binomial(link="logit"))
-
-p_mod2 <- 
-  an_d |>
-  filter(trial_info=="Diagnostic trial") |>
-  mutate(instructions = log(instructions),
-         correct_response = factor(correct_response)) |>
-  glmer(correct_response ~ con + instructions + (1|id), data = _,
-        family = binomial(link="logit"))
-
-anova(p_mod1, p_mod2)
-  # n.s. 
-
-summary( p_mod1 )
-
-exp( getME(p_mod1, "fixef")[1:2] )
+# 
+# reg_d |> 
+#   ggplot(aes(pct))+
+#   geom_histogram()
+# 
+# reg_d |> 
+#   betareg::betareg(pct ~ con | id, data = _)
+# p_mod1 <- 
+#   reg_d |>
+#   glmer(pct ~ con + (1 | id), data = _,
+#         family = binomial(link="logit"))
+# 
+# p_mod2 <- 
+#   an_d |>
+#   filter(trial_info=="Diagnostic trial") |>
+#   mutate(instructions = log(instructions),
+#          correct_response = factor(correct_response)) |>
+#   glmer(correct_response ~ con + instructions + (1|id), data = _,
+#         family = binomial(link="logit"))
+# 
+# anova(p_mod1, p_mod2)
+#   # n.s. 
+# 
+# summary( p_mod1 )
+# 
+# exp( getME(p_mod1, "fixef")[1:2] )
 
 ```
 
