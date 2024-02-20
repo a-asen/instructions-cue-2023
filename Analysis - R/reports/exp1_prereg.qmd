@@ -10,14 +10,33 @@ editor:
 ```{r libraries }
 #| include: FALSE
 library(tidyverse)
-library(ggpp)
-library(gt)
 library(patchwork)
+library(gt)
 library(BayesFactor)
 library(bayestestR)
 library(lsr)
 source("../lib/helper_functions.R")
 ```
+
+```{r citation}
+#| echo: false
+
+
+library(NCmisc)
+
+
+citation("tidyverse")
+citation("patchwork")
+citation("gt")
+citation("BayesFactor")
+citation("bayestestR")
+citation("lsr")
+
+citation("dplyr")
+citation("ggplot2")
+```
+
+
 
 ```{r load data }
 #| include: FALSE
@@ -81,7 +100,7 @@ data |>
 
 raw_d <- 
   data |> 
-  dplyr::select(id, t %>% rial_info, diagnostic_run, italic, inducer_run, stimulus, congruent, correct_diag_response_side, response, correct_response,rt) |>
+  dplyr::select(id, trial_info, diagnostic_run, italic, inducer_run, stimulus, congruent, correct_diag_response_side, response, correct_response,rt) |>
   filter(trial_info=="Diagnostic trial" | trial_info=="Inducer instructions" | trial_info =="Diagnostic instructions") |>
   mutate(inducer_run = as.numeric(inducer_run),
          italic = ifelse(italic=="true", TRUE, FALSE)) |>

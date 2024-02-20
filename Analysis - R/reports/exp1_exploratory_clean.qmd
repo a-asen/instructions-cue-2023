@@ -10,15 +10,27 @@ editor:
 ```{r libraries }
 #| include: FALSE
 library(tidyverse)
-library(ggpp)
-library(gt)
 library(patchwork)
+library(gt)
 library(BayesFactor)
 library(bayestestR)
 library(lsr)
 library(lme4)
 library(jsonlite)
 source("../lib/helper_functions.R")
+```
+
+```{r citation}
+#| include: false
+
+citation("tidyverse")
+citation("patchwork")
+citation("gt")
+citation("BayesFactor")
+citation("bayestestR")
+citation("lsr")
+citation("lme4")
+citation("jsonlite")
 ```
 
 
