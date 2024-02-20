@@ -14,6 +14,7 @@ First we can sample effects from experiment 1.
 ```{r}
 #| include: false
 load("../data/trans/exp1_data.rdata")
+load("../data/sim/diagnostic_length_simulation.rdata")
 
 library(tidyverse)
 library(lsr)
@@ -179,6 +180,8 @@ gen_sample <- function(N, OBS, eff.rt, eff.pct){
     pct = rnorm(N*OBS*2, 0 + as.integer(con=="con") * eff.pct, 1),
   ) 
 }
+gen_sample(30, 60, .7/4, .7)
+gen_sample(, 60, .7/4, .7)
 ```
 
 
@@ -189,63 +192,83 @@ In this case, effect size in steps of .05 from 0 to .5. Moreover, we use 30 to 7
 ```{r}
 #| echo: false
 
-library(pbapply)
-library(parallel)
-
-# Create a "cluster" to simulate faster
-# Take half the computers cores 
-makeCluster( floor(detectCores() - detectCores() * 1/2) ) -> cl
-# Export the local function
-clusterExport(cl, varlist = c("gen_sample"))
-# Initiate libraries in clusters
-clusterEvalQ(cl, {
-  library(tidyverse)
-  library(pbapply)
-  library(lsr)
-})
-
-
-# For each different effect size (*y*)...
-pblapply(seq(0,.75, .05), \(y){
+# You dont want to start this if you have the data.... 
+if(!exists(gen_data)){
   
-  # Sequence over each sample size (*i*)...
-  map_df(10:90, \(i){
-    # Sequence diagnostic lengths (*x*)....
-    map_df(30:120, \(x){
-      
-      # Generate...
-      gen_sample(i, x, y/4, y) |> 
-        group_by(id) |> 
-        mutate( n = rep(1:(length(rt)/2), each=2) ) |> 
-        pivot_wider(names_from=con, values_from = c(rt,pct))  |> 
-        ungroup() |> 
-        summarise(
-          eff = y, 
-          size = i,
-          dia.len = x,
-          rt.con = mean(rt_con),
-          rt.incon = mean(rt_incon),
-          rt.di = mean(rt_incon-rt_con),
-          rt.p = t.test(rt_incon, rt_con, paired=T)$p.value,
-          rt.t = t.test(rt_incon, rt_con, paired=T)$statistic,
-          rt.d = cohensD(rt_incon, rt_con, method = "paired"),
-          pct.con = mean(pct_con),
-          pct.incon = mean(pct_incon),
-          pct.di = mean(pct_incon-pct_con),
-          pct.p = t.test(pct_incon, pct_con, paired=T)$p.value,
-          pct.t = t.test(pct_incon, pct_con, paired=T)$statistic,
-          pct.d = cohensD(pct_incon, pct_con, method = "paired"),)
-    })
+  library(pbapply)
+  library(parallel)
+  
+  # Create a "cluster" to simulate faster
+  # Take half the computers cores 
+  makeCluster( floor(detectCores() - detectCores() * 1/2) ) -> cl
+  # Export the local function
+  clusterExport(cl, varlist = c("gen_sample"))
+  # Initiate libraries in clusters
+  clusterEvalQ(cl, {
+    library(tidyverse)
+    library(pbapply)
+    library(lsr)
   })
-}, cl = cl) |>
-  map_df(~.x) -> gen_data
+  
+  
+  # For each different effect size (*y*)...
+  map_df(seq(0,.75, .05), \(eff.size){
+    
+    # For each sample size (i)...
+    pblapply(10:90, \(samp_size){
+    
+      # For each diagnostic length (x)...
+      map_df(10:90, \(diag_len){
+        
+          # Repeat the sampling 300 times 
+          map_df(1:300, \(rep){
+            
+            # SAMPLE....
+            gen_sample(samp_size, diag_len, eff.size/4, eff.size) |> 
+              group_by(id) |> 
+              mutate( n = rep( 1:(length(rt)/2 ), each=2) ) |> 
+              pivot_wider(names_from=con, values_from = c(rt,pct))  |> 
+              ungroup() |> 
+              summarise(
+                eff        = eff.size, 
+                size       = sample,
+                dia.len    = diag_len,
+                rep        = rep, 
+                rt.con     = mean(rt_con),
+                rt.incon   = mean(rt_incon),
+                rt.dif     = mean(rt_incon-rt_con),
+                rt.p       = t.test(rt_incon, rt_con, paired=T)$p.value,
+                rt.t       = t.test(rt_incon, rt_con, paired=T)$statistic,
+                rt.d       = cohensD(rt_incon, rt_con, method = "paired"),
+                pct.con    = mean(pct_con),
+                pct.incon  = mean(pct_incon),
+                pct.dif    = mean(pct_incon-pct_con),
+                pct.p      = t.test(pct_incon, pct_con, paired=T)$p.value,
+                pct.t      = t.test(pct_incon, pct_con, paired=T)$statistic,
+                pct.d      = cohensD(pct_incon, pct_con, method = "paired"),
+                )
+            
+          })
+        }) -> test 
+      }, cl = cl) |> map_df(~.x)
+    }) -> diag_simu
+  # save(gen_data, file = "../data/sim/diagnostic_length_simulation.rdata")
+  
+  # stop cluster
+  stopCluster(cl)
+  
+} else {
+  gen_data
+}
 
-# save(gen_data, file = "../data/sim/diagnostic_length_simulation.rdata")
+test |> 
+  ggplot(aes(rep, rt.p))+
+  geom_line()+
+  geom_hline(yintercept=.05)
 
-# stop cluster
-stopCluster(cl)
+mean(test$rt.p<0.05)
+
 ```
-
 
 ```{r}
 gen_data |>
@@ -257,27 +280,54 @@ gen_data |>
   stat_summary(geom="line")+
   geom_smooth(method="lm")+
   scale_y_log10()+
-  geom_hline(yintercept=0.05)+
-  geom_vline(xintercept=60)
+  geom_hline(yintercept=0.05)
 ```
 
 In this graph we see a clear increase in p for increasing diagnostic lengths. 
 
+
 ```{r}
 #| echo: false
+
 gen_data |>
   filter(eff>.1) |>
   mutate(eff = factor(as.character(eff))) |>
   pivot_longer(c(rt.p, pct.p)) |>
   ggplot(aes(size, rt.d, col = eff, group=eff ))+
   stat_summary(geom="line")+
-  geom_smooth(method="lm", alpha =.2)
+  geom_smooth(method="lm", alpha =.2)+ 
+  theme(legend.position = "none") -> p1 
+
+
+gen_data |>
+  filter(eff>.1) |>
+  mutate(eff = factor(as.character(eff))) |>
+  pivot_longer(c(rt.p, pct.p)) |>
+  ggplot(aes(size, pct.d, col = eff, group=eff ))+
+  stat_summary(geom="line")+
+  geom_smooth(method="lm", alpha =.2) -> p2
+
+p1+p2
 ```
 
 Similarly, the effect size seems to be rather stable for all diagnostic lengths. 
 
 
 From the generated data, we can calculate the power for each effect size: 
+
+```{r}
+gen_data |> 
+  # filter(eff<.16, eff>.14) |>
+  # filter(size %in% c(10,20,30,40,50,60)) |> 
+  filter(size %in% c(20,40,60)) |>
+  mutate(size = factor(size)) |>
+  ggplot(aes(dia.len, rt.p, col=size, group=size))+
+  stat_summary(geom="line")+
+  geom_hline(yintercept=.05)
+```
+
+
+
 
 ```{r}
 #| echo: false
