@@ -2,10 +2,12 @@
 title: "Experiment 2 post-cue sampling"
 format: docx
 lang: en-GB
+title: "Diag simulation"
 editor: 
   markdown:
       wrap: 62
 ---
+
 
 # Sampling from experiment 1
 
@@ -29,7 +31,6 @@ library(gt)
 d <-
   exp1_d |>
   dplyr::select(id, trial_info, inducer_run, diagnostic_run, correct_response, rt, con) |>
-  mutate(rt = as.numeric( ifelse(rt=="null", NA, rt)) ) |>
   filter(trial_info == "Diagnostic trial" | trial_info == "Inducer trial") |>
   filter(!is.na(correct_response))
 ```
@@ -115,6 +116,9 @@ stat_test <- function(size){
       pct_d = cohensD(pct_FALSE, pct_TRUE, method="corrected")
     )
 }
+```
+
+```{r}
 map_df(1:50, \(x){
   stat_test(x)
 }) -> sample1 
@@ -161,11 +165,94 @@ This did not appear to solve the problem at all.
 I suspect there is some unequalness with the sampling... 
 We can move over to generated data to see how increased samples "should" trend the data towards more significant differences. 
 
+
+## Expected loss of diagnostic trials:
+
+```{r loss est}
+#| echo: false
+d -> d_ex
+loss <- list()
+loss$data_trials <- nrow(d_ex)
+
+# accur
+d_ex |>
+  filter( trial_info == "Diagnostic trial" | trial_info == "Inducer trial" ) |>
+  group_by( id ) |>
+  mutate( correct_response = ifelse( trial_info=="Inducer trial" & is.na(rt), 0, correct_response) ) |>
+    #' !  Non-responses count as a wrong response & are subject to the exclusion criteria.  !
+  summarise( acc = sum(correct_response, na.rm = TRUE) / length( !is.na(correct_response) ) ) |>
+  filter( acc < .7 ) |>
+  pull( id ) -> loss$exclude_par
+
+loss[["exclude_par_trials"]] <- length( d_ex$rt[d_ex$id == loss$exclude_par] )
+loss[["exclude_par_pct"]]    <- length( d_ex$rt[d_ex$id == loss$exclude_par] ) / loss$data_trials * 100
+
+d_ex |> filter( !(id %in% loss$exclude_par) ) -> d_ex
+# rt dev+miss
+d_ex |>
+  mutate(rt = as.integer(rt)) |>
+  ungroup() |>
+  group_by(id) |>
+  mutate(
+    rt_crit = ifelse( 
+      trial_info == "Diagnostic trial",
+      mean( rt ) + sd( rt ) * 2.5,
+      NA ),
+      retain_trials = ifelse(
+        (rt > rt_crit & trial_info == "Diagnostic trial") | # **OR**
+          (is.na(rt) & trial_info == "Diagnostic trial"),
+        0, 1 ) 
+    ) -> d_ex
+
+sum(d_ex$retain_trials == 0) -> loss[["rt_sd_trials"]]
+sum(d_ex$retain_trials == 0) / loss$data_trials * 100 -> loss[["rt_sd_pct"]]
+
+d_ex |> 
+  filter( retain_trials == 1 ) -> d_ex
+# inducers:
+d_ex |>
+  mutate( valid_trials = case_when( trial_info=="Inducer trial" & correct_response==1 ~ 1,
+                                    trial_info=="Inducer trial" & correct_response==0 ~ 0,
+                                    trial_info=="Inducer trial" & is.na(correct_response) ~ 0,
+                                      # non-responses count as a wrong response
+                                    T ~ NA ) ) |>
+  fill(valid_trials, .direction = "up") -> d_ex
+
+sum(d_ex$valid_trials==0) -> loss[["inducer_fail_trials"]]
+sum(d_ex$valid_trials==0) / loss$data_trials * 100 -> loss[["inducer_fail_pct"]]
+
+d_ex |> filter( valid_trials == 1 ) -> d_ex
+
+d_ex |> 
+  filter(trial_info == "Diagnostic trial") |>
+  group_by(id) |>
+  count()
+```
+
+The above table indicate the number of diagnostic trials that are left after all excluding trials. 
+
+On average, this leaves us with:
+```{r}
+#| echo: false
+d_ex |>
+  filter(trial_info=="Diagnostic trial") |>
+  group_by(id) |>
+  count() |>
+  ungroup() |>
+  summarise(avg = mean(n)) |> gt()
+```
+trials.
+
+This is a loss of approximately: `r 180/240`. Whatever post-cue run we decide, we need to estimate an expected loss of about .75. 
+
+
+
 # Generating data
 
 Generate normal distributions with a mean of 0 and a standard deviation of 1.
-Effect.size adjusts the effect on the congruent trials by "eff.size" difference.
-For our purposes here "rt" and "pct" can be on the same scale.
+Effect.size adjusts the effect on the congruent trials by "eff.rt" and "eff.pct". 
+(It is not necessary to have two effect size. One is sufficient)
+
 ```{r}
 gen_sample <- function(N, OBS, eff.rt, eff.pct){
   #' @param N Number of subjects
@@ -176,18 +263,14 @@ gen_sample <- function(N, OBS, eff.rt, eff.pct){
   tibble(
     id = rep(1:N, each = OBS*2),
     con = rep.int( c("con","incon"), N*OBS),
-    rt = rnorm(N*OBS*2, 0 + as.integer(con=="con") * eff.rt, 1),
+    rt  = rnorm(N*OBS*2, 0 + as.integer(con=="con") * eff.rt, 1),
     pct = rnorm(N*OBS*2, 0 + as.integer(con=="con") * eff.pct, 1),
   ) 
 }
-gen_sample(30, 60, .7/4, .7)
-gen_sample(, 60, .7/4, .7)
 ```
 
+We simulate generate data over (1) difference effect sizes for (2) various sample sizes for (3) various diagnostic lengths -- each repeated 300 times.
 
-We can then generate random data related to each effect size with different diagnostic lengths.
-In this case, effect size in steps of .05 from 0 to .5. Moreover, we use 30 to 70 diagnostic trials.
-60 trials would correspond to an average of 2.5 trials in each block, and what would correspond to a range of 0 to 5 trials (post-cue trials).
 
 ```{r}
 #| echo: false
@@ -200,7 +283,7 @@ if(!exists(gen_data)){
   
   # Create a "cluster" to simulate faster
   # Take half the computers cores 
-  makeCluster( floor(detectCores() - detectCores() * 1/2) ) -> cl
+  makeCluster( floor(detectCores() * .90) ) -> cl # Use 90% of the available cores
   # Export the local function
   clusterExport(cl, varlist = c("gen_sample"))
   # Initiate libraries in clusters
@@ -212,13 +295,14 @@ if(!exists(gen_data)){
   
   
   # For each different effect size (*y*)...
-  map_df(seq(0,.75, .05), \(eff.size){
+  map_df(seq(0.05,.75, .05), \(eff.size){
     
     # For each sample size (i)...
     pblapply(10:90, \(samp_size){
     
       # For each diagnostic length (x)...
       map_df(10:90, \(diag_len){
+          # diag length corresponds to pairs of diagnostic values! 
         
           # Repeat the sampling 300 times 
           map_df(1:300, \(rep){
@@ -231,7 +315,7 @@ if(!exists(gen_data)){
               ungroup() |> 
               summarise(
                 eff        = eff.size, 
-                size       = sample,
+                size       = samp_size,
                 dia.len    = diag_len,
                 rep        = rep, 
                 rt.con     = mean(rt_con),
@@ -248,227 +332,311 @@ if(!exists(gen_data)){
                 pct.d      = cohensD(pct_incon, pct_con, method = "paired"),
                 )
             
-          })
-        }) -> test 
-      }, cl = cl) |> map_df(~.x)
-    }) -> diag_simu
-  # save(gen_data, file = "../data/sim/diagnostic_length_simulation.rdata")
+          })                   # repeat 300 
+        })                       # for each diagnostic length 10:90
+      }, cl = cl) |> map_df(~.x)   # for each sample size 10:90
+                                     # For each effect size seq(.05, .75, .05)
+    }) -> diag_simu 
+  
+  # # Update dia.len to correspond (b/c each len correspond to one congruent and one incongruent -- i.e., a pair of observation! )
+  # diag_simu |>
+  #   mutate(dia.len = dia.len*2) -> diag_simu
+  
+  # save(diag_simu, file = "../data/sim/diag_simu_raw.rdata")
+  
+  diag_simu_sum <-
+    diag_simu |>
+    group_by(eff, size, dia.len) |>
+    summarise(eff=unique(eff),
+              size=unique(size),
+              dia.len=unique(dia.len),
+              rt.pow = mean(rt.p<.05),
+              pct.pow = mean(pct.p<.05),
+              across(c(starts_with("rt."), starts_with("pct.")), mean)
+              )
+  # save(diag_simu_sum, file="../data/sim/diag_simu_sum.rdata")
   
   # stop cluster
   stopCluster(cl)
   
 } else {
-  gen_data
+  diag_simu
 }
-
-test |> 
-  ggplot(aes(rep, rt.p))+
-  geom_line()+
-  geom_hline(yintercept=.05)
-
-mean(test$rt.p<0.05)
-
 ```
 
-```{r}
-gen_data |>
-  filter(eff>.1) |>
-  mutate(eff = factor(as.character(eff))) |>
-  pivot_longer(c(rt.p, pct.p)) |>
-  ggplot(aes(size, value, col = eff, group=eff ))+
-  facet_wrap(~name, scales="free")+
-  stat_summary(geom="line")+
-  geom_smooth(method="lm")+
-  scale_y_log10()+
-  geom_hline(yintercept=0.05)
-```
-
-In this graph we see a clear increase in p for increasing diagnostic lengths. 
-
+### Visualizing
+#### animate:
 
 ```{r}
 #| echo: false
 
-gen_data |>
-  filter(eff>.1) |>
-  mutate(eff = factor(as.character(eff))) |>
-  pivot_longer(c(rt.p, pct.p)) |>
-  ggplot(aes(size, rt.d, col = eff, group=eff ))+
-  stat_summary(geom="line")+
-  geom_smooth(method="lm", alpha =.2)+ 
-  theme(legend.position = "none") -> p1 
+library(gganimate)
+library(gifski)
+library(av)
 
-
-gen_data |>
-  filter(eff>.1) |>
-  mutate(eff = factor(as.character(eff))) |>
-  pivot_longer(c(rt.p, pct.p)) |>
-  ggplot(aes(size, pct.d, col = eff, group=eff ))+
-  stat_summary(geom="line")+
-  geom_smooth(method="lm", alpha =.2) -> p2
-
-p1+p2
-```
-
-Similarly, the effect size seems to be rather stable for all diagnostic lengths. 
-
-
-From the generated data, we can calculate the power for each effect size: 
-
-```{r}
-gen_data |> 
-  # filter(eff<.16, eff>.14) |>
-  # filter(size %in% c(10,20,30,40,50,60)) |> 
-  filter(size %in% c(20,40,60)) |>
-  mutate(size = factor(size)) |>
-  ggplot(aes(dia.len, rt.p, col=size, group=size))+
-  stat_summary(geom="line")+
-  geom_hline(yintercept=.05)
+diag_simu_sum |>
+  filter(eff > .10) |>
+  mutate(`Effect size` = factor(eff)) |>
+  ggplot(aes(dia.len, pct.pow, col = `Effect size`)) +
+  geom_line() +
+  geom_hline( yintercept=.9 ) +
+  scale_y_continuous(breaks=seq(0,1,.1)) +
+  scale_x_continuous(breaks=seq(0,100,5)) +
+  coord_cartesian(ylim=c(.5, 1), expand = F) +
+  labs(title = "Diagnostic length: {size}", y = "Power", x="Sample size") +
+  theme_minimal() +
+  transition_time(size) +
+  ease_aes("linear") -> p_ani
+# Save
+anim_save("../figs/anim/anim1.gif", p_ani, path="./")
 ```
 
 
+Animate the impact of increasing the sample size (see [LINK]). 
 
-
-```{r}
+```{r manual save and animate}
 #| echo: false
+#| message: false
 
-gen_data |>
-  group_by(eff) |>
-  summarise(power.rt = mean(rt.p<.05), power.pct = mean(pct.p<.05)) |>
-  gt()
+# This animates power of various diagnostic lengths over different sample sizes: 
+walk(seq(min(diag_simu_sum$size), max(diag_simu_sum$size), 1), \(x){
+  #cat("\nSample size:", x)
+  p <- 
+    diag_simu_sum |>
+    filter(size == x) |>
+    filter(eff < .45) |>
+    mutate(`Effect size` = factor(eff)) |>
+    ggplot(aes(dia.len, pct.pow, col = `Effect size`)) +
+    geom_line() +
+    geom_hline( yintercept = .9 ) +
+    scale_y_continuous(breaks = seq(0, 1, .1)) +
+    scale_x_continuous(breaks = seq(0, 300, 10)) +
+    coord_cartesian(ylim=c(.5, 1), expand = F) +
+    labs(title = paste0("Sample size: ", x), y = "Power", x="Diagnostic length") +
+    theme_minimal()+
+    theme(plot.background = element_rect(colour="white"))
+  
+    ggsave(plot = p, filename = paste0("../figs/anim/anim2/anim_diag_", x, ".png"),
+          width = 7, heigh = 5) 
+})
+
+# get path to graphs
+list.files("../figs/anim/anim2/", full.names = T) -> figfnames
+# fix arrangement
+tibble(figfnames) |>
+  mutate(arr = as.integer( str_split(figfnames, "[_.]") |> map_chr(5) )) |>
+  arrange(arr) |>
+  pull(figfnames) -> o_figfnames
+
+# create gif
+gifski(o_figfnames, "../figs/anim/anim_sample_size_increase.gif", delay = .25)
+
+# create video format
+av_encode_video(o_figfnames, "../figs/anim/anim_sample_size_increase.mkv", framerate = 4)
+""
 ```
 
+Animate the impact of changes in diagnostic lengths (see [LINK]).
 
-Let us sample multiple times with 60 diagnostic trials:
-
-```{r}
+```{r animate dual}
 #| echo: false
 #| message: false
 #| warning: false
-map_df(seq(0,.5, .05), \(y){
-  map_df(1:1000, \(x){
-    gen_sample(27, 60, y) |>
-      summarise(
-        eff = y,
-        count = x,
-        size = 60, 
-        rt.con = mean(rt_con, na.rm=T),
-        rt.incon = mean(rt_inc, na.rm=T),
-        rt.est  = mean(rt_inc-rt_con, na.rm=T),
-        rt.t  = t.test(rt_inc, rt_con, paried=T, na.rm=T)$statistic,
-        rt.p  = t.test(rt_inc, rt_con, paried=T, na.rm=T)$p.value,
-        rt.d = cohensD(rt_inc, rt_con, method="corrected"),
-        pct.con = mean(pct_con, na.rm=T),
-        pct.incon = mean(pct_inc, na.rm=T),
-        pct.est  = mean(pct_inc-pct_con, na.rm=T),
-        pct.t  = t.test(pct_inc, pct_con, paried=T, na.rm=T)$statistic,
-        pct.p  = t.test(pct_inc, pct_con, paried=T, na.rm=T)$p.value,
-        pct.d = cohensD(pct_inc, pct_con, method="corrected")
-      )
-  })
-}) -> gen_data2
+#| messages: false
 
+# This the power the power over sample size split by loss of data
 
-gen_data2 |>
-  filter(eff>.1) |>
-  mutate(eff = factor(as.character(eff))) |>
-  pivot_longer(c(rt.p, pct.p)) |>
-  ggplot(aes(count, value, col = eff, group=eff ))+
-  facet_wrap(~name, scales="free")+
-  stat_summary(geom="line", alpha = .4)+
-  geom_smooth(method="lm")+
-  scale_y_log10()+
-  geom_hline(yintercept=0.05)
+walk(seq(56, max(diag_simu_sum$dia.len), 2), \(x){
+  #cat("\nDiag length: ",x )  
+  samp_size <- 30
+  loss <- .75
+  
+  diag_length_adj   <- ifelse( (x/2) %% 2 == 0, floor( x/2 ), floor( x/2 - 1 ) )
+  diag_length_adj_l <- ifelse(floor(diag_length_adj*loss) %% 2 == 0, 
+                              floor( diag_length_adj*loss ), floor( diag_length_adj*loss-1 ) ) 
+  diag_simu_sum |>
+    filter(eff < .45) |>
+    filter(dia.len == diag_length_adj |
+             dia.len == diag_length_adj_l) |>
+    group_by(eff, size) |>
+    mutate(`Effect size` = factor(eff),
+           dia.len = dia.len * 2 ) |>
+    ggplot(aes(size, pct.pow, col = `Effect size`))+
+    facet_wrap(~ dia.len)+
+    # geom_smooth() +
+    geom_line() +
+    geom_hline(yintercept = .9)+
+    geom_vline(xintercept = samp_size) +
+    scale_x_continuous(breaks = seq(0, 100, 10)) +
+    scale_y_continuous(breaks = seq(0, 100, .1)) +
+    labs(
+      x = "Sample size", y = "Power",
+      subtitle = paste("Diagnostic length: ", x,"\n
+                        25 % loss                                                 Original")
+                       ,
+    )+
+    theme_minimal()+
+    coord_cartesian(ylim=c(.5, 1), expand =.0001) +
+    theme(plot.background = element_rect(colour="white")) -> p
+  
+    ggsave(plot = p, filename = paste0("../figs/anim/anim3/anim_diag_", x, ".png"),
+          width = 7, heigh = 5, dpi = 300) 
+})
+# get list
+list.files("../figs/anim/anim3/", full.names = T) -> figfnames
+tibble(figfnames) |>
+  mutate(arr = as.integer( str_split(figfnames, "[_.]") |> map_chr(5) )) |>
+  arrange(arr) |>
+  pull(figfnames) -> o_figfnames
+
+gifski(o_figfnames, "../figs/anim/anim_diag_len_increase.gif", delay = .25)
+
+av_encode_video(o_figfnames, "../figs/anim/anim_diag_len_increase.mkv", framerate = 4)
+""
 ```
 
-This yields a very nicely coloured graph. At any rate, we can see that there is some variation around each effect size, but that it is generally stable over time.
-
-From this, we can calculate the power for each effect size:
-```{r}
-#| echo: false
-
-gen_data2 |>
-  group_by(eff) |>
-  summarise(power.rt = mean(rt.p<.05), power.pct = mean(pct.p<.05)) |>
-  gt()
-```
-
-With an effect size of at least .10, we will get a power of 80%.
-
-In line with our results, we found .17 for rt and .70 with accuracy. 
-This means we should be able to detect both response time and accuracy with a high than 98% power. 
-
-
-
-Testing slightly less trials, due to loss at the first inducer block: 
-```{r}
-#| echo: false
-#| message: false
-map_df(seq(0,.5, .05), \(y){
-  map_df(1:1000, \(x){
-    gen_sample(27, 55, y) |>
-      summarise(
-        eff = y,
-        count = x,
-        size = 55, 
-        rt.con = mean(rt_con, na.rm=T),
-        rt.incon = mean(rt_inc, na.rm=T),
-        rt.est  = mean(rt_inc-rt_con, na.rm=T),
-        rt.t  = t.test(rt_inc, rt_con, paried=T, na.rm=T)$statistic,
-        rt.p  = t.test(rt_inc, rt_con, paried=T, na.rm=T)$p.value,
-        rt.d = cohensD(rt_inc, rt_con, method="corrected"),
-        pct.con = mean(pct_con, na.rm=T),
-        pct.incon = mean(pct_inc, na.rm=T),
-        pct.est  = mean(pct_inc-pct_con, na.rm=T),
-        pct.t  = t.test(pct_inc, pct_con, paried=T, na.rm=T)$statistic,
-        pct.p  = t.test(pct_inc, pct_con, paried=T, na.rm=T)$p.value,
-        pct.d = cohensD(pct_inc, pct_con, method="corrected")
-      )
-  })
-}) -> gen_data3
-
-gen_data3 |>
-  filter(eff>.1) |>
-  mutate(eff = factor(as.character(eff))) |>
-  pivot_longer(c(rt.p, pct.p)) |>
-  ggplot(aes(count, value, col = eff, group=eff ))+
-  facet_wrap(~name, scales="free")+
-  stat_summary(geom="line", alpha = .4)+
-  geom_smooth(method="lm")+
-  scale_y_log10()+
-  geom_hline(yintercept=0.05)
-```
+In the plot below we can see how the set diagnostic limit (right) and then the diagnostic limit after the assumed exclusion (left). 
 
 ```{r}
 #| echo: false
 
-gen_data3 |>
-  group_by(eff) |>
-  summarise(power.rt = mean(rt.p<.05), power.pct = mean(pct.p<.05)) |>
-  gt()
+samp_size <- 30
+diag_length <- 60
+loss <- .75
+
+diag_length_adj   <- ifelse(round(diag_length/2) %% 2 == 0, floor( diag_length/2 ), floor( diag_length/2-1 ) )
+diag_length_adj_l <- ifelse(floor(diag_length_adj*loss) %% 2 == 0, 
+                            floor( diag_length_adj*loss ), floor( diag_length_adj*loss-1 ) ) 
+diag_simu_sum |>
+  filter(eff < .45) |>
+  filter(dia.len == diag_length_adj |
+           dia.len == diag_length_adj_l) |>
+  group_by(eff, size) |>
+  mutate(`Effect size` = factor(eff),
+         dia.len = dia.len * 2 ) |>
+  ggplot(aes(size, pct.pow, col = `Effect size`))+
+  facet_wrap(~ dia.len)+
+  # geom_smooth() +
+  geom_line() +
+  geom_hline(yintercept = .9)+
+  geom_vline(xintercept = samp_size) +
+  scale_x_continuous(breaks = seq(0, 100, 10)) +
+  scale_y_continuous(breaks = seq(0, 100, .1)) +
+  labs(
+    x = "Sample size", y = "Power",
+    subtitle = "Left plot corresponds to the right plot after data exclusion",
+  )
 ```
 
-Still results in rather similar outcomes. A solid > 98% power at an effect size of .15. 
+Assuming a sample size of 30 participants, we can achieve 90 % power with an effect size of about .2 (right plot). However, considering the expected loss of around 25%, we are left with 44 trials (left; rounded to the closest pair), rather than 60. This reduces the power to just under .8. 
+Granted the arbitrary loss of data, we may be left with deviating lengths of congruent and incongruent trials. In other words, we should overshoot a couple of trials to ensure sufficient pairs.
+
+We have to solution to this problem: Increase the sample size or increase the number of diagnostic trials. 
+
+Regarding the diagnostic trials, we are weary of adding too many diagnostic trials given that the cue is supposed to signal "sooner-rather-than-later" switching. Increasing the number of diagnostic trials might influence the utility of the cue. 
 
 
-# Congruency check 
-A last notion relates to whether we need to or should force an equal number of diagnostic trials. 
+The plot below visualize the effect size across diagnostic length for a sample size of 30.  
 
 ```{r}
 #| echo: false
-#| message: false
-d |>
-  filter(!is.na(con)) |>
-  group_by(id, con) |>
-  count() |>
-  mutate(trials = n - 30) |>
-  ggplot(aes(trials))+
-  geom_histogram(alpha = .4)+
-  geom_histogram(aes(x=n, fill="all data"), alpha=.4)+
-  scale_x_continuous(breaks = seq(5,200, 5))
+
+samp_size <- 30
+diag_length <- 70
+diag_loss <- .75
+
+diag_simu_sum |> 
+  filter(eff < .3) |>
+  filter(size == samp_size) |>
+  mutate(`Effect size` = factor(eff) ) |>
+  ggplot(aes(dia.len, pct.pow, col = `Effect size`))+
+  # geom_smooth() +
+  geom_line() +
+  geom_hline(yintercept = .9)+
+  geom_vline(xintercept = diag_length * diag_loss, linetype = "dashed") +
+  geom_vline(xintercept = diag_length) +
+  scale_x_continuous(breaks = seq(0, 500, 10) ) +
+  scale_y_continuous(breaks = seq(0, 100, .1) ) +
+  labs(
+    x = "Diagnostic length", 
+    y = "Power",
+    subtitle = paste0("Sample size: ", samp_size, 
+                      # "   Diagnostic length: ", diag_length, 
+                      # "   Diagnostic pairs: ", diag_length/2,
+                      "   Loss of: ", diag_loss),
+    caption = "Horizontal line correspond to 90% power. \n
+    Solid vertical line correspond to the set diagnostic length. \n
+    Dashed vertical line correspond to the estimated remaining trials after exclusion (trials*loss)")
 ```
 
-In relation to the simulated data above, removing 30 trials does not lead to problems with regards to finding a congruency effect. 
-With at least 75 trials for some conditions. 
+Exactly counteract the loss (60 * 1.25):
 
-The general conclusion from this is that we do not need to force an equal number of right/left diagnostic trials for the **pre-cue**, but to be sure we receive enough trials for the **post-cue** we will force that to be equal.
+```{r}
+#| echo: false
+
+samp_size <- 30
+diag_length <- 70
+diag_loss <- .75
+
+diag_simu_sum |> 
+  filter(eff < .3) |>
+  filter(size == 30) |>
+  mutate(`Effect size` = factor(eff) ) |>
+  ggplot(aes(dia.len, pct.pow, col = `Effect size`))+
+  facet_wrap(~size)+
+  geom_line() +
+  geom_hline(yintercept = .9)+
+  geom_vline(xintercept = diag_length * diag_loss, linetype = "dashed") +
+  geom_vline(xintercept = diag_length) +
+  scale_x_continuous(breaks = seq(0, 500, 10) ) +
+  scale_y_continuous(breaks = seq(0, 100, .1) ) +
+  labs(
+    x = "Diagnostic length", 
+    y = "Power",
+    subtitle = paste0("Sample size: ", samp_size, 
+                      # "   Diagnostic length: ", diag_length, 
+                      # "   Diagnostic pairs: ", diag_length/2,
+                      "   Loss of: ", diag_loss),
+    caption = "Horizontal line correspond to 90% power. \n
+    Solid vertical line correspond to the set diagnostic length. \n
+    Dashed vertical line correspond to the estimated remaining trials after exclusion (trials*loss)")
+```
+
+Try larger sample:
+
+```{r}
+
+samp_size <- c(30,34)
+diag_length <- 70
+diag_loss <- .75
+
+diag_simu_sum |> 
+  filter(eff < .3) |>
+  filter(size %in% samp_size) |>
+  mutate(`Effect size` = factor(eff) ) |>
+  ggplot(aes(dia.len, pct.pow, col = `Effect size`)) +
+  facet_wrap(~ size)+
+  geom_line() +
+  geom_hline(yintercept = .9)+
+  geom_vline(xintercept = diag_length * diag_loss, linetype = "dashed") +
+  geom_vline(xintercept = diag_length) +
+  scale_x_continuous(breaks = seq(0, 500, 25) ) +
+  scale_y_continuous(breaks = seq(0, 100, .1) ) +
+  labs(
+    x = "Diagnostic length", 
+    y = "Power",
+    subtitle = paste0("Split by sample sizes ", paste(samp_size, collapse = " & "), 
+                      "\nDiagnostic length: ", diag_length,
+                      "     Loss: ", diag_loss, "   =~ ", floor(diag_length*.75)),
+    caption = "Horizontal line correspond to 90% power. \n
+    Solid vertical line correspond to the set diagnostic length. \n
+    Dashed vertical line correspond to the estimated remaining trials after exclusion (trials*loss)")
+```
+
+
+With 34 participants and 70 trials of the post-cue diagnostic runs, we should have 90 % power even to a small effect of .15.
+
+A good compromise.
+
+
+
