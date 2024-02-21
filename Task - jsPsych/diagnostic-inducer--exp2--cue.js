@@ -7,9 +7,8 @@ const skip_instructions = false  // Skip intro? (to test trials)
 const save_local_data = false    // Save a local file (test analysis)
 
 
-// const study_name = "exp1" // add to filename 
-// const redirect_link = "https://app.prolific.com/submissions/complete?cc=COAKFO2E" 
-        // https://app.prolific.com/submissions/complete?cc=COAKFO2E (REPLICATION STUDY)
+const study_name = "exp2_pilot" // add to filename 
+// const redirect_link = ## NT &&//"https://app.prolific.com/submissions/complete?cc=" 
         // https://app.prolific.com/submissions/complete?cc=C4S441ES (CUE TASK)
 
 
@@ -50,17 +49,16 @@ const response_sides = ["LEFT","RIGHT"];  // What participants will RESPOND to (
     // i.e., f (or whatever key) should correspond to the response side (left)
 
 ////    Inducer parameters     ////
-const inducer_colours      = ["red", "yellow", "blue", "green", "purple"]      // Inducer colour randomize between participants (if more than 1)
-const inducer_colour_names = ["red", "yellow", "blue", "green", "purple"]      // Inducer colour randomize between participants (if more than 1)
+const inducer_colours      = ["red", "yellow", "blue"]      // Inducer colour randomize between participants (if more than 1)
     // ["darkred", "yellow", "purple"] 
     // This is also what is DISPLAYED (i.e., text) to participants. Should therefore be a readable name. 
 
 ////    Diagnostic parameters   ////
-const number_of_inducers = 24;       // Number of inducers 
+const number_of_inducers = 2//24;       // Number of inducers 
     // !!! CHANGE max trials !!! 
 const diagnostic_min_length = 4         // Min run length
 const diagnostic_max_length = 16        // Max run length
-const max_diagnostic_trials = 240     // Total max diagnostic trials
+const max_diagnostic_trials = 24//0     // Total max diagnostic trials
     // max/2 * number_of_inducers
 
 ////    Inducer CUE      ////
@@ -70,18 +68,8 @@ const cue_duration = 1250        // How long is the pre-cue present for?
 
 const cue_min_length = 0
 const cue_max_length = 5
-const cue_n_trials = 60
+const cue_n_trials = 5//560
 
-// 4 of each trial type: 
-// Yielding 60 trials
-// const cue_array = Array(
-//     Array(4).fill(0),
-//     Array(4).fill(1),
-//     Array(4).fill(2),
-//     Array(4).fill(3),
-//     Array(4).fill(4),
-//     Array(4).fill(5),
-//     ).flat()
 
 ////    Practice parameters     ////
 const prac_diagnostic_rounds = 16                    // Number of diagnostic practice rounds
@@ -597,6 +585,10 @@ function inducer_FNC(run_stimuli, exp_block, trial_info, force_resp_side = false
 var ID = jsPsych.randomization.randomID(8);
 if(debug){ console.log("ID = " + ID) }
 
+// Shuffle left/right for each participants (remains the same throughout)
+let rnd_response_sides = jsPsych.randomization.shuffle(response_sides); 
+
+
 // Shuffle stimuli list
 let rnd_stimuli = jsPsych.randomization.shuffle(stimuli);  // Shuffle stimuli list
 if(debug) { console.log("Randomized stimuli list:", rnd_stimuli) }
@@ -606,7 +598,7 @@ let rnd_inducer_colour = jsPsych.randomization.sampleWithReplacement(inducer_col
 if(debug){ console.log("Inducer colour: ", rnd_inducer_colour) }
 
 
-//// Diagnostic stuff ////
+////         Diagnostic stuff    ////
 // Generate diagnostic length range
 let diagnostic_range = Array.from(Array(diagnostic_max_length-diagnostic_min_length+1), (x, i) => i + diagnostic_min_length) 
 if(debug){ console.log("The range of diagnostic lengths: ", diagnostic_range) }
@@ -657,14 +649,16 @@ if(sum_diags != max_diagnostic_trials){
 
 
 ////        CUE          ///
-// Cue colour
+// Filter colours not used for the inducer:
 let r_col = inducer_colours.filter(item => item !== rnd_inducer_colour);
+// Sample a colour from the remaining colours:
 let rnd_cue_col = jsPsych.randomization.sampleWithReplacement(r_col, 1)[0]
 if(debug) { console.log("Inducer colour: ", rnd_inducer_colour, " |  Pre-cue colour: ", rnd_cue_col)}
 
 // Cue stimulus
-
+// Randomly sample a number between 0 and 2.
 const rnd_cue_picker = jsPsych.randomization.sampleWithReplacement([0,1,2], 1)[0]
+// Then select the cue & the respective name:
 const rnd_cue_stimulus = [draw_circle,draw_square,draw_triangle][rnd_cue_picker]
 const cue_stimulus_name = ["Circle", "Square", "Triangle"][rnd_cue_picker]
 
@@ -742,9 +736,14 @@ if(sum_rnd_cue_array != cue_n_trials){
     if(debug){ console.log("Fixed post-cue diagnostic lengths:", rnd_cue_array) }
 }
 
+if(cue_force_equal){
+    let force_cue_resp_side = Array(  Array(Math.floor(cue_n_trials/2)).fill(1) ,  Array( Math.ceil(cue_n_trials/2) ).fill(0)  ).flat()
+    // Generate equal left/right inducer response trials
+    var rnd_force_cue_resp_side = jsPsych.randomization.shuffle(force_cue_resp_side)
+    if(debug){ console.log("Cue force resp side:", rnd_force_cue_resp_side)}
+}
 
-// Shuffle left/right for each participants (remains the same throughout)
-let rnd_response_sides = jsPsych.randomization.shuffle(response_sides); 
+
 
 let run_stimuli;
 
@@ -1078,17 +1077,32 @@ timeline.push( long_fixation )
 
 //// Task proper 
 for(let i = 0; i < number_of_inducers; i++){
-    // Get new inducer stimuli
+    
+    // Inducer:
     let run_stimuli = [rnd_stimuli[0], rnd_stimuli[1]]
-    // Remove added the stimuli from the main list 
+        // Get run stimuli
     rnd_stimuli.splice(0,2) 
+        // Then remove the stimuli from the list    
+    
+    // Cue:
+    let run_cue_num = rnd_cue_array[i] 
+        // length of the post-cue 
+    let run_cue_len = Array.from( Array(run_cue_num), (x, i) => i + 0) 
+        // Nums to drag from the predetermined italic/upright list
+    let cue_resp_side = run_cue_len.map(index => rnd_force_cue_resp_side[index])  
+        // Get forced response side according to nums from the start. 
+    rnd_force_cue_resp_side.splice(0,  run_cue_num) 
+        // Remove these response sides for future runs.
+    
+    if(debug){ console.log("Current post-cue run length:", run_cue_num, ". With response sides:", cue_resp_side) }
+    
 
     //// Timeline: 
     // Inducer instructions
     inducer_instruction_FNC( run_stimuli, i, "inducer instructions" )
 
     // Diagnostic trials 
-    diagnostic_FNC( rnd_diagnostic_length[i], run_stimuli, i, rnd_cue_array[i], "diagnostic trial" )
+    diagnostic_FNC( rnd_diagnostic_length[i], run_stimuli, i, rnd_cue_array[i], "diagnostic trial" ) //cue_resp_side
 
     // Inducer trial
     inducer_FNC( run_stimuli, i, "inducer trial")
