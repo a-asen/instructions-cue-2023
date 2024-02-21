@@ -34,11 +34,14 @@ d <-
   exp1_d |>
   dplyr::select(id, trial_info, inducer_run, diagnostic_run, correct_response, rt, con) |>
   filter(trial_info == "Diagnostic trial" | trial_info == "Inducer trial") |>
-  filter(!is.na(correct_response))
+  filter(!is.na(correct_response)) |>
+  mutate(rt = as.integer(rt)) 
 ```
 
 ```{r}
 #| echo: false
+#| warning: false
+#| message: false
 d |>
   filter(diagnostic_run <5) |>
   dplyr::group_by(id, con) |>
@@ -69,14 +72,15 @@ map_df(seq_along(1:16), \(x){
     group_by(id, con) |>
     summarise(
       rt = mean(rt),
-      pct = mean(correct_response)
-    ) |> ungroup() |>
+      pct = mean(correct_response) ) |> 
+    ungroup() |>
     summarise(
       n = x,
       est = t.test(rt~con, paired=T)$estimate,
       t = t.test(rt ~ con, paired=T)$statistic,
       p = t.test(rt ~ con, paired=T)$p.value,
-      df = t.test(rt ~ con, paired=T)$parameter,)
+      df = t.test(rt ~ con, paired=T)$parameter,
+      )
 }) -> n_back_test
 n_back_test |>
   ggplot(aes(n, p))+
@@ -84,7 +88,6 @@ n_back_test |>
   geom_hline(yintercept=.05)
 ```
 Sampling from all blocks, across all participants, we appear to need between 8-10 trials (per block) to find a significant congruency effect. 
-
 
 Now I will attempt to see how many diagnostic trials are necessary to find the congruency effect through random sampling of the data from experiment 1. 
 ```{r}
