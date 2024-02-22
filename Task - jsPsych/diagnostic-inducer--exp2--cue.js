@@ -2,10 +2,10 @@
 ////////////////////////////////////////////////////////////////////////
 
 // CHANGE THESE BEFORE EXPERIMENT!
-const debug = true               // Show some console information
-const skip_instructions = false  // Skip intro? (to test trials)
-const save_local_data = true    // Save a local file (test analysis)
-
+const debug = true                  // Show debug information?
+const skip_instructions = true     // Skip intro? 
+const skip_practice = false         // Skip practice? 
+const save_local_data = true        // Save local file? 
 
 const study_name = "exp2_pilot" // add to filename 
 // const redirect_link = ## NT &&//"https://app.prolific.com/submissions/complete?cc=" 
@@ -49,7 +49,7 @@ const response_sides = ["LEFT","RIGHT"];  // What participants will RESPOND to (
     // i.e., f (or whatever key) should correspond to the response side (left)
 
 ////    Inducer parameters     ////
-const inducer_colours      = ["red", "yellow", "blue"]      // Inducer colour randomize between participants (if more than 1)
+const inducer_colours      = ["hotpink", "yellow", "blue"]      // Inducer colour randomize between participants (if more than 1)
     // ["darkred", "yellow", "purple"] 
     // This is also what is DISPLAYED (i.e., text) to participants. Should therefore be a readable name. 
 
@@ -78,7 +78,6 @@ const prac_inducer_rounds = 6
     // NB: Max 64 rounds of new stimuli (prac_inducer_rounds + number_of_inducer > 64)
 const prac_cue_rounds = 16
 const prac_post_cue_num = 4
-
 
 
 // Not used 
@@ -326,34 +325,12 @@ function cue_trial_f(inducer, diag){
 
 
 ////   Trial functions          /////
-function diagnostic_instructions_FNC(){
-    // no parameters needed
-    let diagnostic_task_instruction = {
-        type: jsPsychHtmlKeyboardResponse,
-        stimulus: function(){   
-            return [ 
-            `<p style="font-size: ${general_font_size};"> If <i> italic </i> press ${rnd_response_sides[0]}`+
-            `<p style="font-size: ${general_font_size};"> If upright press ${rnd_response_sides[1]}`]
-        }, 
-        prompt: "Put your left index fingers on the F and your right index finger on the J key. <br> When you are ready, press SPACE to continue.",
-        choices: " ", 
-        trial_duration: instruction_delay,
-        data: {
-            stimulus: `If italic press ${rnd_response_sides[0]} | If upright press ${rnd_response_sides[1]}`,
-            trial_info: "Diagnostic instructions",
-        },
-        on_finish: (data) => { 
-            if(debug){ console.log(data) }
-        }
-    }
-    timeline.push( diagnostic_task_instruction )
-    timeline.push( short_fixation )
-}
-
 function inducer_instruction_FNC(run_stimuli, exp_block, trial_info){
-    // run_stimuli == Randomly selected stimuli for the current block 
-    // exp_block   == Current block number
-    // trial_info  == General trial info
+    /**
+     * @param {list} run_stimuli    List of current run stimuli
+     * @param {integer} exp_block   Current block number
+     * @param {string} trial_info   Trial description 
+     */
 
     let inducer_instruction = { 
         type: jsPsychHtmlKeyboardResponse,
@@ -364,7 +341,7 @@ function inducer_instruction_FNC(run_stimuli, exp_block, trial_info){
         prompt: "Put your left index fingers on the F and your right index finger on the J key. <br> When you are ready, press SPACE to continue.",
         choices: " ", 
         data: {
-            inducer_run: exp_block,     // Inducer run number
+            inducer_run: exp_block,         // Inducer run number
             stimulus: `If ${run_stimuli[0]} press ${rnd_response_sides[0]} | If ${run_stimuli[1]} press ${rnd_response_sides[1]}`,
             trial_info: trial_info
         },
@@ -373,6 +350,7 @@ function inducer_instruction_FNC(run_stimuli, exp_block, trial_info){
             if(debug){ console.log(data) } 
         }
     }
+    // Timeline 
     timeline.push(inducer_instruction)
     timeline.push(short_fixation)
 }
@@ -388,11 +366,12 @@ function diagnostic_FNC(run_diagnostic_length, run_stimuli, exp_block, cue_diag_
      * @param {boolean} deadline            Should the trials have a deadline? 
      * @param {list} equal_list             Supply a predetermined list of diagnostic responses (e.g., [0,1,1,0])
      * 
-     * @returns {null} Pushes the generated trials to the "timeline"
+     * @returns {null}                      Pushes the generated trials to the "timeline"
      */
     
     
     var rnd_prac_diag;
+    var cue_count = 0; 
     
     // Randomly decide whether the stimulus should appear in italic or not.
     if(force_equal && equal_list == null){
@@ -407,9 +386,11 @@ function diagnostic_FNC(run_diagnostic_length, run_stimuli, exp_block, cue_diag_
     for(let exp_diag = 0; exp_diag < run_diagnostic_length; exp_diag++){
         // For each trial...
 
+        let is_post_cue = exp_diag >= run_diagnostic_length - cue_diag_num
+
         // Randomly get a stimulus (from the stimuli list)
         let rnd_diag_stimulus = jsPsych.randomization.sampleWithReplacement(run_stimuli, 1)[0]
-        
+
         // Select italic/upright based on condition: 
         let run_rnd_italic;
         if(force_equal && equal_list == null){ // if not supplied list length
@@ -418,11 +399,13 @@ function diagnostic_FNC(run_diagnostic_length, run_stimuli, exp_block, cue_diag_
             } else {
                 run_rnd_italic = false
             }
-        } else if (force_equal && !equal_list == null) {  // if supplied list length
-            run_rnd_italic = force_equal[exp_diag]
+        } else if (force_equal && !equal_list == null && is_post_cue) {  // if supplied list length
+            run_rnd_italic = force_equal[cue_count]
+            cue_count +=1
         } else { // randomization: 
             run_rnd_italic = jsPsych.randomization.sampleWithReplacement([true,false], 1, run_italic_bias)[0]
         }
+        
         
         // Create trial:
         let diagnostic_run = { 
@@ -446,10 +429,8 @@ function diagnostic_FNC(run_diagnostic_length, run_stimuli, exp_block, cue_diag_
                 stimulus: rnd_diag_stimulus,            // Trial stimulus
                 inducer_run: exp_block,                 // Inducer run number (i.e., block)
                 diagnostic_run: exp_diag,               // Diagnostic run number 
-                post_cue: () => {                       // Is the current trial after the cue? 
-                      if(exp_diag > cue_diag_num) { return true }
-                      else                        { return false }
-                },
+                cue_num: run_diagnostic_length - cue_diag_num, // On which trial will the cue appear? 
+                post_cue: is_post_cue,                  // Is the current trial after the cue? 
                 inducer_trial: false,                       // Not an inducer trial
                 italic: run_rnd_italic,                 // Is the current trial an italic type? 
                 trial_info: trial_info,                 // Trial description
@@ -496,7 +477,8 @@ function diagnostic_FNC(run_diagnostic_length, run_stimuli, exp_block, cue_diag_
         timeline.push(short_fixation)       // PUSH fixation
 
                                             // PUSH cue 
-        if(exp_diag == run_diagnostic_length - cue_diag_num ){
+        
+        if(exp_diag == run_diagnostic_length - cue_diag_num - 1 ){
             timeline.push( cue_trial_f(exp_block, exp_diag) ) 
 
             timeline.push(short_fixation)   // PUSH fixation
@@ -575,7 +557,6 @@ function inducer_FNC(run_stimuli, exp_block, trial_info, force_resp_side = null,
 
     timeline.push( short_fixation )         // PUSH fixation 
 }
-
 
 
 ////////////////////////////////////////////////////////////////////////////////////////////
@@ -669,7 +650,7 @@ if(debug){ console.log("Random cue stimulus:", rnd_cue_stimulus) }
 
 // Pre-inducer cue trial length
 let cue_array = Array.from(Array(cue_max_length - cue_min_length+1), (x, i) => i + cue_min_length) 
-if(debug){ console.log("Pre-cue array:", cue_array) }
+if(debug){ console.log("Cue num array:", cue_array) }
 
 var rnd_cue_array=[];
 // We randomy sample "number_of_inducer" times from the "diagnostic_range"
@@ -921,156 +902,182 @@ let diagnostic_task_instruction_description = {
         if(debug){  console.log(data) }
     }
 }
-timeline.push(diagnostic_task_instruction_description)
+if(!skip_instructions){ timeline.push(diagnostic_task_instruction_description) }
 
 // Diagnostic instructions
-diagnostic_instructions_FNC()
-
-
-//// Practice
-// For the practice we want to force an equal number of right and left responses to not bias the learning. 
-
-// For the diagnostic practic, we only need a single set of stimuli: 
-run_stimuli = [rnd_stimuli[0], rnd_stimuli[1]]
-rnd_stimuli.splice(0,2) 
-// To force an equal number of right/left responses, we set the last parameter to "true". 
-// The function will create an array of equal right/left responses and randomize it. 
-// Selecting the respective response (italic/upright) case based on the predetermined array, looping through it to the length of the "prac_diagnostic_rounds".
-diagnostic_FNC(prac_diagnostic_rounds, run_stimuli, "prac", 100, "diagnostic practice", true, false)
-    // Force the round to be equal to not bias the practice
-
-// Inducer description
-let inducer_task_instruction_description = {
-    type: jsPsychInstructions,
-    pages: () => { 
-        return [
-            // FIRST, what keys will be used in this experiment? 
-            `<div style="font-size:${instruction_font_size}">
-            
-            On the next screen, the instruction that changes throughout the task, will be presented. <br>
-            (Connected to non-words in <b> \n
-            <span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour.toLowerCase() + " colour"}</span></b>.)
-            <br><br>
-            These instructions will have the same format, <br> but will describe two new 3-letter non-words.
-            <br><br>
-            A couple of practice trials will be presented.
-            <br><br>
-            The practice round starts by clicking "Start".
-            </div>`,
-        ]
+let diagnostic_task_instruction = {
+    type: jsPsychHtmlKeyboardResponse,
+    stimulus: function(){   
+        return [ 
+        `<p style="font-size: ${general_font_size};"> If <i> italic </i> press ${rnd_response_sides[0]}`+
+        `<p style="font-size: ${general_font_size};"> If upright press ${rnd_response_sides[1]}`]
+    }, 
+    prompt: "Put your left index fingers on the F and your right index finger on the J key. <br> When you are ready, press SPACE to continue.",
+    choices: " ", 
+    trial_duration: instruction_delay,
+    data: {
+        stimulus: `If italic press ${rnd_response_sides[0]} | If upright press ${rnd_response_sides[1]}`,
+        trial_info: "Diagnostic instructions",
     },
-    allow_keys: false, 
-    show_clickable_nav: true,
-    button_label_previous: "",
-    button_label_next: "Start",
-    post_trial_gap: 1500,
-    data: { stimulus: "Instructions", trial_info: "Final experiment explanation" },
-    on_finish: (data) => {
+    on_finish: (data) => { 
         if(debug){ console.log(data) }
     }
 }
-timeline.push( inducer_task_instruction_description )
+timeline.push( diagnostic_task_instruction )
+timeline.push( short_fixation )
 
 
-// We also want to force an equal number of left/right responses for the practice inducer.
-// In this case we have to generate the array outside of the function and supply the stimulus used in the trial ("force_stimuli_inducer").
-// To do this we create an array of the length of the practice, split it in two, and give them a 0 or 1 value. 
-// We then randomize the array, and parse through the array along the for loop. The value is then force into the inducer trial, 
-// selecting the stimulus corresponding to the value (first = 0, last = 1).
-let prac_indu = Array(  Array(Math.floor(prac_inducer_rounds/2)).fill(1) ,  Array( Math.ceil(prac_inducer_rounds/2) ).fill(0)  ).flat()
-    // Generate equal left/right inducer response trials
-let rnd_prac_indu = jsPsych.randomization.shuffle(prac_indu) // Randomize array
-
-
-for(let i = 0; i < prac_inducer_rounds; i++){
-    let force_stimuli_inducer = rnd_prac_indu[i]
-
-    // Run stimuli
-    let run_stimuli = [rnd_stimuli[0], rnd_stimuli[1]]
+if(!skip_practice){
+    //// Practice
+    // For the practice we want to force an equal number of right and left responses to not bias the learning. 
+    
+    // For the diagnostic practic, we only need a single set of stimuli: 
+    run_stimuli = [rnd_stimuli[0], rnd_stimuli[1]]
     rnd_stimuli.splice(0,2) 
-        // Remove added inducer stimuli from the main list 
-
-    inducer_instruction_FNC(run_stimuli,"prac", "inducer practice")
-    inducer_FNC(run_stimuli, "prac", "inducer practice", force_stimuli_inducer, false)
-}
-
-// Cue instructions
-let cue_instructions = {
-    type: jsPsychHtmlKeyboardResponse,
-    stimulus: function(){   
-        return `<div style="font-size:${instruction_font_size}">
-        
-        One last practice round will be presented.
-
-        <br><br>
-        Every new round will present two new 3-letter non-words. <br>
-        These relate to the non-words presented in 
-        <b><span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour.toLowerCase() + " colour"}</span></b>. 
-        
-        <br><br>
-        Before the 
-        <b><span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour.toLowerCase() + " coloured"}</span></b> 
-        non-word appears, some <b>black coloured</b> non-words will be presented. <br>
-
-        <br><br>
-        In addition, a <b><span style="color:${rnd_cue_col}"> ${rnd_cue_col} coloured ${cue_stimulus_name.toLowerCase() }</span></b> will appear before the 
-        <b><span style="color: ${rnd_inducer_colour}"> ${rnd_inducer_colour.toLowerCase()+ " coloured"}</span></b> non-word.  
-        <br>
-        The <b><span style="color:${rnd_cue_col}"> ${rnd_cue_col} ${cue_stimulus_name.toLowerCase() }</span></b> indicate that the
-        <b><span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour.toLowerCase()+ " coloured"}</span></b> 
-        non-word will appear within a couple of screen.
-        <br>
-        The <b><span style="color:${rnd_cue_col}"> ${rnd_cue_col} ${cue_stimulus_name.toLowerCase() }</span></b> cannot be responded to. 
-
-        </div>`
-    }, 
-    prompt: "<br>Press SPACE to start the last practice",
-    choices: " ", 
-    data: {
-        stimulus: `Cue practice`,
-        trial_info: "Cue practice",
-    },
-    on_finish: (data) => { 
-        if( debug ){ console.log(data) }
+    // To force an equal number of right/left responses, we set the last parameter to "true". 
+    // The function will create an array of equal right/left responses and randomize it. 
+    // Selecting the respective response (italic/upright) case based on the predetermined array, looping through it to the length of the "prac_diagnostic_rounds".
+    diagnostic_FNC(prac_diagnostic_rounds, run_stimuli, "prac", 100, "diagnostic practice", true, false)
+        // Force the round to be equal to not bias the practice
+    
+    // Inducer description
+    let inducer_task_instruction_description = {
+        type: jsPsychInstructions,
+        pages: () => { 
+            return [
+                // FIRST, what keys will be used in this experiment? 
+                `<div style="font-size:${instruction_font_size}">
+                
+                On the next screen, the instruction that changes throughout the task, will be presented. <br>
+                (Connected to non-words in <b> \n
+                <span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour.toLowerCase() + " colour"}</span></b>.)
+                <br><br>
+                These instructions will have the same format, <br> but will describe two new 3-letter non-words.
+                <br><br>
+                A couple of practice trials will be presented.
+                <br><br>
+                The practice round starts by clicking "Start".
+                </div>`,
+            ]
+        },
+        allow_keys: false, 
+        show_clickable_nav: true,
+        button_label_previous: "",
+        button_label_next: "Start",
+        post_trial_gap: 1500,
+        data: { stimulus: "Instructions", trial_info: "Final experiment explanation" },
+        on_finish: (data) => {
+            if(debug){ console.log(data) }
+        }
     }
-}
-timeline.push( cue_instructions )
-
-// Cue practice
-run_stimuli = [rnd_stimuli[0], rnd_stimuli[1]]
-// Remove added inducer stimuli from the main list 
-rnd_stimuli.splice(0,2) 
-inducer_instruction_FNC(run_stimuli, "prac", "cue practice")
-diagnostic_FNC(prac_cue_rounds, run_stimuli, "prac", prac_post_cue_num, "cue practice", false)
-inducer_FNC(run_stimuli, "prac", "inducer practice", false)
-
-
-//// Proper task start instructions
-let proper_task_start = {
-    type: jsPsychHtmlKeyboardResponse,
-    stimulus: function(){   
-        return `<div style="font-size:${instruction_font_size}">
-        You have now completed the practice.
-        
-        <br><br>
-        From now on, each presentation will have a deadline of 2 seconds. <br>
-        Respond to each non-word as <b>fast and accurately</b> as possible. <br>
-        The task will be difficult, but feedback will be provided. 
-        
-        </div>`
-    }, 
-    prompt: "<br>Press SPACE to start the task",
-    choices: " ", 
-    data: {
-        stimulus: `End practice`,
-        trial_info: "End of practice",
-    },
-    on_finish: (data) => { 
-        if( debug ){ console.log(data) }
+    timeline.push( inducer_task_instruction_description )
+    
+    
+    // We also want to force an equal number of left/right responses for the practice inducer.
+    // In this case we have to generate the array outside of the function and supply the stimulus used in the trial ("force_stimuli_inducer").
+    // To do this we create an array of the length of the practice, split it in two, and give them a 0 or 1 value. 
+    // We then randomize the array, and parse through the array along the for loop. The value is then force into the inducer trial, 
+    // selecting the stimulus corresponding to the value (first = 0, last = 1).
+    let prac_indu = Array(  Array(Math.floor(prac_inducer_rounds/2)).fill(1) ,  Array( Math.ceil(prac_inducer_rounds/2) ).fill(0)  ).flat()
+        // Generate equal left/right inducer response trials
+    let rnd_prac_indu = jsPsych.randomization.shuffle(prac_indu) // Randomize array
+    
+    
+    for(let i = 0; i < prac_inducer_rounds; i++){
+        let force_stimuli_inducer = rnd_prac_indu[i]
+    
+        // Run stimuli
+        let run_stimuli = [rnd_stimuli[0], rnd_stimuli[1]]
+        rnd_stimuli.splice(0,2) 
+            // Remove added inducer stimuli from the main list 
+    
+        inducer_instruction_FNC(run_stimuli,"prac", "inducer practice")
+        inducer_FNC(run_stimuli, "prac", "inducer practice", force_stimuli_inducer, false)
     }
+    
+    // Cue instructions
+    let cue_instructions = {
+        type: jsPsychHtmlKeyboardResponse,
+        stimulus: function(){   
+            return `<div style="font-size:${instruction_font_size}">
+            
+            One last practice round will be presented.
+    
+            <br><br>
+            Every new round will present two new 3-letter non-words. <br>
+            These relate to the non-words presented in 
+            <b><span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour.toLowerCase() + " colour"}</span></b>. 
+            
+            <br><br>
+            Before the 
+            <b><span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour.toLowerCase() + " coloured"}</span></b> 
+            non-word appears, some <b>black coloured</b> non-words will be presented. <br>
+    
+            <br><br>
+            In addition, a <b><span style="color:${rnd_cue_col}"> ${rnd_cue_col} coloured ${cue_stimulus_name.toLowerCase() }</span></b> will appear before the 
+            <b><span style="color: ${rnd_inducer_colour}"> ${rnd_inducer_colour.toLowerCase()+ " coloured"}</span></b> non-word.  
+            <br>
+            The <b><span style="color:${rnd_cue_col}"> ${rnd_cue_col} ${cue_stimulus_name.toLowerCase() }</span></b> indicate that the
+            <b><span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour.toLowerCase()+ " coloured"}</span></b> 
+            non-word will appear within a couple of screen.
+            <br>
+            The <b><span style="color:${rnd_cue_col}"> ${rnd_cue_col} ${cue_stimulus_name.toLowerCase() }</span></b> cannot be responded to. 
+    
+            </div>`
+        }, 
+        prompt: "<br>Press SPACE to start the last practice",
+        choices: " ", 
+        data: {
+            stimulus: `Cue practice`,
+            trial_info: "Cue practice",
+        },
+        on_finish: (data) => { 
+            if( debug ){ console.log(data) }
+        }
+    }
+    timeline.push( cue_instructions )
+    
+    // Cue practice
+    run_stimuli = [rnd_stimuli[0], rnd_stimuli[1]]
+    // Remove added inducer stimuli from the main list 
+    rnd_stimuli.splice(0,2) 
+    inducer_instruction_FNC(run_stimuli, "prac", "cue practice")
+
+    // equal resp after cue
+    let prac_cue_run = Array( Array( Math.floor( prac_post_cue_num/2 ) ).fill(0), Array( Math.ceil( prac_post_cue_num/2 ) ).fill(1) ).flat()
+    let rnd_prac_cue_run = jsPsych.randomization.shuffle( prac_cue_run )
+    if(debug){ console.log( "prac cue run:", rnd_prac_cue_run) }
+    diagnostic_FNC(prac_cue_rounds, run_stimuli, "prac", prac_post_cue_num, "cue practice", false,  false, rnd_prac_cue_run)
+    inducer_FNC(run_stimuli, "prac", "inducer practice", false)
+    
+    
+    //// Proper task start instructions
+    let proper_task_start = {
+        type: jsPsychHtmlKeyboardResponse,
+        stimulus: function(){   
+            return `<div style="font-size:${instruction_font_size}">
+            You have now completed the practice.
+            
+            <br><br>
+            From now on, each presentation will have a deadline of 2 seconds. <br>
+            Respond to each non-word as <b>fast and accurately</b> as possible. <br>
+            The task will be difficult, but feedback will be provided. 
+            
+            </div>`
+        }, 
+        prompt: "<br>Press SPACE to start the task",
+        choices: " ", 
+        data: {
+            stimulus: `End practice`,
+            trial_info: "End of practice",
+        },
+        on_finish: (data) => { 
+            if( debug ){ console.log(data) }
+        }
+    }
+    timeline.push( proper_task_start )
+    timeline.push( long_fixation )
 }
-timeline.push( proper_task_start )
-timeline.push( long_fixation )
 
 
 //// Task proper 
@@ -1085,22 +1092,23 @@ for(let block = 0; block < number_of_inducers; block++){
         // length of the post-cue 
     let run_cue_len = Array.from( Array(run_cue_num), (x, i) => i + 0) 
         // Nums to drag from the predetermined italic/upright list
-    let cue_resp_side = run_cue_len.map(index => rnd_force_cue_resp_side[index])  
+    let cue_resp_sides = run_cue_len.map(index => rnd_force_cue_resp_side[index])  
         // Get forced response side according to nums from the start. 
     rnd_force_cue_resp_side.splice(0,  run_cue_num) 
         // Remove these response sides for future runs.
     
-    if(debug){ console.log("Current post-cue run length:", run_cue_num, ". With response sides:", cue_resp_side) }
+    
+    // if(debug){ console.log("Current post-cue run length:", run_cue_num, ". With response sides:", cue_resp_sides) }
 
     ////    Timeline: 
     // Inducer instructions
     inducer_instruction_FNC( run_stimuli, block, "inducer instructions")
 
     // Diagnostic trials 
-    diagnostic_FNC( rnd_diagnostic_length[block], run_stimuli, block, rnd_cue_array[block], "diagnostic trial", true, equal_list=rnd_force_cue_resp_side)
+    diagnostic_FNC( rnd_diagnostic_length[block], run_stimuli, block, rnd_cue_array[block], "diagnostic trial", true, true, cue_resp_sides)
 
     // Inducer trial
-    inducer_FNC( run_stimuli, i, "inducer trial")
+    inducer_FNC( run_stimuli, block, "inducer trial")
 }
 
 
