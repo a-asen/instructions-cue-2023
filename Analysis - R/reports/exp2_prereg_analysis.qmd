@@ -20,7 +20,17 @@ library(lsr)
 source("../lib/helper_functions.R")
 load("../data/trans/exp2_data.rdata")
 read_csv("../data/raw/experiment2/exp2_demo.csv") -> demo
+
 ```
+
+```{r}
+list.files("../data/raw/experiment2/pilots/", full.names = T)  -> fnames
+map_df(fnames, \(x){
+  read_csv(x)
+})  -> dat
+
+```
+
 
 ```{r transformation}
 #| include: FALSE
@@ -54,55 +64,13 @@ We recruited `r length(demo$Age)+4`, participants from the United Kingdom via Pr
 #| include: false
 # Select the relevant columns & rows
 # Remove the first inducer_run (i.e., 0th)
-exp2_d
-  select(id, trial_info, inducer_run, diagnostic_run, correct_response, rt, congruent) |>
+exp2_d ##|>
+  dat |>
+  dplyr::select(id, trial_info, inducer_run, diagnostic_run, correct_response, rt, congruent, post_cue) |>
     # note. Congruent has a conding error. Recalculating congruency is done below
-  filter(trial_info == "Diagnostic trial" | trial_info == "Inducer trial") |>
+  filter(trial_info == "diagnostic trial" | trial_info == "inducer trial") |>
   # Filter the first inducer run (combined practice)
   filter(inducer_run != 0) -> d
-```
-
-
-```{r recalculating the congruency effect}
-#| include: false
-
-#' Due to a typo in the task script, the congruency output would (for some participants)
-#' be the opposite. 
-
-raw_d <- 
-  exp2_d |> 
-  select(id, trial_info, diagnostic_run, italic, inducer_run, stimulus, congruent, correct_diag_response_side, response, correct_response,rt) |>
-  filter(trial_info=="Diagnostic trial" | trial_info=="Inducer instructions" | trial_info =="Diagnostic instructions") |>
-  mutate(inducer_run = as.numeric(inducer_run),
-         italic = ifelse(italic=="true", TRUE, FALSE)) |>
-  fill(inducer_run, .direction = "up") |>
-  group_by(id) |>
-  mutate( 
-    diag_ins = stimulus[trial_info=="Diagnostic instructions"],
-    if_italic = str_split(diag_ins, " ") |> map_chr(4) ) |> 
-  ungroup() |>
-  group_by(id, inducer_run) |> 
-  # reframe(ins = stimulus[trial_info=="Inducer instructions"] ) 
-  mutate(
-    response_side = ifelse(response=="j", "RIGHT", "LEFT"),
-    #
-    indu_ins = stimulus[trial_info=="Inducer instructions"], 
-    ins_left = str_split(indu_ins, " | ") |> map_chr(2),
-    ins_right = str_split(indu_ins, " | ") |> map_chr(7),
-    ins_resp = str_split(indu_ins, " | ") |> map_chr(4),
-    #
-    inducer_tap  = ifelse(stimulus==ins_left, ins_resp, ifelse(ins_resp=="LEFT", "RIGHT", "LEFT")),
-    diag_tap     = ifelse(italic, if_italic, ifelse(if_italic=="LEFT", "RIGHT","LEFT") ) ) |>
-  filter(trial_info=="Diagnostic trial") |> 
-  ungroup() |>
-  mutate(con = ifelse(inducer_tap==diag_tap, T,F)) |>
-  select(id, inducer_run, diagnostic_run, con)
-
-
-d <- 
-  d |> 
-  mutate(inducer_run = as.numeric(inducer_run)) |>
-  left_join(raw_d, by=c("id","inducer_run", "diagnostic_run"))
 ```
 
 ## Exclusion
