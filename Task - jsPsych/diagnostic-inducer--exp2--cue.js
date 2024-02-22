@@ -4,7 +4,7 @@
 // CHANGE THESE BEFORE EXPERIMENT!
 const debug = true               // Show some console information
 const skip_instructions = false  // Skip intro? (to test trials)
-const save_local_data = false    // Save a local file (test analysis)
+const save_local_data = true    // Save a local file (test analysis)
 
 
 const study_name = "exp2_pilot" // add to filename 
@@ -63,12 +63,12 @@ const max_diagnostic_trials = 24//0     // Total max diagnostic trials
 
 ////    Inducer CUE      ////
 const cue_size = 70
-const cue_force_equal = true    // Force equal number of right/left trials 
 const cue_duration = 1250        // How long is the pre-cue present for? 
 
 const cue_min_length = 0
 const cue_max_length = 5
-const cue_n_trials = 5//560
+const cue_n_trials =  5 //70       // Number of cue trials 
+const cue_force_equal = true       // Force equal number of right/left trials 
 
 
 ////    Practice parameters     ////
@@ -78,7 +78,6 @@ const prac_inducer_rounds = 6
     // NB: Max 64 rounds of new stimuli (prac_inducer_rounds + number_of_inducer > 64)
 const prac_cue_rounds = 16
 const prac_post_cue_num = 4
-
 
 
 
@@ -102,7 +101,6 @@ const stimuli = [
     "lpn", "zpl", "feg", "ydi", "vsc", "pmf", "ibg", "geb", "byy"];
     // Enough stimuli for 64 rounds. 
     
-
 
 ////         Functions          ////
 // Date functions 
@@ -379,53 +377,53 @@ function inducer_instruction_FNC(run_stimuli, exp_block, trial_info){
     timeline.push(short_fixation)
 }
 
-function diagnostic_FNC(run_diagnostic_length, run_stimuli, exp_block, cue_diag_num, trial_info, force_equal=false, deadline=true){
-    // run_diagnostic_length == length of the current diagnostic length
-    // run_stimuli           == Block stimuli
-    // inducer_round         == Inducer block 
-    // cue_diag_num          == Apperance of the cue relative (-) to the switch 
-    // trial_info            == General trial information 
-    // force_equal           == equal number of right/left
-    // deadline              == if there is a deadline on trials
+function diagnostic_FNC(run_diagnostic_length, run_stimuli, exp_block, cue_diag_num, trial_info, force_equal=false, deadline=true, equal_list=null){
+    /**
+     * @param {list} run_diagnostic_length  Length of the current diagnostic length
+     * @param {list} run_stimuli            Run stimuli (list of two stimuli)
+     * @param {string} inducer_round        Inducer block number 
+     * @param {integer} cue_diag_num        Apperance of the cue relative to the *end* of the run 
+     * @param {string} trial_info           General trial information 
+     * @param {boolean} force_equal         Force an equal number of right/left (combine with equal_list to specific the responses)
+     * @param {boolean} deadline            Should the trials have a deadline? 
+     * @param {list} equal_list             Supply a predetermined list of diagnostic responses (e.g., [0,1,1,0])
+     * 
+     * @returns {null} Pushes the generated trials to the "timeline"
+     */
+    
     
     var rnd_prac_diag;
     
     // Randomly decide whether the stimulus should appear in italic or not.
-    if(force_equal){
+    if(force_equal && equal_list == null){
+        // If only force equal: 
+        // Generate array with equal italic/upright trials based on the supplied run_diagnostic_length 
         let prac_dia = Array(  Array(Math.floor(run_diagnostic_length/2)).fill(1) ,  Array( Math.ceil(run_diagnostic_length/2) ).fill(0)  ).flat()
-        // Generate array with equal italic/upright trials.
-        
-        rnd_prac_diag = jsPsych.randomization.shuffle(prac_dia)
-        // Randomize the equal italic/upright trials
+        rnd_prac_diag = jsPsych.randomization.shuffle(prac_dia) // Randomize the equal italic/upright trials
         if(debug){ console.log("equal diag:", rnd_prac_diag) }
     }
     
     ////    Generate diagnostic trials  ////
     for(let exp_diag = 0; exp_diag < run_diagnostic_length; exp_diag++){
-
         // For each trial...
+
         // Randomly get a stimulus (from the stimuli list)
         let rnd_diag_stimulus = jsPsych.randomization.sampleWithReplacement(run_stimuli, 1)[0]
         
+        // Select italic/upright based on condition: 
         let run_rnd_italic;
-        // Sample or choose italic/upright
-        if(force_equal){
+        if(force_equal && equal_list == null){ // if not supplied list length
             if(rnd_prac_diag[exp_diag] == 1){
                 run_rnd_italic = true
-            } else{
+            } else {
                 run_rnd_italic = false
             }
-        } else {
+        } else if (force_equal && !equal_list == null) {  // if supplied list length
+            run_rnd_italic = force_equal[exp_diag]
+        } else { // randomization: 
             run_rnd_italic = jsPsych.randomization.sampleWithReplacement([true,false], 1, run_italic_bias)[0]
         }
         
-
-        // If it is post cue, we need to force an equal number of right/left.
-        if( exp_diag >= run_diagnostic_length-cue_diag_num ){
-
-        } 
-
-
         // Create trial:
         let diagnostic_run = { 
             type: jsPsychHtmlKeyboardResponse,
@@ -437,92 +435,97 @@ function diagnostic_FNC(run_diagnostic_length, run_stimuli, exp_block, cue_diag_
                 }
             }, 
             choices: allowed_responses,
-            trial_duration: () => {
-                if(deadline){
+            trial_duration: () => { 
+                if(deadline){ 
                     return trial_duration
                 } else {
                     return null
                 }
             },
             data: {
-                stimulus: rnd_diag_stimulus,         // Stimulus
-                inducer_run: exp_block,                   // Inducer run number (i.e., block)
-                diagnostic_run: exp_diag,                 // Diagnostic trial number //start with 1
-                post_cue: () => {                         // Whether the trials is before or after the cue
-                      if(exp_diag>cue_diag_num) { return true }
-                      else                      { return false }
+                stimulus: rnd_diag_stimulus,            // Trial stimulus
+                inducer_run: exp_block,                 // Inducer run number (i.e., block)
+                diagnostic_run: exp_diag,               // Diagnostic run number 
+                post_cue: () => {                       // Is the current trial after the cue? 
+                      if(exp_diag > cue_diag_num) { return true }
+                      else                        { return false }
                 },
-                inducer_trial: false,                     // Not an inducer trial
-                italic: run_rnd_italic,             // Whether the run is ITALIC or not
-                trial_info: trial_info,         // This is a diagnostic trial
-                correct_inducer_response_side: () => { // Required response side for the inducer task
+                inducer_trial: false,                       // Not an inducer trial
+                italic: run_rnd_italic,                 // Is the current trial an italic type? 
+                trial_info: trial_info,                 // Trial description
+                force_equal: force_equal,               // Is the current trial force to be equal in some way? 
+                correct_inducer_response_side: () => {  // GET the correct inducer response side (in relation to the select stimulus)
                     if( rnd_diag_stimulus == run_stimuli[0] ) { return rnd_response_sides[0] }
                     else                                      { return rnd_response_sides[1] }
                 },
-                correct_diag_response_side: () => {     // Required response side for the diagnostic task
+                correct_diag_response_side: () => {     // GET the correct diagnostic response side (according to the italic/upright) 
                     if (run_rnd_italic) { return rnd_response_sides[0] } 
                     else                { return rnd_response_sides[1] } 
                 },
             },
             on_finish: (data) => {
-                // Require diagnostic response key 
+                // SET the correct response key
                 if(data.correct_diag_response_side == response_sides[0]) 
                         { data.correct_response_key = allowed_responses[0] }
                 else    { data.correct_response_key = allowed_responses[1] }
                 
-                // Correct response
+                // CHECK whether the response equal the correct response ke
                 if(data.response == null){  data.correct_response = NaN  } 
                 else {
-                    // If response equals correct_response_key
                     if(data.correct_response_key == data.response)    { data.correct_response = 1 }
                     else                                              { data.correct_response = 0 }
                 }
 
-                ////    GONGUENCEY      ////
-                // If the response side match, then congruent
+                // CHECK whether the current response side is congruent
                 if(data.correct_diag_response_side == data.correct_inducer_response_side){
                     data.congruent = true
                 } else { 
                     data.congruent = false
                 }
 
-                if(debug){ console.log(data) } // debg
+                if(debug){ console.log(data) } // DEBUG
             }
         }
         
         ////        Timeline         ////
-        // Trial
-        timeline.push(diagnostic_run)
+        timeline.push(diagnostic_run)       // PUSH the current trial
     
-        // Feedback
-        timeline.push(too_slow_trial)
-        timeline.push(wrong_response_trial)
+        timeline.push(too_slow_trial)       // PUSH feedback: SLOW
+        timeline.push(wrong_response_trial) // PUSH feedback: WRONG
 
-        // Fixation
-        timeline.push(short_fixation)
+        timeline.push(short_fixation)       // PUSH fixation
 
-        // Cue appears cue_diag_num from the switch. 
-        if(exp_diag == run_diagnostic_length-cue_diag_num ){
-            timeline.push( cue_trial_f(exp_block, exp_diag) )
-                // Add exp_block and exp_diag to trial
+                                            // PUSH cue 
+        if(exp_diag == run_diagnostic_length - cue_diag_num ){
+            timeline.push( cue_trial_f(exp_block, exp_diag) ) 
 
-            // Fixation,
-            timeline.push(short_fixation)
+            timeline.push(short_fixation)   // PUSH fixation
         }
     }
 }
 
-function inducer_FNC(run_stimuli, exp_block, trial_info, force_resp_side = false, deadline = true){
+function inducer_FNC(run_stimuli, exp_block, trial_info, force_resp_side = null, deadline = true){
+    /**
+     * @param {list} run_stimuli            List of the current run stimuli
+     * @param {integer} exp_block           Current block number
+     * @param {string} trial_info           Trial description
+     * @param {integer} force_resp_side     List of forced response sides (e.g., [0,1,0,0,1,1])
+     * @param {boolean} deadline            Will the run have a deadline? 
+     */
     // run_stimuli == Randomly selected stimuli for the current block 
     // exp_block == Current block number
 
     var rnd_inducer_stimulus;
-
-    if(force_resp_side.length >=1){
+    var force_equal;
+    
+    // GET inducer stimulus
+    if(!force_resp_side == null){
         rnd_inducer_stimulus = run_stimuli[force_resp_side]
+        force_equal = true
     } else {
         // Randomly get a stimulus for the inducer trial
         rnd_inducer_stimulus = jsPsych.randomization.sampleWithReplacement(run_stimuli, 1)[0]
+        force_equal = false
     }
 
     // Create inducer trial: 
@@ -538,39 +541,39 @@ function inducer_FNC(run_stimuli, exp_block, trial_info, force_resp_side = false
             }
         },
         data: {
-            stimulus: rnd_inducer_stimulus,         // Stimulus
-            inducer_run: exp_block,                     // Inducer run number
-            inducer_trial: true,                    // This is an inducer trial
-            trial_info: trial_info,            // General trial info 
-            correct_indu_response_side: () => {     // Required response side for the diagnostic task
+            stimulus: rnd_inducer_stimulus,         // Trial stimulus
+            inducer_run: exp_block,                 // Inducer run number
+            inducer_trial: true,                        // Inducer
+            trial_info: trial_info,                 // General trial info 
+            force_equal: force_equal,               // Is the current trial force to be equal in some way?     
+            correct_indu_response_side: () => {     // Get the correct response side (according to the stimulus) 
                 if (rnd_inducer_stimulus == run_stimuli[0]) { return rnd_response_sides[0] } 
                 else                                        { return rnd_response_sides[1] } 
-            }
+            },
+            
         },
         on_finish: (data) => {
-            // Associate correct key from response sides
+            // SET the correct response key
             if(data.correct_indu_response_side == response_sides[0]) 
                     { data.correct_response_key = allowed_responses[0] }
             else    { data.correct_response_key = allowed_responses[1] }
             
-            // Associate correct response from correct response key
+            // CHECK the response according to the correct Associate correct response from correct response key
             if(data.response == null){  data.correct_response = NaN  } 
             else {
-                // If response equals correct_response_key
                 if(data.correct_response_key == data.response)    { data.correct_response = 1 }
                 else                                              { data.correct_response = 0 }
             }
-            if(debug){ console.log(data) }
+            if(debug){ console.log(data) }  // DEBUG
         }
     }
-    timeline.push( inducer_task )
+    
+    timeline.push( inducer_task )           // PUSH the current trial
 
-    // Feedback
-    timeline.push(too_slow_trial)
-    timeline.push(wrong_response_trial)
+    timeline.push(too_slow_trial)           // PUSH feedback: SLOW
+    timeline.push(wrong_response_trial)     // PUSH feedbacl: WRONG
 
-    // fixation
-    timeline.push( short_fixation )
+    timeline.push( short_fixation )         // PUSH fixation 
 }
 
 
@@ -743,14 +746,10 @@ if(cue_force_equal){
     if(debug){ console.log("Cue force resp side:", rnd_force_cue_resp_side)}
 }
 
-
+/////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////
 
 let run_stimuli;
-
-
-/////////////////////////////////////////////////////////////////////////////////////////////
-/////////////////////////////////////////////////////////////////////////////////////////////
-
 
 ////////////////////////////
 ////    Instructions    ////
@@ -933,13 +932,12 @@ diagnostic_instructions_FNC()
 
 // For the diagnostic practic, we only need a single set of stimuli: 
 run_stimuli = [rnd_stimuli[0], rnd_stimuli[1]]
-// Remove the stimuli from the main list. 
 rnd_stimuli.splice(0,2) 
 // To force an equal number of right/left responses, we set the last parameter to "true". 
 // The function will create an array of equal right/left responses and randomize it. 
 // Selecting the respective response (italic/upright) case based on the predetermined array, looping through it to the length of the "prac_diagnostic_rounds".
 diagnostic_FNC(prac_diagnostic_rounds, run_stimuli, "prac", 100, "diagnostic practice", true, false)
-    // these round need a forced sequence. 
+    // Force the round to be equal to not bias the practice
 
 // Inducer description
 let inducer_task_instruction_description = {
@@ -980,9 +978,9 @@ timeline.push( inducer_task_instruction_description )
 // We then randomize the array, and parse through the array along the for loop. The value is then force into the inducer trial, 
 // selecting the stimulus corresponding to the value (first = 0, last = 1).
 let prac_indu = Array(  Array(Math.floor(prac_inducer_rounds/2)).fill(1) ,  Array( Math.ceil(prac_inducer_rounds/2) ).fill(0)  ).flat()
-// Generate equal left/right inducer response trials
-let rnd_prac_indu = jsPsych.randomization.shuffle(prac_indu)
-// Randomize array
+    // Generate equal left/right inducer response trials
+let rnd_prac_indu = jsPsych.randomization.shuffle(prac_indu) // Randomize array
+
 
 for(let i = 0; i < prac_inducer_rounds; i++){
     let force_stimuli_inducer = rnd_prac_indu[i]
@@ -1076,16 +1074,14 @@ timeline.push( long_fixation )
 
 
 //// Task proper 
-for(let i = 0; i < number_of_inducers; i++){
-    
-    // Inducer:
+for(let block = 0; block < number_of_inducers; block++){
+    ////    Setup: 
+    // Block stimuli: 
     let run_stimuli = [rnd_stimuli[0], rnd_stimuli[1]]
-        // Get run stimuli
     rnd_stimuli.splice(0,2) 
-        // Then remove the stimuli from the list    
     
-    // Cue:
-    let run_cue_num = rnd_cue_array[i] 
+    // Cue length
+    let run_cue_num = rnd_cue_array[block] 
         // length of the post-cue 
     let run_cue_len = Array.from( Array(run_cue_num), (x, i) => i + 0) 
         // Nums to drag from the predetermined italic/upright list
@@ -1095,19 +1091,17 @@ for(let i = 0; i < number_of_inducers; i++){
         // Remove these response sides for future runs.
     
     if(debug){ console.log("Current post-cue run length:", run_cue_num, ". With response sides:", cue_resp_side) }
-    
 
-    //// Timeline: 
+    ////    Timeline: 
     // Inducer instructions
-    inducer_instruction_FNC( run_stimuli, i, "inducer instructions" )
+    inducer_instruction_FNC( run_stimuli, block, "inducer instructions")
 
     // Diagnostic trials 
-    diagnostic_FNC( rnd_diagnostic_length[i], run_stimuli, i, rnd_cue_array[i], "diagnostic trial" ) //cue_resp_side
+    diagnostic_FNC( rnd_diagnostic_length[block], run_stimuli, block, rnd_cue_array[block], "diagnostic trial", true, equal_list=rnd_force_cue_resp_side)
 
     // Inducer trial
     inducer_FNC( run_stimuli, i, "inducer trial")
 }
-
 
 
 /////////////////////////////////////////////////////////////////////////////////////
