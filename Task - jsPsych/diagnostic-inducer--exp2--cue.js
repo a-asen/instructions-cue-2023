@@ -3,9 +3,9 @@
 
 // CHANGE THESE BEFORE EXPERIMENT!
 const debug = true                  // Show debug information?
-const skip_instructions = true     // Skip intro? 
+const skip_instructions = false     // Skip intro? 
 const skip_practice = false         // Skip practice? 
-const save_local_data = true        // Save local file? 
+const save_local_data = false        // Save local file? 
 
 const study_name = "exp2_pilot" // add to filename 
 // const redirect_link = ## NT &&//"https://app.prolific.com/submissions/complete?cc=" 
@@ -50,24 +50,25 @@ const response_sides = ["LEFT","RIGHT"];  // What participants will RESPOND to (
 
 ////    Inducer parameters     ////
 const inducer_colours      = ["hotpink", "yellow", "blue"]      // Inducer colour randomize between participants (if more than 1)
+const inducer_colour_name  = ["pink", "yellow", "blue"]
     // ["darkred", "yellow", "purple"] 
     // This is also what is DISPLAYED (i.e., text) to participants. Should therefore be a readable name. 
 
 ////    Diagnostic parameters   ////
-const number_of_inducers = 2//24;       // Number of inducers 
+const number_of_inducers = 10//24;       // Number of inducers 
     // !!! CHANGE max trials !!! 
 const diagnostic_min_length = 4         // Min run length
 const diagnostic_max_length = 16        // Max run length
-const max_diagnostic_trials = 24//0     // Total max diagnostic trials
+const max_diagnostic_trials = 100//0     // Total max diagnostic trials
     // max/2 * number_of_inducers
 
 ////    Inducer CUE      ////
 const cue_size = 70
-const cue_duration = 1250        // How long is the pre-cue present for? 
+const cue_duration = 750        // How long is the pre-cue present for? 
 
 const cue_min_length = 0
 const cue_max_length = 5
-const cue_n_trials =  5 //70       // Number of cue trials 
+const cue_n_trials =  35 //70       // Number of cue trials 
 const cue_force_equal = true       // Force equal number of right/left trials 
 
 
@@ -578,7 +579,9 @@ let rnd_stimuli = jsPsych.randomization.shuffle(stimuli);  // Shuffle stimuli li
 if(debug) { console.log("Randomized stimuli list:", rnd_stimuli) }
 
 // Inducer colour
-let rnd_inducer_colour = jsPsych.randomization.sampleWithReplacement(inducer_colours, 1)[0]
+let rnd_indu_col = jsPsych.randomization.sampleWithReplacement([0,1,2],1)[0]
+let rnd_inducer_colour = inducer_colours[rnd_indu_col]
+let rnd_inducer_colour_name = inducer_colour_name[rnd_indu_col]
 if(debug){ console.log("Inducer colour: ", rnd_inducer_colour) }
 
 
@@ -625,19 +628,21 @@ if(sum_diags != max_diagnostic_trials){
         } else { // else skip
             if(debug){ console.log("Value: ", rnd_diagnostic_length[loc], "at location", loc, "is at threshold, skipping...") } }
         break_count+=1 // in case 
-        if(debug){ console.log( break_count ) }
     } while( diff > 0 & break_count < 500)
     if(debug){ console.log("Fixed diagnostic lengths:", rnd_diagnostic_length) }
-    if(break_count >= 500){ "WARNING: COULD NOT EQUALIZE DIAGNOSTIC LENGTHS, CHECK PARAMETERS" }
+    if(break_count >= 500){ console.log("WARNING: COULD NOT EQUALIZE DIAGNOSTIC LENGTHS, CHECK PARAMETERS") }
 }
-
 
 ////        CUE          ///
 // Filter colours not used for the inducer:
 let r_col = inducer_colours.filter(item => item !== rnd_inducer_colour);
+let r_col_name = inducer_colour_name.filter(item => item !== rnd_inducer_colour_name);
 // Sample a colour from the remaining colours:
-let rnd_cue_col = jsPsych.randomization.sampleWithReplacement(r_col, 1)[0]
-if(debug) { console.log("Inducer colour: ", rnd_inducer_colour, " |  Pre-cue colour: ", rnd_cue_col)}
+let rnd_cue_n = jsPsych.randomization.sampleWithReplacement([0,1], 1)[0]
+let rnd_cue_col = r_col[rnd_cue_n]
+let rnd_cue_col_n = r_col_name[rnd_cue_n]
+
+if(debug) { console.log("Inducer colour: ", rnd_inducer_colour, " |  Cue colour: ", rnd_cue_col)}
 
 // Cue stimulus
 // Randomly sample a number between 0 and 2.
@@ -646,7 +651,7 @@ const rnd_cue_picker = jsPsych.randomization.sampleWithReplacement([0,1,2], 1)[0
 const rnd_cue_stimulus = [draw_circle,draw_square,draw_triangle][rnd_cue_picker]
 const cue_stimulus_name = ["Circle", "Square", "Triangle"][rnd_cue_picker]
 
-if(debug){ console.log("Random cue stimulus:", rnd_cue_stimulus) }
+if(debug){ console.log("Random cue stimulus:", cue_stimulus_name) }
 
 // Pre-inducer cue trial length
 let cue_array = Array.from(Array(cue_max_length - cue_min_length+1), (x, i) => i + cue_min_length) 
@@ -663,6 +668,10 @@ for(let i = 0; i < number_of_inducers; i++){
         // Test whether the cue length can be put in the respective trial
         if(rnd_diagnostic_length[i] - cue_pre_trials >= diagnostic_min_length ){
             rnd_cue_array.push(cue_pre_trials)
+            if(debug){ console.log("Location:", i, 
+            "Diagnostic run length (at loc):", rnd_diagnostic_length[i], 
+            "Random cue length of:",  cue_pre_trials, 
+            "Differences of: ",rnd_diagnostic_length[i] - cue_pre_trials) }
             break;
         }
     }
@@ -675,11 +684,11 @@ if(debug){ console.log("Total post-cue diag trials:", sum_rnd_cue_array) }
 if(sum_rnd_cue_array != cue_n_trials){
     let operation = (sum_rnd_cue_array < cue_n_trials) ? "+" : "-";
     let diff = Math.abs(sum_rnd_cue_array - cue_n_trials)
-        // Difference between the set number of trials and the calculated number
+    // Difference between the set number of trials and the calculated number
     var cond;
 
-    if(debug){ console.log("Current operation", operation, "with a differences of", diff) }
-
+    if(debug){ console.log("Sufficient cue-length is missing. Cue length operation is", operation, "with a differences of", diff) }
+    
     // Dont need a break here, because it will always finish. 
     do{
         if(debug){ console.log("Diff: ", diff) }
@@ -697,24 +706,23 @@ if(sum_rnd_cue_array != cue_n_trials){
                 var cue_add = -1
                 break;
         }
-        // Test whether we can increase/decrease, if not skip. 
-        if(cond){ 
-            if(debug){ console.log("Adjusting:",  rnd_cue_array[loc], "at location", loc) }
-
-            // Before we add, we test whether this particular trial is less than threshold 
-            // (at least diagnostic_min_length (4) trials pre-cue)
-            if( rnd_diagnostic_length[loc] - rnd_cue_array[loc] + cue_add >= diagnostic_min_length ) {
-                operation == "+" ? rnd_cue_array[loc]++ : operation=="-" ? rnd_cue_array[loc]-- : "";
-                diff--;
-            } else {
-                if(debug){ console.log("below minimum, skipping")}
-                continue;
-            }
-
-        } else {
-            if(debug){ console.log("Value: ", rnd_cue_array[loc], "at location", loc, "is at threshold, skipping...") } 
-        }
+        let can_change = rnd_diagnostic_length[loc] - ( rnd_cue_array[loc] + cue_add ) >= diagnostic_min_length
+    
         
+        if(debug){ console.log("Cue at threshold:", cond, "Min pre-cue condition:",can_change,) }
+        
+        // Test whether we can increase/decrease, if not skip. 
+        if(cond && can_change ){ 
+            if(debug){ console.log( 
+                "Location:", loc,"-> ",
+                "Adjusting:",          rnd_cue_array[loc], "to", rnd_cue_array[loc] + cue_add, 
+                "Total diag length:",  rnd_diagnostic_length[loc],
+                "Pre-cue length:",   rnd_diagnostic_length[loc] - ( rnd_cue_array[loc] + cue_add ),
+                "Post-cue length:", rnd_cue_array[loc]+ cue_add ) }
+            
+            rnd_cue_array[loc] += cue_add 
+            diff--;
+        }         
     } while( diff > 0 ) 
 
     if(debug){ console.log("Fixed post-cue diagnostic lengths:", rnd_cue_array) }
@@ -978,11 +986,11 @@ if(!skip_practice){
     // To do this we create an array of the length of the practice, split it in two, and give them a 0 or 1 value. 
     // We then randomize the array, and parse through the array along the for loop. The value is then force into the inducer trial, 
     // selecting the stimulus corresponding to the value (first = 0, last = 1).
-    let prac_indu = Array(  Array(Math.floor(prac_inducer_rounds/2)).fill(1) ,  Array( Math.ceil(prac_inducer_rounds/2) ).fill(0)  ).flat()
+    var prac_indu = Array(  Array(Math.floor(prac_inducer_rounds/2)).fill(1) ,  Array( Math.ceil(prac_inducer_rounds/2) ).fill(0)  ).flat()
         // Generate equal left/right inducer response trials
-    let rnd_prac_indu = jsPsych.randomization.shuffle(prac_indu) // Randomize array
-    
-    
+    var rnd_prac_indu = jsPsych.randomization.shuffle(prac_indu) // Randomize array
+    if(debug){ console.log("Rnd practice inducer:", rnd_prac_indu) }
+
     for(let i = 0; i < prac_inducer_rounds; i++){
         let force_stimuli_inducer = rnd_prac_indu[i]
     
@@ -1014,14 +1022,14 @@ if(!skip_practice){
             non-word appears, some <b>black coloured</b> non-words will be presented. <br>
     
             <br><br>
-            In addition, a <b><span style="color:${rnd_cue_col}"> ${rnd_cue_col} coloured ${cue_stimulus_name.toLowerCase() }</span></b> will appear before the 
+            In addition, a <b><span style="color:${rnd_cue_col}"> ${rnd_cue_col_n} coloured ${cue_stimulus_name.toLowerCase() }</span></b> will appear before the 
             <b><span style="color: ${rnd_inducer_colour}"> ${rnd_inducer_colour.toLowerCase()+ " coloured"}</span></b> non-word.  
             <br>
-            The <b><span style="color:${rnd_cue_col}"> ${rnd_cue_col} ${cue_stimulus_name.toLowerCase() }</span></b> indicate that the
+            The <b><span style="color:${rnd_cue_col}"> ${rnd_cue_col_n} ${cue_stimulus_name.toLowerCase() }</span></b> indicate that the
             <b><span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour.toLowerCase()+ " coloured"}</span></b> 
             non-word will appear within a couple of screen.
             <br>
-            The <b><span style="color:${rnd_cue_col}"> ${rnd_cue_col} ${cue_stimulus_name.toLowerCase() }</span></b> cannot be responded to. 
+            The <b><span style="color:${rnd_cue_col}"> ${rnd_cue_col_n} ${cue_stimulus_name.toLowerCase() }</span></b> cannot be responded to. 
     
             </div>`
         }, 
