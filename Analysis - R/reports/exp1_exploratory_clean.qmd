@@ -18,6 +18,8 @@ library(lsr)
 library(lme4)
 library(jsonlite)
 source("../lib/helper_functions.R")
+
+save_outputs <- TRUE
 ```
 
 ```{r citation}
@@ -58,7 +60,7 @@ data |>
 # Select the relevant columns & rows
 # Remove the first inducer_run (i.e., 0th)
 data |>
-  select(id, trial_info, inducer_run, diagnostic_run, correct_response, rt, congruent) |>
+  dplyr::select(id, trial_info, inducer_run, diagnostic_run, correct_response, rt, congruent) |>
     # note. Congruent has a conding error. Recalculating congruency is done below
   filter(trial_info == "Diagnostic trial" | trial_info == "Inducer trial") |>
   # Filter the first inducer run (combined practice)
@@ -73,7 +75,7 @@ data |>
 
 raw_d <- 
   data |> 
-  select(id, trial_info, diagnostic_run, italic, inducer_run, stimulus, congruent, correct_diag_response_side, response, correct_response,rt) |>
+  dplyr::select(id, trial_info, diagnostic_run, italic, inducer_run, stimulus, congruent, correct_diag_response_side, response, correct_response,rt) |>
   filter(trial_info=="Diagnostic trial" | trial_info=="Inducer instructions" | trial_info =="Diagnostic instructions") |>
   mutate(inducer_run = as.numeric(inducer_run),
          italic = ifelse(italic=="true", TRUE, FALSE)) |>
@@ -98,7 +100,7 @@ raw_d <-
   filter(trial_info=="Diagnostic trial") |> 
   ungroup() |>
   mutate(con = ifelse(inducer_tap==diag_tap, T,F)) |>
-  select(id, inducer_run, diagnostic_run, con)
+  dplyr::select(id, inducer_run, diagnostic_run, con)
 
 d <- 
   d |> 
@@ -118,12 +120,12 @@ d |>
   group_by( id ) |>
   mutate( correct_response = ifelse( trial_info=="Inducer trial" & is.na(rt), 0, correct_response) ) |>
     #' !  Non-responses count as a wrong response & are subject to the exclusion criteria.  !
-  summarize( acc = sum(correct_response, na.rm = TRUE) / length( !is.na(correct_response) ) ) |>
-  filter( acc < .7 ) |>
+  summarize( err = 1 - mean(correct_response, na.rm=TRUE) ) |>
+  filter( err > .3 ) |>
   pull( id ) -> loss$exclude_par
 
 loss[["exclude_par_trials"]] <- length( d$rt[d$id == loss$exclude_par] )
-loss[["exclude_par_pct"]]    <- length( d$rt[d$id == loss$exclude_par] ) / loss$data_trials * 100
+loss[["exclude_par_prop"]]    <- length( d$rt[d$id == loss$exclude_par] ) / loss$data_trials * 100
 
 d |> filter( !(id %in% loss$exclude_par) ) -> d
 ```
@@ -167,7 +169,7 @@ d |>
   #' the preregistration, it is *not* preregistered.
 
 sum(d$retain_trials == 0) -> loss[["rt_sd_trials"]]
-sum(d$retain_trials == 0) / loss$data_trials * 100 -> loss[["rt_sd_pct"]]
+sum(d$retain_trials == 0) / loss$data_trials * 100 -> loss[["rt_sd_prop"]]
 
 d |> 
   filter( retain_trials == 1 ) -> d
@@ -184,7 +186,7 @@ d |>
   fill(valid_trials, .direction = "up") -> d
 
 sum(d$valid_trials==0) -> loss[["inducer_fail_trials"]]
-sum(d$valid_trials==0) / loss$data_trials * 100 -> loss[["inducer_fail_pct"]]
+sum(d$valid_trials==0) / loss$data_trials * 100 -> loss[["inducer_fail_prop"]]
 
 d |> filter( valid_trials == 1 ) -> d
 ```
@@ -205,7 +207,8 @@ d |>
   group_by(id) |>
   summarize(g_rt = mean(rt, na.rm = TRUE),
             g_rt_sd = sd(rt),
-            g_pe = 1 - mean(correct_response),
+            # err
+            g_pe = 1 - mean(correct_response), 
             g_pe_sd =  sd(correct_response)) ->  lisas_grand
 
 d |>
@@ -266,14 +269,14 @@ d |>
   ungroup() |>
   summarize(g_rt = mean(rt, na.rm = TRUE),
             g_rt_sd = sd(rt),
-            g_pe = mean(correct_response),
-            g_pe_sd =  sd(correct_response),) -> g_bis
+            g_pc = mean(correct_response),
+            g_pc_sd =  sd(correct_response),) -> g_bis
 
 d |>
   filter(trial_info=="Diagnostic trial") |>
   group_by(id, con) |>
   summarize(rt = mean(rt, na.rm = TRUE),
-            pe = mean(correct_response) ) -> ind_bis # |>
+            pc = mean(correct_response) ) -> ind_bis # |>
   #pivot_wider( names_from = con, values_from = c(rt, pe) ) -> ind_bis
 
 BIS <- 
@@ -281,7 +284,7 @@ BIS <-
   cbind(g_bis) |> 
   mutate(con = ifelse(con==FALSE, "Incongruent", "Congruent")) |>
   group_by(id, con) |>
-  mutate(BIS  = ( (pe - g_pe) / g_pe_sd ) - ( (rt - g_rt) / g_rt_sd ) )
+  mutate(BIS  = ( (pc - g_pc) / g_pc_sd ) - ( (rt - g_rt) / g_rt_sd ) )
 
 bis__lisas <- 
   lisas |> 
@@ -292,33 +295,15 @@ bis__lisas <-
             # standardize: would have to be done at calculation to yield informative output? 
   ) |>
   left_join(BIS, by=c("id", "con")) |>
-      # join by two conds. 
-  # select(!name) |> 
   mutate(BIS_inv = -1*BIS,
           # inverse
          BIS_lisas = (-1*BIS) * g_rt_sd.y + g_rt.y ,
           # Inverse & RT correct
          ) |>
-  rename(rt = rt.x, pe = pe.x) |>
-  select(id, con, rt, pe, lisas, BIS_lisas, BIS) 
-```
-
-# Feedback
-ANCOVA related 
-```{r}
-#| echo: false
-data |> 
-  filter(stimulus == "feedback") |> 
-  dplyr::select(id, response) |>
-  mutate(
-    strat = map(response, fromJSON) |> map_chr(1),
-    open  = map(response, fromJSON) |> map_chr(2), ) |>
-  dplyr::select(-response) |>
-  mutate(
-    exclu = ifelse(id %in% loss$exclude_par, TRUE,FALSE)
-  ) |> 
-  dplyr::select(id, exclu, everything()) |>
-  gt()
+  rename(rt = rt.x) |>
+  dplyr::select(id, con, rt, pe, lisas, BIS_lisas, BIS) 
+      # join by two conds. 
+  # select(!name) |> 
 ```
 
 
@@ -341,7 +326,7 @@ comb_table <-
     mdiff     = mean(Incongruent-Congruent),
     t.val     = t.test(Incongruent, Congruent, paired=T)$statistic,
     df        = t.test(Incongruent, Congruent, paired=T)$parameter,
-    p.val     = t.test(Incongruent, Congruent, paired=T)$p.value  |> fmt_APA_numbers(p = T), 
+    p.val     = t.test(Incongruent, Congruent, paired=T)$p.value  |> fmt_APA_numbers(.p = T), 
     b.est     = mean( ttestBF(Incongruent, Congruent, paired=T, posterior=T, iterations=5000)[,"mu"] ),
     b         = extractBF( ttestBF(Incongruent, Congruent, paired=T) )$bf,
     hdi       = paste0("[",
@@ -353,9 +338,12 @@ comb_table <-
   ) |> 
   mutate( across( where(is.numeric), fmt_APA_numbers) ) 
   
+mean(comb_table$df) -> tab_df
 comb_table |> 
   mutate(name = factor(name, levels=c("rt","pe","lisas","BIS_lisas","BIS") ), 
-         e1="",e2="",e3="", e4="") |>
+         e1="",e2="",e3="", e4="",
+         across(contains(c("con", "b")), ~ fmt_APA_numbers(num=.x, .chr=T) )
+         ) |>
   arrange(name) |>
   gt() |>
   cols_move(e1, sd_incon) |>
@@ -367,17 +355,39 @@ comb_table |>
   #tab_spanner("Congruent", C(m_con, sd_con) )
     # why u not wrk? 
   cols_label(m_incon = md("*M*"), sd_incon = md("*SD*"), m_con = md("*M*"), sd_con = md("*SD*"),
-             mdiff = md("*M*~diff~"), p.val = md("*p*"), b = md("BF~10~"), b.est = md("B~est~"), 
-             hdi = "HDI", d = md("*d*"), e1="",e2="",e3="", e4="") |>
+             p.val = md("*p*"), b = md("BF~10~"), b.est = md("*M*~est~"), 
+             hdi = "HDI", d = md("*d*"), e1="",e2="",e3="", e4="", t.val = md( paste0("*t*(", tab_df,")") ) ) |>
   tab_spanner("Congruent", c(m_con, sd_con) ) |>
-  cols_hide( c(t.val, df)) |>
-  cols_align("center" ) 
+  cols_hide( c(df, mdiff)) |>
+  cols_align("center" )  -> exp1_table_complex
+exp1_table_complex
+
+if(save_outputs){ gtsave(exp1_table_complex, filename = "../outputs/tables/exp1_table_complex.docx") }
 ```
 
 
 
-# Encoding and congruency 
 
+# Feedback
+```{r}
+#| echo: false
+data |> 
+  filter(stimulus == "feedback") |> 
+  dplyr::select(id, response) |>
+  mutate(
+    strat = map(response, fromJSON) |> map_chr(1),
+    open  = map(response, fromJSON) |> map_chr(2), ) |>
+  dplyr::select(-response) |>
+  mutate(
+    exclu = ifelse(id %in% loss$exclude_par, TRUE,FALSE)
+  ) |> 
+  dplyr::select(id, exclu, everything()) |>
+  gt()
+```
+
+
+# Encoding and congruency 
+ANCOVA related 
 ## Correlation
 Grand correlation, encoding time (ms) and response time (ms) for the inducer task
 ```{r total table}
@@ -437,7 +447,7 @@ p1 <-
   geom_smooth(method=lm, col="indianred2", linewidth=1) +
   scale_x_continuous(breaks=seq(0,20000,2000)) +
   scale_y_continuous(breaks=seq(0,2000,250)) +
-  labs(y = "Trial response time (ms)", x = "Instruction response time (ms)")+
+  labs(y = "Trial Response Time (ms)", x = "Instruction Response Time (ms)")+
   theme(legend.position = "none")+
   coord_cartesian(ylim=c(0,2000))+
   labs(title="Corrected")+
@@ -452,7 +462,7 @@ p2 <-
   geom_smooth(method=lm, col="indianred2", linewidth=1) +
   scale_x_continuous(breaks=seq(0,20000,2000)) +
   scale_y_continuous(breaks=seq(0,2000,250)) +
-  labs(y = "Trial response time (ms)", x = "Instruction response time (ms)")+
+  labs(y = "Trial Response Time (ms)", x = "Instruction Response Time (ms)")+
   theme(legend.position = "none")+
   coord_cartesian(ylim=c(0,2000))+
   labs(title="Removed")+
@@ -473,7 +483,7 @@ d |>
   an_d
 
 an_d |>
-  filter( trial_info=="Diagnostic trial" ) |>
+  filter( trial_info=="Diagnostic rial" ) |>
   ggplot(aes(instructions, rt, col=con))+
   geom_point(alpha=.1)+
   geom_smooth(method="lm")
@@ -489,7 +499,7 @@ an_d |>
   geom_point(alpha=.1)+ 
   scale_x_continuous(breaks=seq(0,20000,2000)) +
   scale_y_continuous(breaks=seq(0,2000,250)) +
-  labs(y = "Trial response time (ms)", x = "Instruction response time (ms)")+
+  labs(y = "Trial Response Time (ms)", x = "Instruction Response Time (ms)")+
   theme(legend.position = "none")+
   coord_cartesian(ylim=c(0,2000))+
   theme_minimal()
@@ -504,7 +514,7 @@ reg_d <-
   an_d |>
   filter( trial_info=="Diagnostic trial" ) |>
   group_by(id, inducer_run, con) |>
-  summarise(rt = mean(rt), instructions = unique(instructions), pct = mean(correct_response)) |>
+  summarise(rt = mean(rt), instructions = unique(instructions), prop = mean(correct_response)) |>
   mutate( instructions = log(instructions),
           rt = log(rt),)
 ```
@@ -560,7 +570,7 @@ r_mod3 <-
 anova(r_mod1, r_mod2, r_mod3)
 summary(r_mod3)
 exp(fixef(r_mod3))
-glht()
+#glht()
 ```
 
 Results suggest that only the model that include encoding, but no the interaction, is a significant improvement compared to the former model. 
@@ -639,21 +649,21 @@ an_d |>
 In this way, including a random intercept for each block explains more variance. 
 
 
-## Impact of Encoding on  PCT
+## Impact of Encoding on  err
 
 ### Linear mixed model
 ```{r}
 #| echo: false
 # 
 # reg_d |> 
-#   ggplot(aes(pct))+
+#   ggplot(aes(err))+
 #   geom_histogram()
 # 
 # reg_d |> 
-#   betareg::betareg(pct ~ con | id, data = _)
+#   betareg::betareg(err ~ con | id, data = _)
 # p_mod1 <- 
 #   reg_d |>
-#   glmer(pct ~ con + (1 | id), data = _,
+#   glmer(err ~ con + (1 | id), data = _,
 #         family = binomial(link="logit"))
 # 
 # p_mod2 <- 

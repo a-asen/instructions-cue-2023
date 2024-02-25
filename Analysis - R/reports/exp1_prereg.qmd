@@ -16,14 +16,14 @@ library(BayesFactor)
 library(bayestestR)
 library(lsr)
 source("../lib/helper_functions.R")
+
+save_outputs <- TRUE
 ```
 
 ```{r citation}
-#| echo: false
-
+#| include: false
 
 library(NCmisc)
-
 
 citation("tidyverse")
 citation("patchwork")
@@ -35,7 +35,6 @@ citation("lsr")
 citation("dplyr")
 citation("ggplot2")
 ```
-
 
 
 ```{r load data }
@@ -66,15 +65,15 @@ demo |>
     n = length(Age),
     age = mean(Age),
     age_sd = sd(Age),
-    male = sum(s==1),
-    female = sum(s==0),
+    maleS = sum(s==1),
+    femaleS = sum(s==0),
     sex = mean(s),
     sex_s = sd(s)
   ) |> round(2) -> dem
 dem$age
 ```
 
-We recruited `r length(demo$Age)+4`, participants from the United Kingdom via Prolific. Due to a coding mistake, four participants did not generate any data. This left us with a mean age of `r dem$age` (SD = `r dem$age_sd`; `r dem$females` females) from the United Kingdom via Prolific. Note that two participants were excluded from the data analysis, but cannot be removed from the demographics due to non-connections between data points and demographics variables. 
+We recruited `r length(demo$Age)+4`, participants from the United Kingdom via Prolific. Due to a coding mistake, four participants did not generate any data. This left us with a mean age of `r dem$age` (SD = `r dem$age_sd`; `r dem$femaleS` females) from the United Kingdom via Prolific. Note that two participants were excluded from the data analysis, but cannot be removed from the demographics due to non-connections between data points and demographics variables. 
 
 
 
@@ -146,19 +145,19 @@ d |>
   group_by( id ) |>
   mutate( correct_response = ifelse( trial_info=="Inducer trial" & is.na(rt), 0, correct_response) ) |>
     #' !  Non-responses count as a wrong response & are subject to the exclusion criteria.  !
-  summarise( acc = sum(correct_response, na.rm = TRUE) / length( !is.na(correct_response) ) ) |>
-  filter( acc < .7 ) |>
+  summarise( acc = 1 - mean(correct_response, na.rm = TRUE) ) |>
+  filter( acc > .3 ) |>
   pull( id ) -> loss$exclude_par
 
 loss[["exclude_par_trials"]] <- length( d$rt[d$id == loss$exclude_par] )
-loss[["exclude_par_pct"]]    <- length( d$rt[d$id == loss$exclude_par] ) / loss$data_trials * 100
+loss[["exclude_par_prop"]]    <- length( d$rt[d$id == loss$exclude_par] ) / loss$data_trials * 100
 
 d |> filter( !(id %in% loss$exclude_par) ) -> d
 ```
 
 In total, `r length(loss[["exclude_par"]])`
 `r ifelse(length(loss[["data_trials"]]) > 1, "participants", "participant")`
-where excluded due to low accuracy (> 70%). 
+where excluded due to low accuracy (< 30% error). 
 <!-- Does not result in any loss of data, since they are replaced --> 
 
 ```{r due to high SD & NA responses }
@@ -200,7 +199,7 @@ d |>
   #' the preregistration, it is *not* preregistered.
 
 sum(d$retain_trials == 0) -> loss[["rt_sd_trials"]]
-sum(d$retain_trials == 0) / loss$data_trials * 100 -> loss[["rt_sd_pct"]]
+sum(d$retain_trials == 0) / loss$data_trials * 100 -> loss[["rt_sd_prop"]]
 
 d |> 
   filter( retain_trials == 1 ) -> d
@@ -208,7 +207,7 @@ d |>
 
 Furthermore, `r loss[["rt_sd_trials"]]` trials were lost due
 to deviating (2.5 SD) response times and none response(s).
-Representing a loss of `r round(loss[["rt_sd_pct"]], 2)`
+Representing a loss of `r round(loss[["rt_sd_prop"]], 2)`
 percent of the data.
 
 
@@ -223,7 +222,7 @@ d |>
   fill(valid_trials, .direction = "up") -> d
 
 sum(d$valid_trials==0) -> loss[["inducer_fail_trials"]]
-sum(d$valid_trials==0) / loss$data_trials * 100 -> loss[["inducer_fail_pct"]]
+sum(d$valid_trials==0) / loss$data_trials * 100 -> loss[["inducer_fail_prop"]]
 
 d |> filter( valid_trials == 1 ) -> d
 ```
@@ -231,11 +230,11 @@ d |> filter( valid_trials == 1 ) -> d
 Lastly, `r round(loss[["inducer_fail_trials"]], 2)` trials
 were removed due to a wrong response on the inducer trial.
 Representing a loss of
-`r round(loss[["inducer_fail_pct"]], 2)` percent of the data.
+`r round(loss[["inducer_fail_prop"]], 2)` percent of the data.
 
 A total of
 `r loss$rt_sd_trials + loss$inducer_fail_trials` trials were lost. Representing a loss of
-`r round(loss$rt_sd_pct + loss$inducer_fail_pct, 2)`percent of the data.
+`r round(loss$rt_sd_prop + loss$inducer_fail_prop, 2)` percent of the data.
 
 ## Summary
 
@@ -247,11 +246,11 @@ d |>
   filter(trial_info=="Diagnostic trial") |>
   group_by(id, con) |>
   summarize(rt = mean(rt),
-            pct = mean(correct_response)) |>
+            pe = 1 - mean(correct_response)) |>
   ungroup() |>
     #' na.rm is not necessary, because problems related to missing trials 
     #' should be handled by the above criteria.
-  pivot_wider( names_from = con, values_from = c(rt, pct) ) |>
+  pivot_wider( names_from = con, values_from = c(rt, pe) ) |>
   ungroup() -> d2
 ```
 
@@ -289,31 +288,31 @@ d2 |>
     )  -> d_rt
 
 ## proportion correct trials
-pct_test      <- t.test(  d2$pct_FALSE, d2$pct_TRUE, paired = TRUE, alternative = "less" )
-pct_test_b    <- ttestBF( d2$pct_FALSE, d2$pct_TRUE, paired = T, iterations = 10000, posterior = F )
-pct_test_b2   <- ttestBF( d2$pct_FALSE, d2$pct_TRUE, paired = T, iterations = 10000, posterior = T )
-pct_test_hdi  <- hdi(pct_test_b2)
+pe_test      <- t.test(  d2$pe_FALSE, d2$pe_TRUE, paired = TRUE, alternative = "greater" )
+pe_test_b    <- ttestBF( d2$pe_FALSE, d2$pe_TRUE, paired = T, iterations = 10000, posterior = F )
+pe_test_b2   <- ttestBF( d2$pe_FALSE, d2$pe_TRUE, paired = T, iterations = 10000, posterior = T )
+pe_test_hdi  <- hdi(pe_test_b2)
   # weird if this is how you have to do it
 
 d2 |>
   summarise(
-    name             = "PCT",
-    m_incongruent    = fmt_APA_numbers( mean(pct_FALSE) ),
-    sd_incongruent   = fmt_APA_numbers( sd(pct_FALSE) ),
-    m_congruent      = fmt_APA_numbers( mean(pct_TRUE) ),
-    sd_congruent     = fmt_APA_numbers( sd(pct_TRUE) ),
-    Mdiff            = fmt_APA_numbers( mean(pct_FALSE - pct_TRUE) ),
-    t                = fmt_APA_numbers( pct_test$statistic ),
-    df               = pct_test$parameter,
-    p                = pct_test$p.value,
+    name             = "PE",
+    m_incongruent    = fmt_APA_numbers( mean(pe_FALSE) ),
+    sd_incongruent   = fmt_APA_numbers( sd(pe_FALSE) ),
+    m_congruent      = fmt_APA_numbers( mean(pe_TRUE) ),
+    sd_congruent     = fmt_APA_numbers( sd(pe_TRUE) ),
+    Mdiff            = fmt_APA_numbers( mean(pe_FALSE - pe_TRUE) ),
+    t                = fmt_APA_numbers( pe_test$statistic ),
+    df               = pe_test$parameter,
+    p                = pe_test$p.value,
     ps               = set_p_star(p),
     Mdiff            = paste0( fmt_APA_numbers(Mdiff), ps ),
-    b.est            = fmt_APA_numbers( mean(pct_test_b2[,"mu"]) ),
-    hdi              = paste0("[",fmt_APA_numbers(pct_test_hdi$CI_low[1]),", ", 
-                                  fmt_APA_numbers(pct_test_hdi$CI_high[1]),"]"),
-    bf               = fmt_APA_numbers( extractBF(pct_test_b)$bf ),
-    d                = fmt_APA_numbers( cohensD(pct_FALSE, pct_TRUE, method = "corrected") ),
-  ) -> d_pct
+    b.est            = fmt_APA_numbers( mean(pe_test_b2[,"mu"]) ),
+    hdi              = paste0("[",fmt_APA_numbers(pe_test_hdi$CI_low[1]),", ", 
+                                  fmt_APA_numbers(pe_test_hdi$CI_high[1]),"]"),
+    bf               = fmt_APA_numbers( extractBF(pe_test_b)$bf ),
+    d                = fmt_APA_numbers( cohensD(pe_FALSE, pe_TRUE, method = "corrected") ),
+  ) -> d_pe
 
 ```
 
@@ -322,40 +321,43 @@ Table XX \n
 *Test statistics for the experimental conditions*
 ```{r stat table}
 #| echo: false
-rbind(d_rt, d_pct) -> b
+rbind(d_rt, d_pe) -> b
 b |> summarize( m = mean(df) ) |> pull() -> d2_df
 b |> pull(p) |> min() -> p_min
 
 if(d2_df != floor(d2_df)){ warning("NOT SIMILAR, CHECK DF") }
   # degrees of freedom
 
-b |>
+mean(b$df) -> b_df_m
+exp1_table_simple <- 
+  b |>
   # add bayes row? 
-  mutate(em1 = "", em2="", em3="") |>
+  mutate(em1 = "", em2="", em3="", 
+         p = fmt_APA_numbers(p, .p=T),
+         across(contains(c("con","b")), ~ fmt_APA_numbers(.x, .chr=T) )  ) |>
   gt() |>
-  cols_hide(    c(p, t, df, ps) ) |>
+  cols_hide(    c(df, ps, Mdiff) ) |>
   tab_spanner(  "Incongruent", c(m_incongruent, sd_incongruent) ) |>
   cols_label(   m_incongruent = md("*M*"), sd_incongruent = md("*SD*" ) ) |>
   tab_spanner(  "Congruent", c(m_congruent, sd_congruent) ) |>
   cols_label(   m_congruent = md("*M*"),  sd_congruent = md("*SD*") ) |>
   tab_spanner(  "Bayes", c(b.est, bf, hdi)) |>
-  cols_label(   b.est = md("*M*~est~"), bf = md("BF~10~"), hdi = "HDI",    # html("BF<sub>10</sub>")
-                Mdiff = md("*M*~diff~") )  |>     # html("<i>M</i><sub>diff</sub>") 
+  cols_label(   b.est = md("*M*~est~"), bf = md("BF~10~"), hdi = "HDI", ) |> 
   #fmt_markdown() |>
-  cols_move(    "ps", Mdiff ) |> 
+  #cols_move(    "ps", Mdiff ) |> 
   cols_move(    "em1", sd_incongruent ) |>
   cols_move(    "em2", ps ) |>
-  cols_label(   em1="",em2="", name = "", d = md("*d*"), em3="") |>
+  cols_label(   em1 = "", em2 = "", name = "", d = md("Cohen's *d*"), em3 = "", 
+                t = md( paste0("*t*(",b_df_m,")")), p = md("*p*") ) |>
   cols_align(   "center", c(2:15)) |> 
   cols_move(    "em3", hdi) 
+exp1_table_simple
 
+if(save_outputs){ gtsave(exp1_table_simple, filename = "../outputs/tables/exp1_table_simple.docx") }
 ```
-*Note.* The tests have `r  d2_df` degrees of freedom.  <br/>
+*Note.* <br/>
 `r fmt_APA_p_table_fig(p_min)` <br/>
-*M* = Mean, *SD* = standard deviation, *M*~diff~ = Differences
-of the means, HDI = highest density interval, *d* = Effect size.
 
-**remove extra zeros**
 
 ### Figures
 #### Linerange
@@ -370,7 +372,8 @@ of the means, HDI = highest density interval, *d* = Effect size.
 # This way of visualizing is not necessarily the best -- it can illustate each
 # change in data (congruent/incongruent), but summary score should not be used with it
 
-d |>
+p1 <- 
+  d |>
   filter(!is.na(con)) |>
   group_by(id, con) |>
     # ????????????????  inducer_run
@@ -387,21 +390,22 @@ d |>
   scale_x_continuous(breaks = c(0,1), labels = c("Incongruent", "Congruent"), name="",
                      expand = c(.2,.2), minor_breaks = NULL)+
   scale_y_continuous(breaks = seq(0,2000,50), minor_breaks = NULL)+
-  coord_cartesian(ylim = c(450, 960))+
+  coord_cartesian(ylim = c(500, 850))+
                         # Adjust
   theme_minimal()+
   theme(axis.text.x = element_text(size = 10), legend.position = "none")+
-  labs(title = "Response time", x = "", y = "Response time (ms)") -> p1
+  labs(title = "Response Time (RT)", x = "", y = "Response Time (ms)")
 
 
-d |>
+p2 <-
+  d |>
   filter(!is.na(con)) |>
   group_by(id, con) |>
-  summarize(pct = mean(correct_response)) |>
+  summarize(pe = 1 - mean(correct_response)) |>
     # Summarize the proportion of correct per block
   ungroup() |>  
   mutate(con2 = ifelse(con==T,1,0)) |>
-  ggplot(aes(x = con2, y = pct, group=id, col = factor(con)))+
+  ggplot(aes(x = con2, y = pe, group=id, col = factor(con)))+
   stat_summary(aes(col=NULL), position=position_dodge(.1), geom = "point", fun = mean, alpha = .1)+
   stat_summary(aes(col=NULL), position=position_dodge(.1), geom = "line", fun = mean, alpha = .1)+
   stat_summary(aes(group=NULL), fun.data = mean_se, geom = "errorbar", width=.2, size = 1.5, alpha = .8)+
@@ -409,13 +413,15 @@ d |>
   scale_x_continuous(breaks = c(0,1), labels = c("Incongruent", "Congruent"), name="",
                      expand = c(.2,.2), minor_breaks = NULL)+
   scale_y_continuous(breaks = seq(0,1,.05), minor_breaks = NULL)+
-  coord_cartesian(ylim = c(.65, 1.01))+
+  coord_cartesian(ylim = c(0, .3))+
                       # Adjust
   theme_minimal()+
   theme(axis.text.x = element_text(size = 10), legend.position = "none")+
-  labs(title = "Proportion of correct trials", x = "", y = "Proportion") -> p2
+  labs(title = "Proportion of Error", x = "", y = "Error") 
 
 p1+p2
+
+if(save_outputs){ ggsave("../outputs/figs/exp1_rt-pe_line.jpeg", p1+p2, width=8, height=5) }
 ```
 
 
@@ -442,11 +448,11 @@ p1 <-
   scale_x_continuous(breaks = c(0,1), labels = c("Incongruent", "Congruent"), name="",
                      expand = c(.2,.2), minor_breaks = NULL)+
   scale_y_continuous(breaks = seq(0,2000,25), minor_breaks = NULL)+
-  coord_cartesian(ylim = c(600, 700))+
+  coord_cartesian(ylim = c(600, 750))+
                         # Adjust? 
   theme_minimal()+
   theme(axis.text.x = element_text(size = 10), legend.position = "none")+
-  labs(title = "Response time", x = "", y = "Response time (ms)")+
+  labs(title = "Response time", x = "", y = "Response Time (ms)")+
   annotate("segment", x=-0.1, xend=1.1, y=696, yend=696, size=1)+
   annotate(geom = "text", x = .5, y=700, label="**", size=5)
 
@@ -455,26 +461,27 @@ p2 <-
   filter(!is.na(con)) |>
   group_by(id, con) |>
     # ????????????????  inducer_run
-  summarize(pct = mean(correct_response)) |>
+  summarize(pe = 1 - mean(correct_response)) |>
     # Summarize the proportion of correct per block
   ungroup() |>  
   mutate(con2 = ifelse(con==T,1,0)) |>
-  ggplot(aes(x = con2, y = pct, fill = factor(con2)))+
+  ggplot(aes(x = con2, y = pe, fill = factor(con2)))+
   stat_summary(fun=mean, geom="col")+
   stat_summary(aes(group=NULL), fun.data = mean_se, geom = "errorbar", width=.4, size = 1)+
   scale_x_continuous(breaks = c(0,1), labels = c("Incongruent", "Congruent"), name="",
                      expand = c(.2,.2), minor_breaks = NULL)+
-  scale_y_continuous(breaks = seq(0,1,.02), minor_breaks = NULL)+
-  coord_cartesian(ylim = c(.9, 1.01))+
+  scale_y_continuous(breaks = seq(0,1,.05), minor_breaks = NULL)+
+  coord_cartesian(ylim = c(0, .3))+
                         # Adjust? 
   theme_minimal()+
   theme(axis.text.x = element_text(size = 10), legend.position = "none")+
-  labs(title = "Proportion of correct trials", x = "", y = "Proportion")+
-  annotate("segment", x=-0.1, xend=1.1, y=.995, yend=.995, size=1)+
-  annotate(geom = "text", x = .5, y=.997, label="**", size=5)
+  labs(title = "Proportion of Error", x = "", y = "Error")+
+  annotate("segment", x=-0.1, xend=1.1, y=.13, yend=.13, size=1)+
+  annotate(geom = "text", x = .5, y=.137, label="**", size=5)
     
 p1+p2
-ggsave("../figs/exp1_rt-pct.jpeg", p1+p2, width=8, height=5)
+
+if(save_outputs){ ggsave("../outputs/figs/exp1_rt-pe_bar.jpeg", p1+p2, width=8, height=5) }
 ```
 
 
