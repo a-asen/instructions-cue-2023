@@ -4,3 +4,5 @@
 .Ruserdata
 .kdev4
 *.docx
+outputs/ 
+# Not necessary to upload any outputs.
