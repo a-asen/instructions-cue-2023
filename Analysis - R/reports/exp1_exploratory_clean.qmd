@@ -684,7 +684,11 @@ In this way, including a random intercept for each block explains more variance.
 ```
 
 
+## Instruction appearance & congruency 
 
+```{r}
+
+```
 
 
 
