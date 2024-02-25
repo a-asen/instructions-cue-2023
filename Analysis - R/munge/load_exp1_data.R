@@ -44,4 +44,4 @@ exp1_d <-
   mutate(inducer_run = as.numeric(inducer_run)) |>
   left_join(raw_d, by=c("id","inducer_run", "diagnostic_run"))
 
-#save(exp1_d, file="data/trans/exp1_data.rdata")
+#save(exp1_d, file="data/processed/exp1_data.rdata")
