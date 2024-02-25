@@ -74,7 +74,7 @@ generate_word_list <- function(data, length = NULL){
 }
 
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ###
-fmt_APA_numbers <- function(num, p=F, low_val=F){
+fmt_APA_numbers <- function(num, .p = FALSE, .low_val = FALSE, .chr = FALSE){
   require(purrr)
 
   purrr::map(num, \(num){
@@ -86,20 +86,29 @@ fmt_APA_numbers <- function(num, p=F, low_val=F){
       return(o_num)
       # if is not numeric after transformation, return original
     }
-    if(p){
+    # p
+    if(.p){
       return( round(num, 3) |> as.character(num) |> sub("0.",".", x = _) )
     }
+    # NORMAL VALS
     if(num >= 100 | num <= -100){
-      return( round(num,0) )
+      num <- round(num, 0)
     }
     if(num >= 10 | num <= -10){
-      return( round(num, 1) )
+      num <- round(num, 1)
     }
-    if(num >= 1 | num <= -1 | num < 1 & !low_val | num > -1 & !low_val){
-      return( round(num, 2) )
+    # IF LOW VALUES
+    if(num >= 1 | num <= -1 | num < 1 & !.low_val | num > -1 & !.low_val){
+      num <- round(num, 2)
     }
-    if(num < 1 & low_val | num > -1 & low_val){
-      return( round(num, 3) )
+    if(num < 1 & .low_val | num > -1 & .low_val){
+      num <- round(num, 3)
+    }
+    # IF .chr
+    if(.chr){
+      return( as.character(num) )
+    } else {
+      return( num )
     }
   }) |> unlist()
 }
