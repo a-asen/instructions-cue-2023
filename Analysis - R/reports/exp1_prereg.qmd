@@ -394,7 +394,7 @@ p1 <-
                         # Adjust
   theme_minimal()+
   theme(axis.text.x = element_text(size = 10), legend.position = "none")+
-  labs(title = "Response Time (RT)", x = "", y = "Response Time (ms)")
+  labs(x = "", y = "Response Time (ms)")
 
 
 p2 <-
@@ -417,7 +417,7 @@ p2 <-
                       # Adjust
   theme_minimal()+
   theme(axis.text.x = element_text(size = 10), legend.position = "none")+
-  labs(title = "Proportion of Error", x = "", y = "Error") 
+  labs(x = "", y = "Proportion of Error") 
 
 p1+p2
 
@@ -452,7 +452,7 @@ p1 <-
                         # Adjust? 
   theme_minimal()+
   theme(axis.text.x = element_text(size = 10), legend.position = "none")+
-  labs(title = "Response time", x = "", y = "Response Time (ms)")+
+  labs(x = "", y = "Response Time (ms)")+
   annotate("segment", x=-0.1, xend=1.1, y=696, yend=696, size=1)+
   annotate(geom = "text", x = .5, y=700, label="**", size=5)
 
@@ -475,7 +475,7 @@ p2 <-
                         # Adjust? 
   theme_minimal()+
   theme(axis.text.x = element_text(size = 10), legend.position = "none")+
-  labs(title = "Proportion of Error", x = "", y = "Error")+
+  labs(x = "", y = "Proportion of Error")+
   annotate("segment", x=-0.1, xend=1.1, y=.13, yend=.13, size=1)+
   annotate(geom = "text", x = .5, y=.137, label="**", size=5)
     
