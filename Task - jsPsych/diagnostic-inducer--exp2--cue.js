@@ -3,8 +3,8 @@
 
 // CHANGE THESE BEFORE EXPERIMENT!
 const debug = true                  // Show debug information?
-const skip_instructions = false     // Skip intro? 
-const skip_practice = false         // Skip practice? 
+const skip_instructions = true     // Skip intro? 
+const skip_practice = true         // Skip practice? 
 const save_local_data = false        // Save local file? 
 
 const study_name = "exp2_pilot" // add to filename 
@@ -55,11 +55,11 @@ const inducer_colour_name  = ["pink", "yellow", "blue"]
     // This is also what is DISPLAYED (i.e., text) to participants. Should therefore be a readable name. 
 
 ////    Diagnostic parameters   ////
-const number_of_inducers = 24;       // Number of inducers 
+const number_of_inducers = 1//24;       // Number of inducers 
     // !!! CHANGE max trials !!! 
 const diagnostic_min_length = 4         // Min run length
 const diagnostic_max_length = 16        // Max run length
-const max_diagnostic_trials = 240     // Total max diagnostic trials
+const max_diagnostic_trials = 10//240     // Total max diagnostic trials
     // max/2 * number_of_inducers
 
 ////    Inducer CUE      ////
@@ -68,7 +68,7 @@ const cue_duration = 750        // How long is the pre-cue present for?
 
 const cue_min_length = 0
 const cue_max_length = 5
-const cue_n_trials =  70       // Number of cue trials 
+const cue_n_trials =  3//70       // Number of cue trials 
 const cue_force_equal = true       // Force equal number of right/left trials 
 
 
@@ -883,7 +883,7 @@ let diagnostic_task_instruction_description = {
             The task consists of two instructions: <br>
             One instruction remains the same throughout the task, and is connected to non-words presented in <b>black colour</b>. <br>
             One instruction changes throughout the task, and is connected to non-words presented in <b> \n
-            <span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour.toLowerCase() + " colour"}</span></b>.
+            <span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour_name.toLowerCase() + " colour"}</span></b>.
             <br><br>
             You will receive a maximum of 20 seconds to read the instructions. <br>
             
@@ -958,7 +958,7 @@ if(!skip_practice){
                 
                 On the next screen, the instruction that changes throughout the task, will be presented. <br>
                 (Connected to non-words in <b> \n
-                <span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour.toLowerCase() + " colour"}</span></b>.)
+                <span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour_name.toLowerCase() + " colour"}</span></b>.)
                 <br><br>
                 These instructions will have the same format, <br> but will describe two new 3-letter non-words.
                 <br><br>
@@ -1014,19 +1014,19 @@ if(!skip_practice){
             <br><br>
             Every new round will present two new 3-letter non-words. <br>
             These relate to the non-words presented in 
-            <b><span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour.toLowerCase() + " colour"}</span></b>. 
+            <b><span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour_name.toLowerCase() + " colour"}</span></b>. 
             
             <br><br>
             Before the 
-            <b><span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour.toLowerCase() + " coloured"}</span></b> 
+            <b><span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour_name.toLowerCase() + " coloured"}</span></b> 
             non-word appears, some <b>black coloured</b> non-words will be presented. <br>
     
             <br><br>
             In addition, a <b><span style="color:${rnd_cue_col}"> ${rnd_cue_col_n} coloured ${cue_stimulus_name.toLowerCase() }</span></b> will appear before the 
-            <b><span style="color: ${rnd_inducer_colour}"> ${rnd_inducer_colour.toLowerCase()+ " coloured"}</span></b> non-word.  
+            <b><span style="color: ${rnd_inducer_colour}"> ${rnd_inducer_colour_name.toLowerCase()+ " coloured"}</span></b> non-word.  
             <br>
             The <b><span style="color:${rnd_cue_col}"> ${rnd_cue_col_n} ${cue_stimulus_name.toLowerCase() }</span></b> indicate that the
-            <b><span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour.toLowerCase()+ " coloured"}</span></b> 
+            <b><span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour_name.toLowerCase()+ " coloured"}</span></b> 
             non-word will appear within a couple of screen.
             <br>
             The <b><span style="color:${rnd_cue_col}"> ${rnd_cue_col_n} ${cue_stimulus_name.toLowerCase() }</span></b> cannot be responded to. 
@@ -1055,7 +1055,7 @@ if(!skip_practice){
     let prac_cue_run = Array( Array( Math.floor( prac_post_cue_num/2 ) ).fill(0), Array( Math.ceil( prac_post_cue_num/2 ) ).fill(1) ).flat()
     let rnd_prac_cue_run = jsPsych.randomization.shuffle( prac_cue_run )
     if(debug){ console.log( "prac cue run:", rnd_prac_cue_run) }
-    diagnostic_FNC(prac_cue_rounds, run_stimuli, "prac", prac_post_cue_num, "cue practice", false,  false, rnd_prac_cue_run)
+    diagnostic_FNC(prac_cue_rounds, run_stimuli, "prac", prac_post_cue_num, "cue practice", false, false, rnd_prac_cue_run)
     inducer_FNC(run_stimuli, "prac", "inducer practice", false)
     
     
