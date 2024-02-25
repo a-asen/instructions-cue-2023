@@ -11,8 +11,8 @@ editor:
 #| include: false
 
 load("../data/trans/exp1_data.rdata")
-load("../data/sim/exp2_estimate_effect_500.rdata")
-load("../data/sim/exp2_gpower_effect_500.rdata")
+load("../data/simulations/exp2_estimate_effect_500.rdata")
+load("../data/simulations/exp2_gpower_effect_500.rdata")
 
 library(tidyverse)
 library(lsr)
@@ -85,13 +85,14 @@ d |> filter( valid_trials == 1 ) -> d
 
 # Estimating effect size for ANOVA: 
 ```{r}
+#| echo: false
 #| message: false
 d |>
   filter(!is.na(con)) |>
   group_by(id, con) |> 
   summarise(rt = mean(rt)) |>
   aov(rt ~ con + Error(id/con), data=_ ) |>
-  EtaSq(x=_, type=1)
+  DescTools::EtaSq(x=_, type=1)
 ```
 Partial eta square of .21 (Lakens, 2013)
 
@@ -112,13 +113,13 @@ In this way, we expect a congruency effect ONLY for trials AFTER the cue.
 
 In the function below we can generate the experimental setup: 
 ```{r}
-exp2_sim2x2 <- function(N, blocks, block.len, eff.con.pre, eff.con.post, eff.con.cue.intr){
-  #' @param N Number of subjects
-  #' @param blocks Number of blocks 
-  #' @param block.len Length of each block -- this is split, half the trials are pre and half are post
-  #' @param eff.con.pre Effect size of the congruency effect
-  #' @param eff.cue.post Effect size of the pre-post cue
-  #' @param eff.con.cue.intr Effect size of the interaction
+exp2_sim2x2 <- function(N, blocks, post.cue.len, block.len, eff.con.pre, eff.con.post, eff.con.cue.intr){
+  #' @param N                 Number of subjects
+  #' @param blocks            Number of blocks 
+  #' @param block.len         Length of each block -- this is split, half the trials are pre and half are post
+  #' @param eff.con.pre       Effect size of the congruency effect
+  #' @param eff.cue.post      Effect size of the pre-post cue
+  #' @param eff.con.cue.intr  Effect size of the interaction
 
   tibble(
     id     = rep(1:N, each = blocks * block.len),
@@ -175,7 +176,8 @@ pblapply(10:100, \(x){
     # repeat each par-size 100 times
     exp2_sim2x2(x, 24, 20, con_eff/3, .008, con_eff) -> d
     d |> 
-      aov_car(rt ~ con*cue + Error(id/(con*cue)), data = _, fun_aggregate=mean) -> 
+      aov_car(rt ~ con*cue + Error(id/(con*cue)), data = _, fun_aggregate=mean) ##-> 
+      aov_4( rt ~ con * cue + (1 | id), data = _, fun_aggregate=mean) 
       res
     tibble(
       size = x,
@@ -195,8 +197,18 @@ pblapply(10:100, \(x){
 
 # stop cluster
 stopCluster(cl)
-#save(est.eff_sim500, file="../data/sim/exp2_estimate_effect_500.rdata")
+#save(est.eff_sim500, file="../data/simulations/exp2_estimate_effect_500.rdata")
 ```
+
+```{r}
+est.eff_sim500 |>
+  pivot_longer(c(pow.con, pow.cue, `pow.con.cue`)) |>
+  ggplot(aes(size, value, col=name))+
+  geom_line()+
+  geom_hline(yintercept=.9)+
+  scale_x_continuous(breaks=seq(0,200,10))
+```
+
 
 ```{r}
 #| echo: false
@@ -313,7 +325,7 @@ pblapply(10:100, \(x){
 
 # stop cluster
 stopCluster(cl)
-#save(gpow.eff_sim500, file="../data/sim/exp2_gpower_effect_500.rdata")
+#save(gpow.eff_sim500, file="../data/simulations/exp2_gpower_effect_500.rdata")
 ```
 
 
@@ -540,7 +552,7 @@ pblapply(10:100, \(x){
 
 # stop cluster
 stopCluster(cl)
-#save(g.eff_2x2x2_sim500, file="../data/sim/design_2x2x2_gpower_eff.rdata") # not correct fix
+#save(g.eff_2x2x2_sim500, file="../data/simulations/design_2x2x2_gpower_eff.rdata") # not correct fix
 ```
 
 

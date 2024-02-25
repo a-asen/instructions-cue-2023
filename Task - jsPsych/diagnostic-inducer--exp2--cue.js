@@ -55,11 +55,11 @@ const inducer_colour_name  = ["pink", "yellow", "blue"]
     // This is also what is DISPLAYED (i.e., text) to participants. Should therefore be a readable name. 
 
 ////    Diagnostic parameters   ////
-const number_of_inducers = 10//24;       // Number of inducers 
+const number_of_inducers = 24;       // Number of inducers 
     // !!! CHANGE max trials !!! 
 const diagnostic_min_length = 4         // Min run length
 const diagnostic_max_length = 16        // Max run length
-const max_diagnostic_trials = 100//0     // Total max diagnostic trials
+const max_diagnostic_trials = 240     // Total max diagnostic trials
     // max/2 * number_of_inducers
 
 ////    Inducer CUE      ////
@@ -68,7 +68,7 @@ const cue_duration = 750        // How long is the pre-cue present for?
 
 const cue_min_length = 0
 const cue_max_length = 5
-const cue_n_trials =  35 //70       // Number of cue trials 
+const cue_n_trials =  70       // Number of cue trials 
 const cue_force_equal = true       // Force equal number of right/left trials 
 
 
