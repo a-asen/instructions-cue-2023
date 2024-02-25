@@ -1,8 +1,7 @@
-  ---
+---
 title: "Experiment 2 post-cue sampling"
 format: docx
 lang: en-GB
-title: "Diag simulation"
 editor: 
   markdown:
       wrap: 62
@@ -16,13 +15,16 @@ First we can sample effects from experiment 1.
 ```{r}
 #| include: false
 load("../data/trans/exp1_data.rdata")
-load("../data/sim/diagnostic_length_simulation.rdata")
+load("../data/sim/diag_simu_sum.rdata")
+load("../data/sim/diag_simu_raw.rdata") # BIG
 
 library(tidyverse)
 library(lsr)
 library(pbapply)
 library(afex)
 library(gt)
+library(gifski)
+library(av)
 
 run_create_animations <- FALSE
 run_create_simulations <- FALSE
@@ -66,6 +68,8 @@ diag_trials <-
 
 First, I will test how many diagnostic trials we need to find a sig difference, based on the results we already have. 
 ```{r}
+#| echo: false
+#| message: false
 map_df(seq_along(1:16), \(x){
   diag_trials |>
     filter(diagnostic_run<x) |>
@@ -124,6 +128,8 @@ stat_test <- function(size){
 ```
 
 ```{r}
+#| echo: false
+#| message: false
 map_df(1:50, \(x){
   stat_test(x)
 }) -> sample1 
@@ -161,6 +167,8 @@ sample2 |>
 
 
 ```{r}
+#| echo: false
+#| message: false
 sample2 |>
   ggplot(aes(n, rt_d))+
   stat_summary()
@@ -231,7 +239,9 @@ d_ex |> filter( valid_trials == 1 ) -> d_ex
 d_ex |> 
   filter(trial_info == "Diagnostic trial") |>
   group_by(id) |>
-  count()
+  count() |>
+  ungroup()  |>
+  gt()  
 ```
 
 The above table indicate the number of diagnostic trials that are left after all excluding trials. 
@@ -281,7 +291,7 @@ We simulate generate data over (1) difference effect sizes for (2) various sampl
 #| echo: false
 
 # You dont want to start this if you have the data.... 
-if(!exists(gen_data) & run_create_simulations){
+if(!exists("diag_simu") & run_create_simulations){
   
   library(pbapply)
   library(parallel)
@@ -364,13 +374,11 @@ if(!exists(gen_data) & run_create_simulations){
   # stop cluster
   stopCluster(cl)
   
-} else {
-  diag_simu
 }
 ```
 
 ### Visualizing
-#### animate:
+#### Animate:
 
 ```{r first animation attempt}
 #| echo: false
@@ -448,54 +456,54 @@ Animate the impact of changes in diagnostic lengths (see [LINK]).
 #| messages: false
 
 # This the power the power over sample size split by loss of data
-
-walk(seq(56, max(diag_simu_sum$dia.len), 2), \(x){
-  #cat("\nDiag length: ",x )  
-  samp_size <- 30
-  loss <- .75
+if( run_create_animations ){
+  walk(seq(56, max(diag_simu_sum$dia.len), 2), \(x){
+    #cat("\nDiag length: ",x )  
+    samp_size <- 30
+    loss <- .75
+    
+    diag_length_adj   <- ifelse( (x/2) %% 2 == 0, floor( x/2 ), floor( x/2 - 1 ) )
+    diag_length_adj_l <- ifelse(floor( diag_length_adj * loss)  %% 2 == 0, 
+                                floor( diag_length_adj * loss), floor( diag_length_adj * loss)+1 ) 
+    diag_simu_sum |>
+      filter(eff < .45) |>
+      filter(dia.len == diag_length_adj |
+               dia.len == diag_length_adj_l) |>
+      group_by(eff, size) |>
+      mutate(`Effect size` = factor(eff),
+             dia.len = dia.len * 2 ) |>
+      ggplot(aes(size, pct.pow, col = `Effect size`))+
+      facet_wrap(~ dia.len)+
+      # geom_smooth() +
+      geom_line() +
+      geom_hline(yintercept = .9)+
+      geom_vline(xintercept = samp_size) +
+      scale_x_continuous(breaks = seq(0, 100, 10)) +
+      scale_y_continuous(breaks = seq(0, 100, .1)) +
+      labs(
+        x = "Sample size", y = "Power",
+        subtitle = paste("Diagnostic length: ", x,"\n
+                          25 % loss                                                 Original")
+                         ,
+      )+
+      theme_minimal()+
+      coord_cartesian(ylim=c(.5, 1), expand =.0001) +
+      theme(plot.background = element_rect(colour="white")) -> p
+    
+      ggsave(plot = p, filename = paste0("../figs/anim/anim3/anim_diag_", x, ".png"),
+            width = 7, heigh = 5, dpi = 300) 
+  })
+  # get list
+  list.files("../figs/anim/anim3/", full.names = T) -> figfnames
+  tibble(figfnames) |>
+    mutate(arr = as.integer( str_split(figfnames, "[_.]") |> map_chr(5) )) |>
+    arrange(arr) |>
+    pull(figfnames) -> o_figfnames
   
-  diag_length_adj   <- ifelse( (x/2) %% 2 == 0, floor( x/2 ), floor( x/2 - 1 ) )
-  diag_length_adj_l <- ifelse(floor(diag_length_adj*loss) %% 2 == 0, 
-                              floor( diag_length_adj*loss ), floor( diag_length_adj*loss-1 ) ) 
-  diag_simu_sum |>
-    filter(eff < .45) |>
-    filter(dia.len == diag_length_adj |
-             dia.len == diag_length_adj_l) |>
-    group_by(eff, size) |>
-    mutate(`Effect size` = factor(eff),
-           dia.len = dia.len * 2 ) |>
-    ggplot(aes(size, pct.pow, col = `Effect size`))+
-    facet_wrap(~ dia.len)+
-    # geom_smooth() +
-    geom_line() +
-    geom_hline(yintercept = .9)+
-    geom_vline(xintercept = samp_size) +
-    scale_x_continuous(breaks = seq(0, 100, 10)) +
-    scale_y_continuous(breaks = seq(0, 100, .1)) +
-    labs(
-      x = "Sample size", y = "Power",
-      subtitle = paste("Diagnostic length: ", x,"\n
-                        25 % loss                                                 Original")
-                       ,
-    )+
-    theme_minimal()+
-    coord_cartesian(ylim=c(.5, 1), expand =.0001) +
-    theme(plot.background = element_rect(colour="white")) -> p
+  gifski(o_figfnames, "../figs/anim/anim_diag_len_increase.gif", delay = .25)
   
-    ggsave(plot = p, filename = paste0("../figs/anim/anim3/anim_diag_", x, ".png"),
-          width = 7, heigh = 5, dpi = 300) 
-})
-# get list
-list.files("../figs/anim/anim3/", full.names = T) -> figfnames
-tibble(figfnames) |>
-  mutate(arr = as.integer( str_split(figfnames, "[_.]") |> map_chr(5) )) |>
-  arrange(arr) |>
-  pull(figfnames) -> o_figfnames
-
-gifski(o_figfnames, "../figs/anim/anim_diag_len_increase.gif", delay = .25)
-
-av_encode_video(o_figfnames, "../figs/anim/anim_diag_len_increase.mkv", framerate = 4)
-""
+  av_encode_video(o_figfnames, "../figs/anim/anim_diag_len_increase.mkv", framerate = 4)
+}
 ```
 
 In the plot below we can see how the set diagnostic limit (right) and then the diagnostic limit after the assumed exclusion (left). 
@@ -535,9 +543,9 @@ diag_simu_sum |>
 Assuming a sample size of 30 participants, we can achieve 90% power with an effect size of about .2 (right plot). However, considering the expected loss of around 25%, we are left with 44 trials (left; rounded to the closest pair), rather than 60. This reduces the power to just under .8. 
 Granted the arbitrary loss of data, we may be left with deviating lengths of congruent and incongruent trials. In other words, we should overshoot a couple of trials to ensure sufficient pairs.
 
-We have to solution too the lacking power: Increase the sample size or increase the number of diagnostic trials. Regarding the diagnostic trials, we are weary of adding too many diagnostic trials given that the cue is supposed to signal "sooner-rather-than-later" switching. Increasing the number of diagnostic trials might influence the utility of the cue. 
+We have two solutions to improve power: (1) Increase the sample size or (2) increase the number of diagnostic trials. Regarding the diagnostic trials, we are weary of adding too many diagnostic trials given that the cue is supposed to signal "prepare" for the switch. Increasing the number of diagnostic trials might influence the usefulness of the cue. 
 
-The plot below visualizes the effect size across diagnostic length for a sample size of 30.  
+The plot below visualizes the effect size across various diagnostic length and effect sizes for a sample size of 30.  
 
 ```{r}
 #| echo: false
@@ -550,14 +558,16 @@ diag_simu_sum |>
   filter(eff < .3) |>
   filter(size == samp_size) |>
   mutate(`Effect size` = factor(eff) ) |>
-  ggplot(aes(dia.len, pct.pow, col = `Effect size`))+
+  ggplot(aes(dia.len, pct.pow, col = `Effect size`)) +
   # geom_smooth() +
   geom_line() +
-  geom_hline(yintercept = .9)+
+  geom_hline(yintercept = .9) +
   geom_vline(xintercept = diag_length * diag_loss, linetype = "dashed") +
   geom_vline(xintercept = diag_length) +
   scale_x_continuous(breaks = seq(0, 500, 10) ) +
   scale_y_continuous(breaks = seq(0, 100, .1) ) +
+  annotate("text", x = diag_length+20, y = .1,
+           label=paste("Dashed:", diag_length*.75))+
   labs(
     x = "Diagnostic length", 
     y = "Power",
@@ -570,7 +580,7 @@ diag_simu_sum |>
     Dashed vertical line correspond to the estimated remaining trials after exclusion (trials*loss)")
 ```
 
-Exactly counteract the loss (60 * 1.25):
+Increase diagnostic length to 70 (the point between 60 and `r 60/.75` - the point to exactly counteract the loss of trials, 60/.75).
 
 ```{r}
 #| echo: false
@@ -591,6 +601,8 @@ diag_simu_sum |>
   geom_vline(xintercept = diag_length) +
   scale_x_continuous(breaks = seq(0, 500, 10) ) +
   scale_y_continuous(breaks = seq(0, 100, .1) ) +
+  annotate("text", x = diag_length+20, y = .1,
+           label=paste("Dashed:", diag_length*.75))+
   labs(
     x = "Diagnostic length", 
     y = "Power",
@@ -603,7 +615,7 @@ diag_simu_sum |>
     Dashed vertical line correspond to the estimated remaining trials after exclusion (trials*loss)")
 ```
 
-Try larger sample:
+Increasing sample size to 34.
 
 ```{r}
 #| echo: false
@@ -634,9 +646,9 @@ diag_simu_sum |>
     Dashed vertical line correspond to the estimated remaining trials after exclusion (trials*loss)")
 ```
 
-With 34 participants and 70 trials of the post-cue diagnostic runs, we will have about 90% power to detect a small effect of .15. A good compromise.
+With 34 participants and 70 post-cue trials, we should have a solid 90% power to detect a small effect of .15.
 
-It should be noted that it might not be necessary to expect such a small effect size. Indeed, the integrated scores suggest that we may expect an effect size of about .4. Which would show a significant effect at much less:
+It should be noted that it might not be necessary to expect such a small effect size. Indeed, the integrated scores suggest that we may expect an effect size of about .4. Which would show a significant effect for even 20 participants and 45 trials:
 
 ```{r}
 #| echo: false
@@ -664,6 +676,5 @@ diag_simu_sum |>
                       "     Loss: ", diag_loss, "   =~ ", floor(diag_length*.75)))
 ```
 
-Expecting an effect size of .4 would essentially mean that we could detect a significant effect with very few participants and very few observations. For our purposes, we will attempt to find an effect even on response times, which we found to be .17 in experiment 1. 
-
+Expecting an effect size of .4 would essentially mean that we could detect a significant effect with very few participants and very few observations. For our purposes, however, we will attempt to find an effect for response times which was small in the first experiment. 
 
