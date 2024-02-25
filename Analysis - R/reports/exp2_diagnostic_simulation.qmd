@@ -16,7 +16,7 @@ First we can sample effects from experiment 1.
 ```{r}
 #| include: false
 load("../data/trans/exp1_data.rdata")
-load("../data/sim/diagnostic_length_simulation.rdata")
+load("../data/simulations/diagnostic_length_simulation.rdata")
 
 library(tidyverse)
 library(lsr)
@@ -347,7 +347,7 @@ if(!exists(gen_data) & run_create_simulations){
   # diag_simu |>
   #   mutate(dia.len = dia.len*2) -> diag_simu
   
-  # save(diag_simu, file = "../data/sim/diag_simu_raw.rdata")
+  # save(diag_simu, file = "../data/simulations/diag_simu_raw.rdata")
   
   # diag_simu_sum <-
   #   diag_simu |>
@@ -359,7 +359,7 @@ if(!exists(gen_data) & run_create_simulations){
   #             pct.pow = mean(pct.p<.05),
   #             across(c(starts_with("rt."), starts_with("pct.")), mean)
   #             )
-  # save(diag_simu_sum, file="../data/sim/diag_simu_sum.rdata")
+  # save(diag_simu_sum, file="../data/simulations/diag_simu_sum.rdata")
   
   # stop cluster
   stopCluster(cl)
@@ -390,7 +390,7 @@ if(run_create_animations){
     transition_time(size) +
     ease_aes("linear") -> p_ani
   # Save
-  anim_save("../figs/anim/anim1.gif", p_ani, path="./")
+  anim_save("../figs/animations/anim1.gif", p_ani, path="./")
 }
 ```
 
@@ -419,12 +419,12 @@ if(run_create_animations){
       theme_minimal()+
       theme(plot.background = element_rect(colour="white"))
     
-      ggsave(plot = p, filename = paste0("../figs/anim/anim2/anim_diag_", x, ".png"),
+      ggsave(plot = p, filename = paste0("../figs/animations/anim2/anim_diag_", x, ".png"),
             width = 7, heigh = 5) 
   })
   
   # get path to graphs
-  list.files("../figs/anim/anim2/", full.names = T) -> figfnames
+  list.files("../figs/animations/anim2/", full.names = T) -> figfnames
   # fix arrangement
   tibble(figfnames) |>
     mutate(arr = as.integer( str_split(figfnames, "[_.]") |> map_chr(5) )) |>
@@ -432,10 +432,10 @@ if(run_create_animations){
     pull(figfnames) -> o_figfnames
   
   # create gif
-  gifski(o_figfnames, "../figs/anim/anim_sample_size_increase.gif", delay = .25)
+  gifski(o_figfnames, "../figs/animations/anim_sample_size_increase.gif", delay = .25)
   
   # create video format
-  av_encode_video(o_figfnames, "../figs/anim/anim_sample_size_increase.mkv", framerate = 4)
+  av_encode_video(o_figfnames, "../figs/animations/anim_sample_size_increase.mkv", framerate = 4)
 }
 ```
 
@@ -482,19 +482,19 @@ walk(seq(56, max(diag_simu_sum$dia.len), 2), \(x){
     coord_cartesian(ylim=c(.5, 1), expand =.0001) +
     theme(plot.background = element_rect(colour="white")) -> p
   
-    ggsave(plot = p, filename = paste0("../figs/anim/anim3/anim_diag_", x, ".png"),
+    ggsave(plot = p, filename = paste0("../figs/animations/anim3/anim_diag_", x, ".png"),
           width = 7, heigh = 5, dpi = 300) 
 })
 # get list
-list.files("../figs/anim/anim3/", full.names = T) -> figfnames
+list.files("../figs/animations/anim3/", full.names = T) -> figfnames
 tibble(figfnames) |>
   mutate(arr = as.integer( str_split(figfnames, "[_.]") |> map_chr(5) )) |>
   arrange(arr) |>
   pull(figfnames) -> o_figfnames
 
-gifski(o_figfnames, "../figs/anim/anim_diag_len_increase.gif", delay = .25)
+gifski(o_figfnames, "../figs/animations/anim_diag_len_increase.gif", delay = .25)
 
-av_encode_video(o_figfnames, "../figs/anim/anim_diag_len_increase.mkv", framerate = 4)
+av_encode_video(o_figfnames, "../figs/animations/anim_diag_len_increase.mkv", framerate = 4)
 ""
 ```
 
