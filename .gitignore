@@ -4,5 +4,7 @@
 .Ruserdata
 .kdev4
 *.docx
-outputs/ 
-# Not necessary to upload any outputs.
+outputs/  
+	# Not necessary to upload any outputs.
+**/data/_local/  
+	# Big local data store
