@@ -64,13 +64,11 @@ We recruited `r length(demo$Age)+4`, participants from the United Kingdom via Pr
 #| include: false
 # Select the relevant columns & rows
 # Remove the first inducer_run (i.e., 0th)
-exp2_d ##|>
+d <- 
   dat |>
   dplyr::select(id, trial_info, inducer_run, diagnostic_run, correct_response, rt, congruent, post_cue) |>
     # note. Congruent has a conding error. Recalculating congruency is done below
-  filter(trial_info == "diagnostic trial" | trial_info == "inducer trial") |>
-  # Filter the first inducer run (combined practice)
-  filter(inducer_run != 0) -> d
+  filter(trial_info == "diagnostic trial" | trial_info == "inducer trial")
 ```
 
 ## Exclusion
@@ -87,8 +85,8 @@ d |>
     #' !  Non-responses count as a wrong response & are subject to the exclusion criteria.  !
   summarise( acc = sum(correct_response, na.rm = TRUE) / length( !is.na(correct_response) ) ) |>
   mutate(qua = quantile(acc)[2])
-  ggplot(aes(y=acc)) + geom_boxplot()
-  filter( acc < .7 ) #|>
+  ggplot(aes(y=acc)) |>
+  filter( acc < .7 ) |>
   pull( id ) -> loss$exclude_par
 
 loss[["exclude_par_trials"]] <- length( d$rt[d$id == loss$exclude_par] )
