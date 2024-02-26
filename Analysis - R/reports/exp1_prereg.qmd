@@ -17,7 +17,7 @@ library(bayestestR)
 library(lsr)
 source("../lib/helper_functions.R")
 
-save_outputs <- TRUE
+save_outputs <- FALSE
 ```
 
 ```{r citation}
@@ -82,12 +82,11 @@ We recruited `r length(demo$Age)+4`, participants from the United Kingdom via Pr
 #| include: false
 # Select the relevant columns & rows
 # Remove the first inducer_run (i.e., 0th)
-data |>
+d <- 
+  data |>
   dplyr::select(id, trial_info, inducer_run, diagnostic_run, correct_response, rt, congruent) |>
     # note. Congruent has a conding error. Recalculating congruency is done below
-  filter(trial_info == "Diagnostic trial" | trial_info == "Inducer trial") |>
-  # Filter the first inducer run (combined practice)
-  filter(inducer_run != 0) -> d
+  filter(trial_info == "Diagnostic trial" | trial_info == "Inducer trial")
 ```
 
 
@@ -139,6 +138,13 @@ d <-
 loss <- list()
 loss$data_trials <- nrow(d)
 
+loss[["inducer_practice_prop"]] <- (1 - (nrow(d |> filter(inducer_run > 0)) / nrow(d))) * 100
+loss[["inducer_practice_trials"]] <- nrow(d) - nrow(d |> filter(inducer_run > 0))
+
+d <- 
+  d |> 
+  filter(inducer_run > 0)
+
 ### Overall accuracy      ====
 d |>
   filter( trial_info == "Diagnostic trial" | trial_info == "Inducer trial" ) |>
@@ -155,9 +161,12 @@ loss[["exclude_par_prop"]]    <- length( d$rt[d$id == loss$exclude_par] ) / loss
 d |> filter( !(id %in% loss$exclude_par) ) -> d
 ```
 
+The first inducer block was considered practice and excluded, representing `r loss[["inducer_practice_prop"]]` percent of the data. 
+
 In total, `r length(loss[["exclude_par"]])`
 `r ifelse(length(loss[["data_trials"]]) > 1, "participants", "participant")`
-where excluded due to low accuracy (< 30% error). 
+where excluded due to low accuracy (> 30% error). 
+
 <!-- Does not result in any loss of data, since they are replaced --> 
 
 ```{r due to high SD & NA responses }
@@ -233,8 +242,8 @@ Representing a loss of
 `r round(loss[["inducer_fail_prop"]], 2)` percent of the data.
 
 A total of
-`r loss$rt_sd_trials + loss$inducer_fail_trials` trials were lost. Representing a loss of
-`r round(loss$rt_sd_prop + loss$inducer_fail_prop, 2)` percent of the data.
+`r loss$rt_sd_trials + loss$inducer_fail_trials + loss$inducer_practice_trials` trials were lost. Representing a loss of
+`r round(loss$rt_sd_prop + loss$inducer_fail_prop + loss$inducer_practice_prop, 2)` percent of the data.
 
 ## Summary
 
