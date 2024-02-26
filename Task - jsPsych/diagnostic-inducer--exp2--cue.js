@@ -748,6 +748,7 @@ let run_stimuli;
     // Perhas we  trust prolifics inclusion/exclusion check ? 
 const check_browser = {
     type: jsPsychBrowserCheck,
+    data: {inducer_colour: rnd_inducer_colour, cue_colour: rnd_cue_col },
     inclusion_function: (data) => {
         data.trial_info = "technicals"
 
