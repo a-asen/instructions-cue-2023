@@ -14,18 +14,20 @@ First we can sample effects from experiment 1.
 
 ```{r}
 #| include: false
-load("../data/trans/exp1_data.rdata")
-load("../data/simulations/diagnostic_length_simulation.rdata")
+load("../data/processed/exp1_data.rdata")
+load("../data/simulations/diag_simu_sum.rdata")
+load("../data/_local/diag_simu_raw.rdata")
 
 library(tidyverse)
 library(lsr)
 library(pbapply)
 library(afex)
 library(gt)
+library(gganimate)
 library(gifski)
 library(av)
 
-run_create_animations <- FALSE
+run_create_animations <- TRUE
 run_create_simulations <- FALSE
 ```
 
@@ -356,7 +358,7 @@ if(!exists("diag_simu") & run_create_simulations){
   # diag_simu |>
   #   mutate(dia.len = dia.len*2) -> diag_simu
   
-  # save(diag_simu, file = "../data/simulations/diag_simu_raw.rdata")
+  # save(diag_simu, file = "../data/_local/diag_simu_raw.rdata")
   
   # diag_simu_sum <-
   #   diag_simu |>
@@ -397,7 +399,7 @@ if(run_create_animations){
     transition_time(size) +
     ease_aes("linear") -> p_ani
   # Save
-  anim_save("../figs/animations/anim1.gif", p_ani, path="./")
+  anim_save("../outputs/animations/anim1.gif", p_ani, path="./")
 }
 ```
 
@@ -426,12 +428,12 @@ if(run_create_animations){
       theme_minimal()+
       theme(plot.background = element_rect(colour="white"))
     
-      ggsave(plot = p, filename = paste0("../figs/animations/anim2/anim_diag_", x, ".png"),
+      ggsave(plot = p, filename = paste0("../outputs/animations/anim2/anim_diag_", x, ".png"),
             width = 7, heigh = 5) 
   })
   
   # get path to graphs
-  list.files("../figs/animations/anim2/", full.names = T) -> figfnames
+  list.files("../outputs/animations/anim2/", full.names = T) -> figfnames
   # fix arrangement
   tibble(figfnames) |>
     mutate(arr = as.integer( str_split(figfnames, "[_.]") |> map_chr(5) )) |>
@@ -439,10 +441,10 @@ if(run_create_animations){
     pull(figfnames) -> o_figfnames
   
   # create gif
-  gifski(o_figfnames, "../figs/animations/anim_sample_size_increase.gif", delay = .25)
+  gifski(o_figfnames, "../outputs/animations/anim_sample_size_increase.gif", delay = .25)
   
   # create video format
-  av_encode_video(o_figfnames, "../figs/animations/anim_sample_size_increase.mkv", framerate = 4)
+  av_encode_video(o_figfnames, "../outputs/animations/anim_sample_size_increase.mkv", framerate = 4)
 }
 ```
 
@@ -489,32 +491,24 @@ if( run_create_animations ){
       coord_cartesian(ylim=c(.5, 1), expand =.0001) +
       theme(plot.background = element_rect(colour="white")) -> p
     
-      ggsave(plot = p, filename = paste0("../figs/anim/anim3/anim_diag_", x, ".png"),
+      ggsave(plot = p, filename = paste0("../outputs/animations/anim3/anim_diag_", x, ".png"),
             width = 7, heigh = 5, dpi = 300) 
   })
-  # get list
-  list.files("../figs/anim/anim3/", full.names = T) -> figfnames
+  
+  # get saved plots
+  list.files("../outputs/animations/anim3/", full.names = T) -> figfnames
   tibble(figfnames) |>
     mutate(arr = as.integer( str_split(figfnames, "[_.]") |> map_chr(5) )) |>
     arrange(arr) |>
     pull(figfnames) -> o_figfnames
   
-  gifski(o_figfnames, "../figs/anim/anim_diag_len_increase.gif", delay = .25)
   
-    ggsave(plot = p, filename = paste0("../figs/animations/anim3/anim_diag_", x, ".png"),
-          width = 7, heigh = 5, dpi = 300) 
-})
-# get list
-list.files("../figs/animations/anim3/", full.names = T) -> figfnames
-tibble(figfnames) |>
-  mutate(arr = as.integer( str_split(figfnames, "[_.]") |> map_chr(5) )) |>
-  arrange(arr) |>
-  pull(figfnames) -> o_figfnames
-
-gifski(o_figfnames, "../figs/animations/anim_diag_len_increase.gif", delay = .25)
-
-av_encode_video(o_figfnames, "../figs/animations/anim_diag_len_increase.mkv", framerate = 4)
-""
+  # Create GIF
+  gifski(o_figfnames, "../outputs/animations/anim_diag_len_increase.gif", delay = .25)
+  
+  # Create video file
+  av_encode_video(o_figfnames, "../outputs/animations/anim_diag_len_increase.mkv", framerate = 4)
+}
 ```
 
 In the plot below we can see how the set diagnostic limit (right) and then the diagnostic limit after the assumed exclusion (left). 
@@ -522,10 +516,11 @@ In the plot below we can see how the set diagnostic limit (right) and then the d
 #### Visualize
 ```{r}
 #| echo: false
+power_90 <- c(.87, 93)
 
 samp_size <- 30
 diag_length <- 60
-loss <- .75
+loss <- .78
 
 diag_length_adj   <- ifelse(round(diag_length/2) %% 2 == 0, floor( diag_length/2 ), floor( diag_length/2-1 ) )
 diag_length_adj_l <- ifelse(floor(diag_length_adj*loss) %% 2 == 0, 
@@ -563,15 +558,15 @@ The plot below visualizes the effect size across various diagnostic length and e
 
 samp_size <- 30
 diag_length <- 70
-diag_loss <- .75
+diag_loss <- .78
 
 diag_simu_sum |> 
   filter(eff < .3) |>
   filter(size == samp_size) |>
   mutate(`Effect size` = factor(eff) ) |>
   ggplot(aes(dia.len, pct.pow, col = `Effect size`)) +
-  # geom_smooth() +
-  geom_line() +
+  geom_line(alpha=.4) +
+  geom_smooth() +
   geom_hline(yintercept = .9) +
   geom_vline(xintercept = diag_length * diag_loss, linetype = "dashed") +
   geom_vline(xintercept = diag_length) +
@@ -598,7 +593,7 @@ Increase diagnostic length to 70 (the point between 60 and `r 60/.75` - the poin
 
 samp_size <- 30
 diag_length <- 70
-diag_loss <- .75
+diag_loss <- .78
 
 diag_simu_sum |> 
   filter(eff < .3) |>
@@ -606,7 +601,8 @@ diag_simu_sum |>
   mutate(`Effect size` = factor(eff) ) |>
   ggplot(aes(dia.len, pct.pow, col = `Effect size`))+
   facet_wrap(~size)+
-  geom_line() +
+  geom_line(alpha = .4) +
+  geom_smooth() +
   geom_hline(yintercept = .9)+
   geom_vline(xintercept = diag_length * diag_loss, linetype = "dashed") +
   geom_vline(xintercept = diag_length) +
@@ -626,13 +622,22 @@ diag_simu_sum |>
     Dashed vertical line correspond to the estimated remaining trials after exclusion (trials*loss)")
 ```
 
-Increasing sample size to 34.
-
 ```{r}
 #| echo: false
-samp_size <- c(30,34)
+
+power_90 <- c(.87, 93)
+
+samp_size <- c(30,36)
 diag_length <- 70
-diag_loss <- .75
+diag_loss <- .78
+effect_sizes <- c(.15)
+
+diag_simu_sum |> 
+  filter(dia.len %in% diag_length & size %in% samp_size) |>
+  filter(pct.pow > power_90[1] & pct.pow < power_90[2]) |>
+  filter(eff %in% effect_sizes) |>
+  pull(pct.pow) -> desc_power
+
 
 diag_simu_sum |> 
   filter(eff < .3) |>
@@ -640,12 +645,14 @@ diag_simu_sum |>
   mutate(`Effect size` = factor(eff) ) |>
   ggplot(aes(dia.len, pct.pow, col = `Effect size`)) +
   facet_wrap(~ size)+
-  geom_line() +
+  geom_line(alpha = .6) +
+  geom_smooth(alpha=0) +
   geom_hline(yintercept = .9)+
   geom_vline(xintercept = diag_length * diag_loss, linetype = "dashed") +
   geom_vline(xintercept = diag_length) +
   scale_x_continuous(breaks = seq(0, 500, 25) ) +
   scale_y_continuous(breaks = seq(0, 100, .1) ) +
+  coord_cartesian(ylim = c(.5, 1))
   labs(
     x = "Diagnostic length", 
     y = "Power",
@@ -657,7 +664,7 @@ diag_simu_sum |>
     Dashed vertical line correspond to the estimated remaining trials after exclusion (trials*loss)")
 ```
 
-With 34 participants and 70 post-cue trials, we should have a solid 90% power to detect a small effect of .15.
+With `r if(length(samp_size>1), paste(samp_size, collapse = " & "), samp_size)` participants and `r diag_length` post-cue trials, we  will have a power of `r if(length(desc_power>1), paste(paste(round(desc_power,2), collapse=" & "), "respectively"), round(desc_power,2))` with an effect size of `r effect_sizes`.
 
 It should be noted that it might not be necessary to expect such a small effect size. Indeed, the integrated scores suggest that we may expect an effect size of about .4. Which would show a significant effect for even 20 participants and 45 trials:
 
@@ -665,7 +672,7 @@ It should be noted that it might not be necessary to expect such a small effect 
 #| echo: false
 samp_size <- c(20,30)
 diag_length <- 60
-diag_loss <- .75
+diag_loss <- .78
 
 diag_simu_sum |> 
   filter(eff <.5, eff>.2) |>
@@ -673,7 +680,8 @@ diag_simu_sum |>
   mutate(`Effect size` = factor(eff) ) |>
   ggplot(aes(dia.len, pct.pow, col = `Effect size`)) +
   facet_wrap(~size) +
-  geom_line() +
+  geom_line(alpha = .6) +
+  geom_smooth(alpha = 0) +
   geom_hline(yintercept = .9)+
   geom_vline(xintercept = diag_length * diag_loss, linetype = "dashed") +
   geom_vline(xintercept = diag_length) +
