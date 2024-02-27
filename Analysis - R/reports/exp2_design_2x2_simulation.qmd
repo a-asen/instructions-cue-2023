@@ -8,20 +8,36 @@ editor:
 ---
 
 ```{r}
+#| echo: false
+save_animations <- FALSE
+run_simulations <- FALSE
+load_big_data <- TRUE
+```
+
+
+```{r}
 #| include: false
-
-load("../data/trans/exp1_data.rdata")
-load("../data/simulations/exp2_estimate_effect_500.rdata")
-load("../data/simulations/exp2_gpower_effect_500.rdata")
-
 library(tidyverse)
 library(lsr)
 library(pbapply)
 library(afex)
 library(gt)
 library(parallel)
+library(gifski)
+library(av)
+library(gganimate)
 
 ```
+
+```{r}
+#| include: false
+load("../data/processed/exp1_data.rdata")
+load("../data/simulations/exp2_estimate_effect_500.rdata")
+load("../data/simulations/exp2_gpower_effect_500.rdata")
+
+load("../data/simulations/exp2_simulation_over_effect_sizes_and_sample_sizes.rdata")
+```
+
 
 ## Exclusion
 ```{r exclusion start - accuracy}
@@ -126,6 +142,7 @@ exp2_sim2x2 <- function(N, blocks, block.len, post.cue.len, eff.con.pre, eff.con
   #' @param N                 Number of subjects
   #' @param blocks            Number of blocks 
   #' @param block.len         Length of each block -- this is split, half the trials are pre and half are post
+  #' @param post.cue.len      N of observation after the cue. 
   #' @param eff.con.pre       Effect size of the congruency effect
   #' @param eff.cue.post      Effect size of the pre-post cue
   #' @param eff.con.cue.intr  Effect size of the interaction
@@ -153,12 +170,10 @@ exp2_sim2x2 <- function(N, blocks, block.len, post.cue.len, eff.con.pre, eff.con
       # We filter in such a way that we slice the first trials for each id in each trial:
       filter(cue=="post") |>
       group_by(id, block) |>
-      slice_head(prop = post.cue.len)
-  )
+      slice_head(n = post.cue.len)
+  ) |> view()
 }
 ```
-
-
 
 ### Effect based on estimate
 Here we assume the effect as calculated by the one-way ANOVA (.21 post-cue , and .07 pre-cue)
@@ -166,9 +181,11 @@ Here we assume the effect as calculated by the one-way ANOVA (.21 post-cue , and
 ```{r simulate experiment 2}
 #| echo: false
 
-
+if(create_animations){
+  
+}
 # Generalized eta squared (effect sizes)
-effect_size_range <- seq(0.07,0.26, 0.01)
+effect_size_range <- seq(0.04,0.70, 0.02)
 # detectCores()
 proportion_of_cores <- .95 
 
@@ -186,54 +203,157 @@ clusterEvalQ(cl, {
 
 # Apply function across "cl"
 map_df(10:100, \(sample_size){
+  # For each sample size....
   
   pblapply(effect_size_range,\(effect_size){
+    # Test all effect sizes... 
     
-    map_df(1:300, \(itr_v){
-      d <- 
-        exp2_sim2x2(sample_size, 24, 20, .5, effect_size/3, .008, effect_size)
+    map(c(3, 4, 5), \(post_prop){ 
+      # Across various post-cue proportions....
       
-      res <-
-        d |> 
-        aov_car(rt ~ con*cue + Error(id/(con*cue)), data = _, fun_aggregate=mean)
+      map_df(1:300, \(itr_v){
+        # And repeat each 300 times ....
+          
+        d <- 
+          exp2_sim2x2(sample_size, 24, 20, .5, effect_size/3, .008, effect_size)
+        
+        res <-
+          d |> 
+          aov_car(rt ~ con*cue + Error(id/(con*cue)), data = _, fun_aggregate=mean)
+        
+        tibble(
+          eff     = effect_size,
+          size    = sample_size,
+          post_prop = post_prop,
+          itr     = itr_v,
+          name    = c(names(res$Anova$SSP[2]),names(res$Anova$SSP[3]), names(res$Anova$SSP[4])),
+          ges     = res[["anova_table"]][["ges"]],
+          p       = res[["anova_table"]][["Pr(>F)"]],
+        ) |> pivot_wider(names_from = name, values_from = c(ges, p))
+        
+      })
       
-      tibble(
-        eff     = effect_size,
-        size    = sample_size,
-        itr     = itr_v,
-        name    = c(names(res$Anova$SSP[2]),names(res$Anova$SSP[3]), names(res$Anova$SSP[4])),
-        ges     = res[["anova_table"]][["ges"]],
-        p       = res[["anova_table"]][["Pr(>F)"]],
-      ) |> pivot_wider(names_from = name, values_from = c(ges, p))
     })
+    
   }, cl = cl) |> map_df(~.x)
-})  -> exp2_simu_raw_2
+  
+})  -> exp2_simu_raw_with_postprop
 
-#save(exp2_simu_raw, file="../data/_local/exp2_simulation_over_effect_sizes_and_sample_sizes.rdata")
+#save(exp2_simu_raw_with_postprop, file="../data/simulations/exp2_simulation_over_effect_sizes_and_sample_sizes.rdata")
+
+#save(exp2_simu_raw, file="../data/simulations/exp2_simulation_over_effect_sizes_and_sample_sizes.rdata")
 
 # stop cluster
 stopCluster(cl)
 #save(est.eff_sim500, file="../data/simulations/exp2_estimate_effect_500.rdata")
 ```
 
-```{r}
-exp2_simu_raw_2 |> 
+```{r summarise simulation}
+#| echo: false
+
+exp2_simu_raw_with_postprop |> 
   summarise(
     pow_con = mean(p_con<.05),
     pow_cue = mean(p_cue<.05),
     pow_con.cue = mean(`p_con:cue`<.05),
     across(c(everything(), -itr), mean),
-    .by = c(eff, size)
-  ) -> exp2_simu_sum2
-  
-exp2_simu_sum2 |>
-  pivot_longer(c(p_con, p_cue, `p_con:cue`)) |>
+    .by = c(eff, size, post_prop)
+  ) -> exp2_simu_w_post_sum
+```
+
+
+```{r power}
+#| echo: false
+
+exp2_simu_w_post_sum |> 
+  filter(post_prop == 4) |>
+  filter(eff < .36 & eff > .1) |>
+  pivot_longer(c(pow_con, pow_cue, pow_con.cue)) |>
   ggplot(aes(size, value, col=factor(eff)))+
   facet_wrap(~name) +
-  geom_line() + 
-  geom_smooth()
+  geom_line(alpha = .4) +
+  geom_smooth(alpha = .1) +
+  coord_cartesian(ylim=c(.7,1)) + 
+  geom_hline(yintercept = .90) +
+  geom_vline(xintercept = 36)
 
-exp2_simu_sum |>
+```
+
+```{r}
+#| echo: false
+
+if(save_animations){
+  eff_range <- seq(.04, .24, .02)
+  
+  walk(seq(.04, .7, .02), \(eff_size){
+    
+    exp2_simu_w_post_sum |>
+      filter( eff %in% eff_size ) |>
+      pivot_longer(c(pow_con, pow_cue, pow_con.cue)) |>
+      ggplot(aes(size, value, col = factor(post_prop))) +
+      facet_wrap(~ name) +
+      geom_line(alpha = .4) + 
+      geom_smooth(alpha = .1) +
+      geom_vline(xintercept = 36) +
+      geom_hline(yintercept = .9) +
+      coord_cartesian(ylim = c(.7, 1)) +
+      labs(col = "post cue", 
+           subtitle = paste("Effect size:", eff_size)) -> p
+    
+    ggsave(paste0("../outputs/animations/exp2_design_2x2/png_over_effs/exp2_design_2x2_eff-", eff_size,".png"), 
+           p, 
+           width = 10, 
+           height = 4)
+  })
+    
+  fignames <- list.files("../outputs/animations/exp2_design_2x2/png_over_effs", full.names = T)
+  # create gif
+  gifski(fignames, "../outputs/animations/exp2_design_2x2/size_over_time_exp2_2x2.gif", delay = .25)
+  # create video format
+  av_encode_video(fignames, "../outputs/animations/exp2_design_2x2/size_over_time_exp2_2x2.mkv", framerate = 4)
+  
+}
+```
+
+```{r}
+#| echo: false
+
+if(save_animations){
+  walk(10:100, \(samp_size){
+    print(samp_size)
+    p <-
+      exp2_simu_w_post_sum |>
+      filter(size == samp_size) |>
+      # filter( eff %in% eff_size ) |>
+      pivot_longer(c(pow_con, pow_cue, pow_con.cue)) |>
+      ggplot(aes(eff, value, col = factor(post_prop))) +
+      facet_wrap(~ name) +
+      geom_line(alpha = .4) + 
+      geom_smooth(alpha = .0) +
+      geom_hline(yintercept = .9) +
+      coord_cartesian(ylim = c(.7, 1)) + 
+      labs(col = "post cue", 
+           subtitle = paste("Sample size:", samp_size)) 
+    
+    ggsave(paste0("../outputs/animations/exp2_design_2x2/png_over_samp_size/exp2_design_2x2_eff-", samp_size,".png"), 
+           p, 
+           width = 10, 
+           height = 4)
+  })
+    
+  fignames <- list.files("../outputs/animations/exp2_design_2x2/png_over_samp_size", full.names = T)
+  # create gif
+  gifski(fignames, "../outputs/animations/exp2_design_2x2/pngize_over_time_exp2_2x2.gif", delay = .25)
+  # create video format
+  av_encode_video(fignames, "../outputs/animations/exp2_design_2x2/size_over_time_exp2_2x2.mkv", framerate = 4)
+  
+}
+```
+
+
+
+```{r }
+exp2_simu_w_post_sum |>
   pivot_longer(c(pow_con, pow_cue, pow_con.cue)) |>
   filter(eff >.13, eff < .22) |>
   ggplot(aes(size, value, col=factor(eff)))+
@@ -330,6 +450,7 @@ Here we assume the effect as calculated by GPower .14 ~ .4 d: (.14 post-cue , an
 #| message: false
 #| warning: false
 
+if(run_simulations)
 # Create a "cluster" to simulate faster
 # Take half the computers cores 
 makeCluster( floor(detectCores() - detectCores() * 1/2) ) -> cl
@@ -397,221 +518,3 @@ To have 95% power for the interaction between congruency and cue with the gpower
 Alternatively, we can have 90% power with 30 participants.
 
 
-# Simulation 2x2x2 rmANOVA (congruency X cue X CSI ) 
-
-We believe that...
-- ... (1) Congruent trials benefit from reduced RT (during short-csi + pre-cue)
-- ... (2) that post-cue interact with congruency reducing RT (due to preparation signals) (during short CSI)
-- ... (3) that long-csi interact with post-cue and congruency to further reduce RT (due to further improved preparation)
-
-We are looking for a congruency during post-cue (2-way interaction) and during long-csi & post-cue (3-way interaction)
-
-```{r}
-exp2_sim2x2x2 <- function(N, blocks, block.len, e.con, short.post.con, long.post.con){
-  #' @param N              Number of subjects
-  #' @param blocks         Number of blocks 
-  #' @param block.len      Length of each block
-  #' @param e.con          What is the effect on RT before the *cue* during the *short CSI*?
-  #' @param short.post.con What is the effect on congruency after the *cue* for the *short CSI*?
-  #' @param long.post.con  What is the effect on congruency after the *cue* for the *short CSI*?
-  
-  cue_rep = 2 
-  tibble(
-    id     = rep(1:N, each = blocks * block.len * cue_rep),
-    csi    = rep.int( rep(c("short", "long"), each = (blocks * block.len * cue_rep)/2), N),
-    block  = rep.int( rep(1:blocks, each = block.len * cue_rep), N),
-    cue    = rep.int( rep(c("pre", "post"), each = block.len), blocks * N),
-    con    = rep.int( c("incon", "con"), N * blocks * block.len),
-    rt     = rnorm(   N * blocks * block.len * cue_rep, 
-                      0 +
-                        # 1:
-                        - as.integer(con=="con") * e.con +
-                        # 2: 
-                        - as.integer(csi=="short" & cue=="post" & con=="con") * short.post.con + 
-                        # 3:                         
-                        - as.integer(csi=="long" & cue=="post" & con=="con") * long.post.con
-    )) -> d
-  
-  # Here we remove some post trials equal to half 
-  # First we take all the pre trials: 
-  d |> 
-    filter(cue=="pre") |>
-    # Then we combine the filtered post trials: 
-    rbind(
-      d |> 
-        # We filter in such a way that we slice the first trials for each id in each trial:
-        filter(cue=="post") |>
-        group_by(id, block) |>
-        slice_head(n = floor( block.len/2/2 ) )
-    )
-}
-```
-
-First let us test whether the function simulates the data in the expected directions: 
-
-(For this we stick with GPower effect size to be conservative)
-```{r}
-#| echo: false
-#| message: false
-exp2_sim2x2x2(30, 24, 20, gpow_eff/5, gpow_eff/2, gpow_eff) -> test_sim
-
-test_sim |>
-  ggplot(aes(con, rt, col=interaction(csi,cue), group=interaction(csi,cue)))+
-  stat_summary(alpha=.2, position=position_dodge(.1))+
-  stat_summary(alpha=.2, geom="line", position=position_dodge(.1))+
-  stat_summary(geom="line", position=position_dodge(.1))+
-  stat_summary(position=position_dodge(.1))+
-  scale_color_manual(values=c("indianred1", "indianred4", "deepskyblue1", "deepskyblue4"))
-```
-
-```{r}
-#| echo: false
-#| message: false
-
-test_sim |>
-  mutate(condition = factor( case_when(
-    csi=="short" & cue=="pre" ~ "short-pre",
-    csi=="short" & cue=="post" ~ "short-post",
-    csi=="long" & cue=="pre" ~ "long-pre",
-    csi=="long" & cue=="post" ~ "long-post",
-    ), levels = c("short-pre", "short-post", "long-pre", "long-post"))) |>
-  ggplot(aes(condition, rt, col = con, group = con))+
-  stat_summary(alpha=.2, position=position_dodge(.1))+
-  stat_summary(alpha=.2, geom="line", position=position_dodge(.1))+
-  stat_summary(geom="line", position=position_dodge(.1))+
-  stat_summary(position=position_dodge(.1))+
-  scale_color_manual(values=c("indianred2", "deepskyblue"))+
-  theme_minimal()
-```
-
-This generally seems to be correct.
-
-
-### Test Sim: 30 repeat
-```{r generate 2x2x2 data}
-#| echo: false
-
-# To flexibly adapt
-# eff_est <- gpow_eff
-eff_est <- .4
-
-pblapply(1:30, \(i) exp2_sim2x2x2(30, 24, 20, eff_est/5, eff_est/2, eff_est) |> 
-           mutate(simulation=i) ) |> 
-  map_df(~.x) -> par30_2x2x2
-```
-
-```{r anova table}
-#| echo: false
-
-par30_2x2x2 |> 
-  filter(simulation==1) |> 
-  aov_car(rt ~ csi*cue*con + Error(id/(csi*cue*con)), data = _,fun_aggregate = mean) |> 
-  summary()
-
-par30_2x2x2 |> 
-  filter(simulation==1) |> 
-  aov(rt ~ csi*cue*con + (1 | id), data=_) |> 
-  summary()
-
-```
-
-```{r}
-par30_2x2x2 |>
-  ggplot(aes(con, rt, col=interaction(csi,cue), group=interaction(simulation,csi,cue)))+
-  stat_summary(alpha=.05, position=position_dodge(.4))+
-  stat_summary(alpha=.05, geom="line", position=position_dodge(.4))+
-  stat_summary(aes(group=interaction(csi,cue)), geom="line", position=position_dodge(.2))+
-  stat_summary(aes(group=interaction(csi,cue)), position=position_dodge(.2))+
-  scale_color_manual(values=c("indianred1", "indianred4", "deepskyblue1", "deepskyblue4"))+
-  labs(col="CSI * CUE")+
-  theme_minimal()
-```
-
-```{r}
-#| echo: false
-#| message: false
-par30_2x2x2 |>
-  mutate(condition = factor( case_when(
-    csi=="short" & cue=="pre" ~ "SHORT--pre",
-    csi=="short" & cue=="post" ~ "SHORT--post",
-    csi=="long" & cue=="pre" ~ "LONG--pre",
-    csi=="long" & cue=="post" ~ "LONG--post",
-    ), levels = c("SHORT--pre", "SHORT--post", "LONG--pre", "LONG--post"))) |>
-  ggplot(aes(condition, rt, col = con, group = interaction(simulation,con)))+
-  stat_summary(aes(col=NULL), alpha=.07, position=position_dodge(.2))+
-  stat_summary(aes(col=NULL), alpha=.07, geom="line", position=position_dodge(.2))+
-  stat_summary(aes(group=con), geom="line", position=position_dodge(.2))+
-  stat_summary(aes(group=con), position=position_dodge(.2))+
-  scale_color_manual(values=c("indianred2", "deepskyblue"))+
-  theme_minimal()+
-  labs(col="Congruency")
-```
-
-
-### Big Sim: 10:100 participants each 500 
-With that, we can calculate the power needed to detect a three-way and a two way interaction: 
-```{r simulate experiment 2}
-#| echo: false
-#| warning: false
-#| message: false
-
-
-# Create a "cluster" to simulate faster
-# Take half the computers cores 
-makeCluster( floor(detectCores() - detectCores() * 1/2) ) -> cl
-# Export the local function
-clusterExport(cl, varlist = c("exp2_sim2x2x2", "gpow_eff"))
-# Initiate libraries in clusters
-clusterEvalQ(cl, {
-  library(tidyverse)
-  library(pbapply)
-  library(afex)
-})
-
-# Apply function across "cl"
-pblapply(10:100, \(x){
-  # apply *x* participants...
-  purrr::map_df(1:500, \(y){
-    # repeat each par-size 100 times
-    exp2_sim2x2x2(x, 24, 20, gpow_eff/5, gpow_eff/2, gpow_eff) -> d
-    d |> 
-      aov_car(rt ~ csi*cue*con + Error(id/(csi*cue*con)), data = _, fun_aggregate=mean) -> res
-    
-    tibble(
-      size = x,
-      itr = y,
-      name = res[["Anova"]][["terms"]][-1],
-      ges = res[["anova_table"]][["ges"]],
-      p = res[["anova_table"]][["Pr(>F)"]],
-    ) |> pivot_wider(names_from = name, values_from =c(ges, p))
-  }) |> summarise(size = unique(size),
-                  itr = max(itr),
-                  p.cs.cu = mean(`p_csi:cue`<.05),
-                  p.cs.co = mean(`p_csi:con`<.05),
-                  p.cu.co = mean(`p_cue:con`<.05),
-                  p.co.cu.cs = mean(`p_csi:cue:con`<.05),
-                  across(contains("_"), mean))
-}, cl = cl) |>
-  map_df(~.x) -> g.eff_2x2x2_sim500
-
-# stop cluster
-stopCluster(cl)
-#save(g.eff_2x2x2_sim500, file="../data/simulations/design_2x2x2_gpower_eff.rdata") # not correct fix
-```
-
-
-```{r}
-g.eff_2x2x2_sim500  |> 
-  pivot_longer(c(`p_csi:cue:con`, `p_cue:con`)) |>
-  ggplot(aes(size, value, col=name, group=interaction(itr, name)))+
-  geom_line()+
-  geom_hline(yintercept=.10)
-```
-
-```{r}
-g.eff_2x2x2_sim500  |> 
-  pivot_longer(c(p.cu.co, p.co.cu.cs)) |>
-  ggplot(aes(size, value, col=name, group=interaction(itr, name)))+
-  geom_line()+
-  geom_hline(yintercept=.9)
-```
