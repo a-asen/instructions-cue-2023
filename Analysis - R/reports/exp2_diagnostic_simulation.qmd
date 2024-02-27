@@ -14,9 +14,6 @@ First we can sample effects from experiment 1.
 
 ```{r}
 #| include: false
-load("../data/processed/exp1_data.rdata")
-load("../data/simulations/diag_simu_sum.rdata")
-load("../data/_local/diag_simu_raw.rdata")
 
 library(tidyverse)
 library(lsr)
@@ -27,8 +24,16 @@ library(gganimate)
 library(gifski)
 library(av)
 
-run_create_animations <- TRUE
-run_create_simulations <- FALSE
+save_animations <- FALSE
+run_simulations <- FALSE
+load_big_data <- TRUE
+
+```
+
+```{r load data}
+load("../data/processed/exp1_data.rdata")
+load("../data/simulations/diag_simu_sum.rdata")
+if(load_big_data){ load("../data/simulations/diag_simu_raw.rdata") }
 ```
 
 ```{r}
@@ -292,7 +297,7 @@ We simulate generate data over (1) difference effect sizes for (2) various sampl
 #| echo: false
 
 # You dont want to start this if you have the data.... 
-if(!exists("diag_simu") & run_create_simulations){
+if(!exists("diag_simu") & run_simulations){
   
   library(pbapply)
   library(parallel)
@@ -384,7 +389,7 @@ if(!exists("diag_simu") & run_create_simulations){
 ```{r first animation attempt}
 #| echo: false
 
-if(run_create_animations){
+if(save_animations){
   diag_simu_sum |>
     filter(eff > .10) |>
     mutate(`Effect size` = factor(eff)) |>
@@ -410,7 +415,7 @@ Animate the impact of increasing the sample size (see [LINK]).
 #| message: false
 
 # This animates power of various diagnostic lengths over different sample sizes: 
-if(run_create_animations){
+if(save_animations){
   walk(seq(min(diag_simu_sum$size), max(diag_simu_sum$size), 1), \(x){
     #cat("\nSample size:", x)
     p <- 
@@ -457,7 +462,8 @@ Animate the impact of changes in diagnostic lengths (see [LINK]).
 #| messages: false
 
 # This the power the power over sample size split by loss of data
-if( run_create_animations ){
+if( save_animations ){
+  
   walk(seq(56, max(diag_simu_sum$dia.len), 2), \(x){
     #cat("\nDiag length: ",x )  
     samp_size <- 30
