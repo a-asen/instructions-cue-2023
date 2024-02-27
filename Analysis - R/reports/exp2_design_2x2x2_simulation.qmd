@@ -1,0 +1,228 @@
+---
+title: "exp2_design_simulation"
+format: html
+lang: en-GB
+editor: 
+  markdown:
+    wrap: 62
+---
+
+
+# Simulation 2x2x2 rmANOVA (congruency X cue X CSI ) 
+
+We believe that...
+- ... (1) Congruent trials benefit from reduced RT (during short-csi + pre-cue)
+- ... (2) that post-cue interact with congruency reducing RT (due to preparation signals) (during short CSI)
+- ... (3) that long-csi interact with post-cue and congruency to further reduce RT (due to further improved preparation)
+
+We are looking for a congruency during post-cue (2-way interaction) and during long-csi & post-cue (3-way interaction)
+
+```{r}
+exp2_sim2x2x2 <- function(N, blocks, block.len, e.con, short.post.con, long.post.con){
+  #' @param N              Number of subjects
+  #' @param blocks         Number of blocks 
+  #' @param block.len      Length of each block
+  #' @param e.con          What is the effect on RT before the *cue* during the *short CSI*?
+  #' @param short.post.con What is the effect on congruency after the *cue* for the *short CSI*?
+  #' @param long.post.con  What is the effect on congruency after the *cue* for the *short CSI*?
+  
+  cue_rep = 2 
+  tibble(
+    id     = rep(1:N, each = blocks * block.len * cue_rep),
+    csi    = rep.int( rep(c("short", "long"), each = (blocks * block.len * cue_rep)/2), N),
+    block  = rep.int( rep(1:blocks, each = block.len * cue_rep), N),
+    cue    = rep.int( rep(c("pre", "post"), each = block.len), blocks * N),
+    con    = rep.int( c("incon", "con"), N * blocks * block.len),
+    rt     = rnorm(   N * blocks * block.len * cue_rep, 
+                      0 +
+                        # 1:
+                        - as.integer(con=="con") * e.con +
+                        # 2: 
+                        - as.integer(csi=="short" & cue=="post" & con=="con") * short.post.con + 
+                        # 3:                         
+                        - as.integer(csi=="long" & cue=="post" & con=="con") * long.post.con
+    )) -> d
+  
+  # Here we remove some post trials equal to half 
+  # First we take all the pre trials: 
+  d |> 
+    filter(cue=="pre") |>
+    # Then we combine the filtered post trials: 
+    rbind(
+      d |> 
+        # We filter in such a way that we slice the first trials for each id in each trial:
+        filter(cue=="post") |>
+        group_by(id, block) |>
+        slice_head(n = floor( block.len/2/2 ) )
+    )
+}
+```
+
+First let us test whether the function simulates the data in the expected directions: 
+
+(For this we stick with GPower effect size to be conservative)
+```{r}
+#| echo: false
+#| message: false
+exp2_sim2x2x2(30, 24, 20, gpow_eff/5, gpow_eff/2, gpow_eff) -> test_sim
+
+test_sim |>
+  ggplot(aes(con, rt, col=interaction(csi,cue), group=interaction(csi,cue)))+
+  stat_summary(alpha=.2, position=position_dodge(.1))+
+  stat_summary(alpha=.2, geom="line", position=position_dodge(.1))+
+  stat_summary(geom="line", position=position_dodge(.1))+
+  stat_summary(position=position_dodge(.1))+
+  scale_color_manual(values=c("indianred1", "indianred4", "deepskyblue1", "deepskyblue4"))
+```
+
+```{r}
+#| echo: false
+#| message: false
+
+test_sim |>
+  mutate(condition = factor( case_when(
+    csi=="short" & cue=="pre" ~ "short-pre",
+    csi=="short" & cue=="post" ~ "short-post",
+    csi=="long" & cue=="pre" ~ "long-pre",
+    csi=="long" & cue=="post" ~ "long-post",
+    ), levels = c("short-pre", "short-post", "long-pre", "long-post"))) |>
+  ggplot(aes(condition, rt, col = con, group = con))+
+  stat_summary(alpha=.2, position=position_dodge(.1))+
+  stat_summary(alpha=.2, geom="line", position=position_dodge(.1))+
+  stat_summary(geom="line", position=position_dodge(.1))+
+  stat_summary(position=position_dodge(.1))+
+  scale_color_manual(values=c("indianred2", "deepskyblue"))+
+  theme_minimal()
+```
+
+This generally seems to be correct.
+
+
+### Test Sim: 30 repeat
+```{r generate 2x2x2 data}
+#| echo: false
+
+# To flexibly adapt
+# eff_est <- gpow_eff
+eff_est <- .4
+
+pblapply(1:30, \(i) exp2_sim2x2x2(30, 24, 20, eff_est/5, eff_est/2, eff_est) |> 
+           mutate(simulation=i) ) |> 
+  map_df(~.x) -> par30_2x2x2
+```
+
+```{r anova table}
+#| echo: false
+
+par30_2x2x2 |> 
+  filter(simulation==1) |> 
+  aov_car(rt ~ csi*cue*con + Error(id/(csi*cue*con)), data = _,fun_aggregate = mean) |> 
+  summary()
+
+par30_2x2x2 |> 
+  filter(simulation==1) |> 
+  aov(rt ~ csi*cue*con + (1 | id), data=_) |> 
+  summary()
+
+```
+
+```{r}
+par30_2x2x2 |>
+  ggplot(aes(con, rt, col=interaction(csi,cue), group=interaction(simulation,csi,cue)))+
+  stat_summary(alpha=.05, position=position_dodge(.4))+
+  stat_summary(alpha=.05, geom="line", position=position_dodge(.4))+
+  stat_summary(aes(group=interaction(csi,cue)), geom="line", position=position_dodge(.2))+
+  stat_summary(aes(group=interaction(csi,cue)), position=position_dodge(.2))+
+  scale_color_manual(values=c("indianred1", "indianred4", "deepskyblue1", "deepskyblue4"))+
+  labs(col="CSI * CUE")+
+  theme_minimal()
+```
+
+```{r}
+#| echo: false
+#| message: false
+par30_2x2x2 |>
+  mutate(condition = factor( case_when(
+    csi=="short" & cue=="pre" ~ "SHORT--pre",
+    csi=="short" & cue=="post" ~ "SHORT--post",
+    csi=="long" & cue=="pre" ~ "LONG--pre",
+    csi=="long" & cue=="post" ~ "LONG--post",
+    ), levels = c("SHORT--pre", "SHORT--post", "LONG--pre", "LONG--post"))) |>
+  ggplot(aes(condition, rt, col = con, group = interaction(simulation,con)))+
+  stat_summary(aes(col=NULL), alpha=.07, position=position_dodge(.2))+
+  stat_summary(aes(col=NULL), alpha=.07, geom="line", position=position_dodge(.2))+
+  stat_summary(aes(group=con), geom="line", position=position_dodge(.2))+
+  stat_summary(aes(group=con), position=position_dodge(.2))+
+  scale_color_manual(values=c("indianred2", "deepskyblue"))+
+  theme_minimal()+
+  labs(col="Congruency")
+```
+
+
+### Big Sim: 10:100 participants each 500 
+With that, we can calculate the power needed to detect a three-way and a two way interaction: 
+```{r simulate experiment 2}
+#| echo: false
+#| warning: false
+#| message: false
+
+
+# Create a "cluster" to simulate faster
+# Take half the computers cores 
+makeCluster( floor(detectCores() - detectCores() * 1/2) ) -> cl
+# Export the local function
+clusterExport(cl, varlist = c("exp2_sim2x2x2", "gpow_eff"))
+# Initiate libraries in clusters
+clusterEvalQ(cl, {
+  library(tidyverse)
+  library(pbapply)
+  library(afex)
+})
+
+# Apply function across "cl"
+pblapply(10:100, \(x){
+  # apply *x* participants...
+  purrr::map_df(1:500, \(y){
+    # repeat each par-size 100 times
+    exp2_sim2x2x2(x, 24, 20, gpow_eff/5, gpow_eff/2, gpow_eff) -> d
+    d |> 
+      aov_car(rt ~ csi*cue*con + Error(id/(csi*cue*con)), data = _, fun_aggregate=mean) -> res
+    
+    tibble(
+      size = x,
+      itr = y,
+      name = res[["Anova"]][["terms"]][-1],
+      ges = res[["anova_table"]][["ges"]],
+      p = res[["anova_table"]][["Pr(>F)"]],
+    ) |> pivot_wider(names_from = name, values_from =c(ges, p))
+  }) |> summarise(size = unique(size),
+                  itr = max(itr),
+                  p.cs.cu = mean(`p_csi:cue`<.05),
+                  p.cs.co = mean(`p_csi:con`<.05),
+                  p.cu.co = mean(`p_cue:con`<.05),
+                  p.co.cu.cs = mean(`p_csi:cue:con`<.05),
+                  across(contains("_"), mean))
+}, cl = cl) |>
+  map_df(~.x) -> g.eff_2x2x2_sim500
+
+# stop cluster
+stopCluster(cl)
+#save(g.eff_2x2x2_sim500, file="../data/simulations/design_2x2x2_gpower_eff.rdata") # not correct fix
+```
+
+
+```{r}
+g.eff_2x2x2_sim500  |> 
+  pivot_longer(c(`p_csi:cue:con`, `p_cue:con`)) |>
+  ggplot(aes(size, value, col=name, group=interaction(itr, name)))+
+  geom_line()+
+  geom_hline(yintercept=.10)
+```
+
+```{r}
+g.eff_2x2x2_sim500  |> 
+  pivot_longer(c(p.cu.co, p.co.cu.cs)) |>
+  ggplot(aes(size, value, col=name, group=interaction(itr, name)))+
+  geom_line()+
+  geom_hline(yintercept=.9)
+```
