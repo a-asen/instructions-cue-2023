@@ -26,11 +26,12 @@ library(av)
 
 save_animations <- FALSE
 run_simulations <- FALSE
-load_big_data <- TRUE
+load_big_data <- FALSE
 
 ```
 
 ```{r load data}
+#| include: false
 load("../data/processed/exp1_data.rdata")
 load("../data/simulations/diag_simu_sum.rdata")
 if(load_big_data){ load("../data/simulations/diag_simu_raw.rdata") }
@@ -82,7 +83,8 @@ map_df(seq_along(1:16), \(x){
     group_by(id, con) |>
     summarise(
       rt = mean(rt),
-      pct = mean(correct_response) ) |> 
+      pct = mean(correct_response) 
+    ) |> 
     ungroup() |>
     summarise(
       n = x,
@@ -90,7 +92,7 @@ map_df(seq_along(1:16), \(x){
       t = t.test(rt ~ con, paired=T)$statistic,
       p = t.test(rt ~ con, paired=T)$p.value,
       df = t.test(rt ~ con, paired=T)$parameter,
-      )
+    )
 }) -> n_back_test
 n_back_test |>
   ggplot(aes(n, p))+
@@ -240,7 +242,9 @@ d_ex |>
 sum(d_ex$valid_trials==0) -> loss[["inducer_fail_trials"]]
 sum(d_ex$valid_trials==0) / loss$data_trials * 100 -> loss[["inducer_fail_pct"]]
 
-d_ex |> filter( valid_trials == 1 ) -> d_ex
+d_ex |> 
+  filter( valid_trials == 1 ) |> 
+  ungroup() -> d_ex
 
 d_ex |> 
   filter(trial_info == "Diagnostic trial") |>
@@ -284,7 +288,7 @@ gen_sample <- function(N, OBS, eff.rt, eff.pct){
   tibble(
     id = rep(1:N, each = OBS*2),
     con = rep.int( c("con","incon"), N*OBS),
-    rt  = rnorm(N*OBS*2, 0 + as.integer(con=="con") * eff.rt, 1),
+    rt  = rnorm(N*OBS*2, 0 + as.integer(con=="con") * eff.rt,  1),
     pct = rnorm(N*OBS*2, 0 + as.integer(con=="con") * eff.pct, 1),
   ) 
 }
@@ -329,11 +333,11 @@ if(!exists("diag_simu") & run_simulations){
           map_df(1:300, \(rep){
             
             # SAMPLE....
-            gen_sample(samp_size, diag_len, eff.size/4, eff.size) |> 
+            gen_sample(samp_size, diag_len, eff.size/4, eff.size) |>
               group_by(id) |> 
               mutate( n = rep( 1:(length(rt)/2 ), each=2) ) |> 
-              pivot_wider(names_from=con, values_from = c(rt,pct))  |> 
-              ungroup() |> 
+              pivot_wider(names_from=con, values_from = c(rt,pct)) |> 
+              ungroup()  |>
               summarise(
                 eff        = eff.size, 
                 size       = samp_size,
@@ -532,7 +536,7 @@ diag_length_adj   <- ifelse(round(diag_length/2) %% 2 == 0, floor( diag_length/2
 diag_length_adj_l <- ifelse(floor(diag_length_adj*loss) %% 2 == 0, 
                             floor( diag_length_adj*loss ), floor( diag_length_adj*loss-1 ) ) 
 diag_simu_sum |>
-  filter(eff < .45) |>
+  filter(eff > .4) |>
   filter(dia.len == diag_length_adj |
            dia.len == diag_length_adj_l) |>
   group_by(eff, size) |>
