@@ -7,6 +7,29 @@ editor:
     wrap: 62
 ---
 
+```{r}
+#| include: false
+save_animations <- FALSE
+run_simulations <- FALSE
+load_big_data <- TRUE
+```
+
+```{r}
+#| include: false
+library(tidyverse)
+library(pbapply)
+library(parallel)
+library(afex)
+```
+
+```{r}
+#| include: false
+
+if(load_big_data){
+  # big sim
+  load("../data/simulations/exp2_design_2x2x2_raw.rdata")
+}
+```
 
 # Simulation 2x2x2 rmANOVA (congruency X cue X CSI ) 
 
@@ -18,13 +41,14 @@ We believe that...
 We are looking for a congruency during post-cue (2-way interaction) and during long-csi & post-cue (3-way interaction)
 
 ```{r}
-exp2_sim2x2x2 <- function(N, blocks, block.len, e.con, short.post.con, long.post.con){
+exp2_sim2x2x2 <- function(N, blocks, block.len, post.cue.len, e.con, short.post.con, long.post.con){
   #' @param N              Number of subjects
   #' @param blocks         Number of blocks 
   #' @param block.len      Length of each block
+  #' @param post.cue.len   Length of each block
   #' @param e.con          What is the effect on RT before the *cue* during the *short CSI*?
   #' @param short.post.con What is the effect on congruency after the *cue* for the *short CSI*?
-  #' @param long.post.con  What is the effect on congruency after the *cue* for the *short CSI*?
+  #' @param long.post.con  What is the effect on congruency after the *cue* for the *LONG CSI*?
   
   cue_rep = 2 
   tibble(
@@ -53,7 +77,7 @@ exp2_sim2x2x2 <- function(N, blocks, block.len, e.con, short.post.con, long.post
         # We filter in such a way that we slice the first trials for each id in each trial:
         filter(cue=="post") |>
         group_by(id, block) |>
-        slice_head(n = floor( block.len/2/2 ) )
+        slice_head(n = post.cue.len )
     )
 }
 ```
@@ -61,6 +85,100 @@ exp2_sim2x2x2 <- function(N, blocks, block.len, e.con, short.post.con, long.post
 First let us test whether the function simulates the data in the expected directions: 
 
 (For this we stick with GPower effect size to be conservative)
+
+
+```{r}
+#| echo: false
+
+if(run_simulations){
+  
+  # Generalized eta squared (effect sizes)
+  effect_size_range <- seq(0.04,0.70, 0.02)
+  # detectCores()
+  proportion_of_cores <- .95 
+  
+  # Create a "cluster" to simulate faster
+  # Take half the computers cores 
+  makeCluster( floor(detectCores() * proportion_of_cores) ) -> cl
+  # Export the local function
+  clusterExport(cl, varlist = c("exp2_sim2x2x2", "effect_size_range"))
+  # Initiate libraries in clusters
+  clusterEvalQ(cl, {
+    library(tidyverse)
+    library(pbapply)
+    library(afex)
+  })
+    
+  # Simulation: 
+  pblapply(10:100, \(samp_size){
+    
+    map_df(effect_size_range, \(eff_size){
+      
+      map_df(24:34, \(block_len){
+        
+        map_df(1:100, \(rep){
+          
+          d <- 
+            exp2_sim2x2x2(samp_size, 20, block_len, 4, eff_size/3, eff_size/2, eff_size)
+          
+          res <-
+            d |> 
+            aov_car(rt ~ con*cue*csi + Error(id/(con*cue*csi)), data = _, fun_aggregate=mean)
+          
+          tibble(
+            samp       = samp_size,
+            eff        = eff_size,
+            block.len  = block_len,
+            rep        = rep,
+            name       = row.names(res$anova_table),
+            ges        = res[["anova_table"]][["ges"]],
+            p          = res[["anova_table"]][["Pr(>F)"]],
+          ) |> pivot_wider(names_from = name, values_from = c(ges, p))
+        
+        })
+        
+      })
+      
+    })
+        
+  }, cl = cl) |> 
+    map_df(~.x) ->
+    exp2_design_2x2x2_simu_raw
+  
+  save(exp2_design_2x2x2_simu_raw, file="../data/simulations/exp2_design_2x2x2_raw.rdata")
+  
+  stopCluster(cl)
+}
+```
+
+```{r}
+
+exp2_design_2x2x2_simu_raw |> 
+  summarise(
+    pow_con = mean(p_con<.05),
+    pow_cue = mean(p_cue<.05),
+    pow_con.cue = mean(`p_con:cue`<.05),
+    pow_con.csi = mean(`p_con:csi`<.05),
+    pow_cue.csi = mean(`p_cue:csi`<.05),
+    pow_con.cue.csi = mean(`p_con:cue:csi`<.05),
+    .by = c(samp, eff, block.len),
+    
+  ) -> sum_exp2_design_2x2x2_simu_raw
+
+```
+
+```{r}
+sum_exp2_design_2x2x2_simu_raw |>
+  filter(block.len == 24) |>
+  filter(eff < .3) |>
+  ggplot(aes(samp, pow_con.cue.csi, col=factor(eff)))+
+  geom_line()+
+  geom_vline(xintercept=35)
+```
+
+
+
+
 ```{r}
 #| echo: false
 #| message: false

@@ -30,11 +30,16 @@ library(gganimate)
 
 ```{r}
 #| include: false
-load("../data/processed/exp1_data.rdata")
+load("../data/processed/exp1_data.rdata") # actual data
+
 load("../data/simulations/exp2_estimate_effect_500.rdata")
 load("../data/simulations/exp2_gpower_effect_500.rdata")
 
-load("../data/simulations/exp2_simulation_over_effect_sizes_and_sample_sizes.rdata")
+if(load_big_data){
+  # Big sim
+  load("../data/simulations/exp2_simulation_over_effect_sizes_and_sample_sizes.rdata")
+  load("../data/simulations/exp2_simulation_w_postprop_sum.rdata")
+}
 ```
 
 
@@ -103,7 +108,9 @@ d |>
 sum(d$valid_trials==0) -> loss[["inducer_fail_trials"]]
 sum(d$valid_trials==0) / loss$data_trials * 100 -> loss[["inducer_fail_pct"]]
 
-d |> filter( valid_trials == 1 ) -> d
+d |> 
+  filter( valid_trials == 1 ) |> 
+  ungroup() -> d
 ```
 
 
@@ -124,6 +131,54 @@ According to gpower, an effect size of .14 correspond to an effect size of .4:
 ```{r}
 con_eff <- .21
 gpow_eff <- .14
+```
+
+
+
+```{r}
+#| echo: false
+
+map_df(1:16, \(x){
+  d |> 
+    filter(diagnostic_run < x) |>
+    filter(!is.na(con)) |>
+    summarise(
+      .by=c(id, con),
+      rt = mean(rt), 
+      pe = 1 - mean(correct_response)
+    ) |>
+    aov_car(pe ~ con + Error(id/(con)), data=_) -> test2
+  
+  d |> 
+    filter(diagnostic_run < x) |>
+    filter(!is.na(con)) |>
+    summarise(
+      .by=c(id, con),
+      rt = mean(rt), 
+      pe = 1 - mean(correct_response)
+    ) |>
+    aov_car(rt ~ con + Error(id/(con)), data=_) -> test
+  
+  tibble(
+    id = x,
+    rt_ges = test$anova_table$ges,
+    pe_ges = test2$anova_table$ges,
+  )
+}) -> ges_diag_lens
+ges_diag_lens |>
+  summarise(across(everything(), mean))
+
+d |> 
+  filter(diagnostic_run <4) |>
+  filter(!is.na(con)) |>
+  summarise(
+    .by=c(id, con),
+    rt = mean(rt), 
+    pe = 1 - mean(correct_response)
+  ) |>
+  aov_car(rt ~ con + Error(id/(con)), data=_)
+
+
 ```
 
 
@@ -170,7 +225,7 @@ exp2_sim2x2 <- function(N, blocks, block.len, post.cue.len, eff.con.pre, eff.con
       filter(cue=="post") |>
       group_by(id, block) |>
       slice_head(n = post.cue.len)
-  ) |> view()
+  ) -> test
 }
 ```
 
@@ -213,7 +268,7 @@ if(create_animations){
           # And repeat each 300 times ....
             
           d <- 
-            exp2_sim2x2(sample_size, 24, 20, .5, effect_size/3, .008, effect_size)
+            exp2_sim2x2(sample_size, 24, 20, 5, effect_size/3, .008, effect_size)
           
           res <-
             d |> 
@@ -238,22 +293,39 @@ if(create_animations){
   })  -> exp2_simu_raw_with_postprop
   #save(exp2_simu_raw_with_postprop, file="../data/simulations/exp2_simulation_over_effect_sizes_and_sample_sizes.rdata")
   
+  exp2_simu_raw_with_postprop |> 
+    summarise(
+      pow_con = mean(p_con<.05),
+      pow_cue = mean(p_cue<.05),
+      pow_con.cue = mean(`p_con:cue`<.05),
+      across(c(everything(), -itr), mean),
+      .by = c(eff, size, post_prop)
+    ) -> exp2_simu_w_post_sum
+  
+  #save(exp2_simu_w_post_sum, file="../data/simulations/exp2_simulation_w_postprop_sum.rdata")
+  
   # stop cluster
   stopCluster(cl)
 }
 ```
 
-```{r summarise simulation}
-#| echo: false
 
-exp2_simu_raw_with_postprop |> 
+```{r}
+test |> 
   summarise(
-    pow_con = mean(p_con<.05),
-    pow_cue = mean(p_cue<.05),
-    pow_con.cue = mean(`p_con:cue`<.05),
-    across(c(everything(), -itr), mean),
-    .by = c(eff, size, post_prop)
-  ) -> exp2_simu_w_post_sum
+    .by = c(id, cue, con),
+    rt = mean(rt)
+  ) |>
+  pivot_wider(names_from = con, values_from = rt) |>
+  summarise(
+    m = mean(con-incon),
+    sd = sd(con-incon),
+    d = m/sd
+  )
+  
+  filter(cue=="post") |>
+  t.test(rt~con, data=_, paired=T)
+  aov_car(rt ~ con*cue + Error(id/(con*cue)), data=_)
 ```
 
 
@@ -262,7 +334,8 @@ exp2_simu_raw_with_postprop |>
 
 exp2_simu_w_post_sum |> 
   filter(post_prop == 4) |>
-  filter(eff < .36 & eff > .1) |>
+  # filter(eff > .4 & eff < .7) |>
+  filter(eff < .12 ) |>
   pivot_longer(c(pow_con, pow_cue, pow_con.cue)) |>
   ggplot(aes(size, value, col=factor(eff)))+
   facet_wrap(~name) +
@@ -271,6 +344,7 @@ exp2_simu_w_post_sum |>
   coord_cartesian(ylim=c(.7,1)) + 
   geom_hline(yintercept = .90) +
   geom_vline(xintercept = 36)
+
 ```
 
 ```{r}

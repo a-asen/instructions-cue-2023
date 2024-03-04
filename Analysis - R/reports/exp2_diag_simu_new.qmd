@@ -117,15 +117,14 @@ d_ex |>
   group_by(id) |>
   count() |>
   ungroup() |>
-  summarise(avg = mean(n)) |> gt()
+  summarise(avg = mean(n))
 ```
 trials.
 
 This is a loss of approximately: `r 180/240`. Whatever post-cue run we decide, we need to estimate an expected loss of about .75. 
 
 
-
-# Generating data
+# Parameter from exp1:
 
 Calculate the standardized means and standard deviations, and effect sizes from experiment 1. 
 
@@ -146,14 +145,148 @@ d_ex |>
   ) |>
   pivot_wider(names_from = con, values_from = c(rt,pe)) |>
   summarise(
+    rt_con_m = mean(rt_TRUE),
+    rt_con_sd = sd(rt_TRUE),
+    rt_incon_m = mean(rt_FALSE),
+    rt_incon_sd = sd(rt_FALSE),
     rt_d_m = mean(rt_FALSE-rt_TRUE),
     rt_d_sd = sd(rt_FALSE-rt_TRUE),
-    rt_d = cohensD(as.double(rt_FALSE), as.double(rt_TRUE), method="paired"),
+    pe_d2 = rt_d_m / rt_d_sd,
     pe_d_m = mean(pe_FALSE-pe_TRUE),
     pe_d_sd = sd(pe_FALSE-pe_TRUE),
-    pe_d = cohensD(as.double(pe_FALSE), as.double(pe_TRUE), method="paired"),
+    pe_d = pe_d_m / pe_d_sd,
   ) -> exp1_outcome
 exp1_outcome
 ```
+These values are standardized, meaning these are the values we will simulate with (?).
+
+```{r}
+#| echo: false
+
+exp1_outcome
+
+gen_data <- function(N, OBS, eff.rt, sd.rt, eff.pe, sd.pe){
+  #' @param N Number of subjects
+  #' @param OBS Number of observation per N
+  #' @param eff.rt  Effect size of congruency on response time
+  #' @param eff.pct Effect size of congruency on proportion of correct trials 
+
+  tibble(
+    id  = rep(1:N, each = OBS*2),
+    con = rep.int( c("con","incon"), N*OBS),
+    rt  = rnorm(N*OBS*2, 0 + as.integer(con=="con") * eff.rt, sd.rt),
+    pe  = rnorm(N*OBS*2, 0 + as.integer(con=="con") * eff.pe, sd.pe),
+  ) 
+}
+```
+
+Simulate data to see GES vs effect size:
+```{r}
+#| echo: false
+
+gen_data(
+  27,
+  1,
+  exp1_outcome$rt_d_m,
+  exp1_outcome$rt_d_sd,
+  exp1_outcome$pe_d_m,
+  exp1_outcome$pe_d_sd
+) -> single_dat_sim
+
+single_dat_sim |> 
+  summarise(
+    .by = c(id, con),
+    rt_m = mean(rt),
+    pe_m = mean(pe)
+  ) |>
+  aov_car(rt_m~con + Error(id/(con)), data=_) # p = .035, GES = .09
+single_dat_sim |> 
+  summarise(
+    .by = c(id, con),
+    rt_m = mean(rt),
+    pe_m = mean(pe)
+  ) -> temptoin 
+  t.test(rt_m~con, data=temptoin , paired=T) #          p = .035,  d = .42
+
+  temptoin |>
+  pivot_wider(names_from=con, values_from = c(rt_m, pe_m)) |>
+  summarise(
+    m = mean(rt_m_con - rt_m_incon),
+    sd = sd(rt_m_con - rt_m_incon),
+    d = m / sd
+  ) |> pivot_longer(everything()) |> gt()
+```
+
+Effect size of about .41 equals GES of .092. 
+
+
+```{r}
+gen_data(
+  27,
+  5,
+  exp1_outcome$rt_d_m,
+  exp1_outcome$rt_d_sd,
+  exp1_outcome$pe_d_m,
+  exp1_outcome$pe_d_sd
+) -> single_dat_sim
+
+single_dat_sim |> 
+  summarise(
+    .by = c(id, con),
+    rt_m = mean(rt),
+    pe_m = mean(pe)
+  ) -> single_dat_calc
+aov_car(rt_m~con + Error(id/(con)), data=single_dat_calc) # p = .035, GES = .09
+t.test(rt_m~con, data=single_dat_calc, paired=T) #          p = .035,  d = .42
+single_dat_calc |>
+  pivot_wider(names_from=con, values_from = c(rt_m, pe_m)) |>
+  summarise(
+      m = mean(rt_m_con - rt_m_incon),
+      sd = sd(rt_m_con - rt_m_incon),
+      d = m / sd
+    )
+```
+
+
+
+```{r}
+#| echo: false
+
+single_dat_sim |> 
+  summarise(
+    .by = c(id, con),
+    rt_m = mean(rt),
+    pe_m = mean(pe)
+  ) |>
+  pivot_wider(names_from = con, values_from = c(rt_m, pe_m))  |>
+  summarise(
+    rt_md = mean(rt_m_incon - rt_m_con),
+    rt_sd = sd(rt_m_incon - rt_m_con),
+    pe_md = mean(pe_m_incon - pe_m_con),
+    pe_sd = sd(pe_m_incon - pe_m_con),
+  )
+
+  pivot_wider(names_from = con, values_from = c(rt_m, pe_m)) |>
+  summarise(
+    rt_d = (rt_m_con - rt_m_incon),
+    m_rt = mean(rt_d),
+    sd_rt = sd(rt_d),
+    d = m_rt/sd_rt
+  )
+
+d_ex |> 
+  filter(diagnostic_run > 0) |>
+  mutate(rt = scale(rt)) |>
+  summarise(
+    .by=c(id,con,inducer_run),
+    rt = mean(rt),
+    rt_sd = sd(rt),
+    pe = mean(correct_response)
+  ) |>
+  mutate( pe = scale(pe) )
+  pivot_wider(names_from = con, values_from=c(rt, correct_response))
+
+```
+
 
 only output is displayed).
