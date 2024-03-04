@@ -88,7 +88,13 @@ fmt_APA_numbers <- function(num, .p = FALSE, .low_val = FALSE, .chr = FALSE){
     }
     # p
     if(.p){
-      return( round(num, 3) |> as.character(num) |> sub("0.",".", x = _) )
+      p <- round(num, 3)
+      if(p < .001){
+        p <- "< .001"
+      } else {
+        p <- p |> as.character(num) |> sub("0.",".", x = _)
+      }
+      return( p )
     }
     # NORMAL VALS
     if(num >= 100 | num <= -100){
