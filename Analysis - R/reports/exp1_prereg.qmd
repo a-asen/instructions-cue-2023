@@ -293,7 +293,7 @@ d2 |>
     hdi             = paste0("[", fmt_APA_numbers(rt_test_hdi$CI_low[1]),", ", 
                                   fmt_APA_numbers(rt_test_hdi$CI_high[1]),"]"),
     bf              = fmt_APA_numbers( extractBF(rt_test_b)$bf ),
-    d               = fmt_APA_numbers( cohensD( rt_FALSE, rt_TRUE, method = "corrected" ) ),
+    d               = fmt_APA_numbers( cohensD( rt_FALSE, rt_TRUE, method = "paired" ) ),
     )  -> d_rt
 
 ## proportion correct trials
@@ -320,7 +320,7 @@ d2 |>
     hdi              = paste0("[",fmt_APA_numbers(pe_test_hdi$CI_low[1]),", ", 
                                   fmt_APA_numbers(pe_test_hdi$CI_high[1]),"]"),
     bf               = fmt_APA_numbers( extractBF(pe_test_b)$bf ),
-    d                = fmt_APA_numbers( cohensD(pe_FALSE, pe_TRUE, method = "corrected") ),
+    d                = fmt_APA_numbers( cohensD(pe_FALSE, pe_TRUE, method = "paired") ),
   ) -> d_pe
 
 ```
