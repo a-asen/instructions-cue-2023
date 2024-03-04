@@ -257,7 +257,7 @@ w_lisas |>
     bf              = fmt_APA_numbers( extractBF(b_lisas)$bf ), 
     hdi             = paste0("[", fmt_APA_numbers( hdi(b_lisas)[3] ), ", ", 
                                   fmt_APA_numbers( hdi(b_lisas)[4] ), "]" ), 
-    d               = fmt_APA_numbers( cohensD(lisas_FALSE, lisas_TRUE, method="corrected") )
+    d               = fmt_APA_numbers( cohensD(lisas_FALSE, lisas_TRUE, method="paired") )
     ) -> lisas_t
 
 ```
@@ -331,7 +331,7 @@ comb_table <-
     mdiff     = mean(Incongruent-Congruent),
     t.val     = t.test(Incongruent, Congruent, paired=T)$statistic,
     df        = t.test(Incongruent, Congruent, paired=T)$parameter,
-    p.val     = t.test(Incongruent, Congruent, paired=T)$p.value  |> fmt_APA_numbers(.p = T), 
+    p.val     = t.test(Incongruent, Congruent, paired=T)$p.value |> fmt_APA_numbers(.p = T), 
     b.est     = mean( ttestBF(Incongruent, Congruent, paired=T, posterior=T, iterations=5000)[,"mu"] ),
     b         = extractBF( ttestBF(Incongruent, Congruent, paired=T) )$bf,
     hdi       = paste0("[",
@@ -340,13 +340,14 @@ comb_table <-
             paste0(collapse=", "), 
       "]", sep="" ),
     d         = cohensD(Incongruent, Congruent, method = "corrected"),
-  ) |> 
+  ) 
   mutate( across( where(is.numeric), fmt_APA_numbers) ) 
   
 mean(comb_table$df) -> tab_df
 comb_table |> 
   mutate(name = factor(name, levels=c("rt","pe","lisas","BIS_lisas","BIS") ), 
          e1="",e2="",e3="", e4="",
+         p.val = fmt_APA_numbers(p.val, .p=T))
          across(contains(c("con", "b")), ~ fmt_APA_numbers(num=.x, .chr=T) )
          ) |>
   arrange(name) |>
