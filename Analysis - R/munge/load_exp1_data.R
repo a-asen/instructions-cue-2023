@@ -40,9 +40,10 @@ raw_d <-
 exp1_d <-
   exp1_d |>
   mutate(inducer_run = as.integer(inducer_run)) |>
-  left_join(raw_d, by=c("id","inducer_run", "diagnostic_run"))
+  left_join(raw_d, by=c("id","inducer_run", "diagnostic_run")) |>
+  ungroup()
 
-cat("'exp1_d' is the raw data with the new congruency ('con')\n" )
+cat("\n\U00023E9 'exp1_d' \U00023EA  is the raw data with the new congruency ('con')\n" )
 #save(exp1_d, file="data/processed/exp1_data.rdata")
 
 
@@ -109,6 +110,7 @@ sum(exp1_excluded$valid_trials==0) / loss$data_trials * 100 -> loss[["inducer_fa
 
 exp1_excluded |>
   filter( valid_trials == 1 ) |>
-  mutate(rt = as.numeric(rt)) -> exp1_excluded
+  mutate(rt = as.numeric(rt)) |>
+  ungroup() -> exp1_excluded
 
-cat("'exp1_excluded' is the data from experiment 1 with exclusions applied for the diagnostic and inducer trials.")
+cat("\n\U00023E9 'exp1_excluded' \U00023EA is the data from experiment 1 with exclusions applied for the diagnostic and inducer trials.")
