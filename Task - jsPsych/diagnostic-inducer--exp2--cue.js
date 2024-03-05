@@ -64,7 +64,7 @@ const max_diagnostic_trials = 10//240     // Total max diagnostic trials
 
 ////    Inducer CUE      ////
 const cue_size = 70
-const cue_duration = 750        // How long is the pre-cue present for? 
+const cue_duration = 1250      // How long is the pre-cue present for? 
 
 const cue_min_length = 0
 const cue_max_length = 5
