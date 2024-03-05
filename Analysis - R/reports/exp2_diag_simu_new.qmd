@@ -12,7 +12,7 @@ editor:
 
 First we can sample effects from experiment 1.
 
-```{r}
+```{r libraries}
 #| include: false
 
 library(tidyverse)
@@ -24,10 +24,15 @@ library(gganimate)
 library(gifski)
 library(av)
 library(arrow) # load parquet files 
+```
 
-save_animations <- FALSE
+```{r params}
+#| include: false
+
+save_animations <- FALSE #?
+
 run_simulations <- FALSE
-load_big_data <- FALSE
+save_simulation_data <- FALSE # if false, will load stored data
 ```
 
 ```{r load data}
@@ -35,11 +40,16 @@ load_big_data <- FALSE
 load("../data/processed/exp1_data.rdata")
 load("../data/simulations/diag_simu_sum.rdata")
 
-if(load_big_data){ load("../data/simulations/diag_simu_raw.rdata") }
-read_parquet("../data/simulations/finding_parameter_values_for_exp1.parquet") -> test
+if(!save_simulation_data){
+  finding_exp1_parameter_vals <- read_parquet("../data/simulations/finding_parameter_values_for_exp1.parquet")
+  vary_diagnostic_lengths <- read_parquet("../data/simulations/vary_diagnostic_length.parquet")
+}
+
 ```
 
-```{r}
+# Experiment 1: 
+
+```{r data}
 #| echo: false
 d <-
   exp1_d |>
@@ -49,7 +59,7 @@ d <-
   mutate(rt = as.integer(rt)) 
 ```
 
-```{r loss est}
+```{r excluding data}
 #| echo: false
 d -> d_ex
 loss <- list()
@@ -107,24 +117,28 @@ d_ex |>
   ungroup() -> d_ex
 ```
 
-The above table indicate the number of diagnostic trials that are left after all excluding trials. 
-
-On average, this leaves us with:
+## Estimating lost trials: 
 ```{r}
-#| echo: false
+#| include: false
 d_ex |>
   filter(trial_info=="Diagnostic trial") |>
   group_by(id) |>
   count() |>
   ungroup() |>
-  summarise(avg = mean(n))
+  pull(n) |> 
+  mean() -> exp1_remaining_trials
 ```
-trials.
 
-This is a loss of approximately: `r 180/240`. Whatever post-cue run we decide, we need to estimate an expected loss of about .75. 
+After the exclusion criteria, we are left with `r exp1_remaining_trials` trials.
+
+This corresponds to a loss of `r exp1_remaining_trials/240` (or `r exp1_remaining_trials/240*100` percent). We will assume a loss of .75 (75%). 
+
+In other words, whatever post-cue run we decide, we need to estimate an expected loss of about .75. 
 
 
 # Parameter from exp1:
+
+## exp1 outcomes values 
 
 Calculate the standardized means and standard deviations, and effect sizes from experiment 1. 
 
@@ -155,18 +169,36 @@ d_ex |>
 exp1_outcome
 ```
 
+## equivalent ANOVA value (GES) 
+
 ```{r}
+#| echo: false
 d_ex |> 
+  filter(!is.na(con)) |>
   summarise(
     .by = c(id, con),
     rt = mean(rt),
     pe = 1 - mean(correct_response)
-  ) |> 
-  t.test(rt ~ con, data = _, paired = T)
+  ) -> d_ex_sum
+d_ex_sum |>
+  aov_car(rt ~ con + Error(id/con), data = _) |>
+  pluck("anova_table") |>
+  as.tibble() |>
+  mutate( name = "rt", .before = 1) |>
+  rbind( 
+    d_ex_sum |>
+      aov_car(pe ~ con + Error(id/con), data = _) |> 
+      pluck("anova_table") |>
+      as.tibble() |>
+      mutate( name = "pe",.before = 1)
+    ) -> exp1_anova_outcome
+exp1_anova_outcome
 ```
 
+RT has a GES of 0.00848
+PE has a GES of 0.117 
 
-These values are standardized, meaning these are the values we will simulate with (?).
+## Simulate exp1 data
 
 ```{r}
 #| echo: false
@@ -177,7 +209,7 @@ gen_data <- function(N, pair.obs, eff.rt, sd.rt, eff.pe, sd.pe){
   #' @param eff.pct Effect size of congruency on proportion of correct trials 
 
   tibble(
-    id  = rep(1:N, each = pair.obs * 2),
+    id  = rep(1:N, each = pair.obs*2),
     con = rep.int( c("con","incon"), N * pair.obs),
     rt  = rnorm(N * pair.obs * 2, 
                 0 + as.integer(con=="con") * eff.rt, 
@@ -189,9 +221,54 @@ gen_data <- function(N, pair.obs, eff.rt, sd.rt, eff.pe, sd.pe){
 }
 ```
 
-Effect size of about .41 equals GES of .092. 
+Simulate data with exp1 outcomes:
 
-```{r}
+```{r quick sim}
+#| echo: false
+
+map_df(1:20, \(x){
+  gen_data(
+    27,
+    x,
+    exp1_outcome$rt_d_m,
+    exp1_outcome$rt_d_sd,
+    exp1_outcome$pe_d_m,
+    exp1_outcome$pe_d_sd
+  ) -> single_dat_sim
+
+  single_dat_sim |> 
+    summarise(
+      .by = c(id, con),
+      rt_m = mean(rt),
+      pe_m = mean(pe)
+    ) -> single_dat_calc
+  
+  sim_aov_rt <- 
+    aov_car(rt_m~con + Error(id/(con)), data=single_dat_calc)
+  sim_t_rt <- 
+    t.test(rt_m~con, data=single_dat_calc , paired=T, alterantive="greater") 
+  
+  single_dat_calc |>
+    pivot_wider(names_from=con, values_from = c(rt_m, pe_m)) |>
+    summarise(
+      num = x, 
+      m = mean(rt_m_con - rt_m_incon),
+      sd = sd(rt_m_con - rt_m_incon),
+      d = m / sd,
+      t_rt_p = sim_t_rt$p.value,
+      aov_rt_p = sim_aov_rt$anova_table$`Pr(>F)`,
+      aov_rt_ges = sim_aov_rt$anova_table$ges,
+    )
+})
+```
+
+Increasing the amount of observations merely decreases the SD, making all results more significant. 
+The only value that is approximating our results is the simulation with 1 (pair of) observation(s). 
+
+For this reason, we need to simulate the amount of observations we have (~ 180 valid trials) and estimate the experiment parameters that create the results found in experiment 1. 
+
+
+```{r find exp1 parameters}
 #| echo: false
 N = 27
 OBS = 180/2
@@ -287,18 +364,195 @@ That is, these parameter values correspond to the results from experiment 1 *wit
 
 With this, we can simulate data for the experiment *with less trials*. 
 
-Only the these parameter may highlight the problem with lacking trials for the post-cue diagnostic run. 
+Only the these parameter may highlight the problem with lacking trials (i.e., post-cue trial) for the post-cue diagnostic run. 
+
+
+Simulate data with the paramaters as estimated above: 
+
+```{r}
+#| echo: false
+
+l <- 
+list( 
+  rt_m  = exp1_outcome$rt_d_m,
+  rt_sd = 2,
+  pe_m  = exp1_outcome$pe_d_m,
+  pe_sd = 7.6
+)
+
+if(run_simulations){
+  
+  makeCluster(detectCores() * .9) -> cl
+  clusterExport(cl, c("l", "gen_data"))
+  clusterEvalQ(cl, {
+    library(tidyverse)
+    library(broom)
+  })
+  
+  pblapply(seq(1, 90, 1), \(pairs){
+    
+    map_df(1:300, \(itr){
+      gen_data(27, pairs, l$rt_m, l$rt_sd, l$pe_m, l$pe_sd) |> 
+        summarise(
+          .by = c(id, con), 
+          rt = mean(rt),
+          pe = mean(pe)
+        ) -> s_d
+      
+      s_d |>
+        pivot_wider(names_from = con, values_from = c(rt,pe)) |>
+        summarise(
+          rt_m = mean(rt_con-rt_incon),
+          rt_sd = sd(rt_con-rt_incon),
+          rt_d = rt_m / rt_sd,
+          pe_m = mean(pe_con-pe_incon),
+          pe_sd = sd(pe_con-pe_incon),
+          pe_d = pe_m / pe_sd,
+        ) |> 
+        cbind(
+          t.test(rt ~ con, s_d, paired=T, alternative="greater") |>
+            tidy() |> 
+            select(2:3) |>
+            rename(rt_stat = statistic,
+                   rt_p = p.value)
+        ) |>
+        cbind( 
+          t.test(pe ~ con, s_d, paired=T, alternative="greater") |>
+            tidy() |> 
+            select(2:3) |>
+            rename(pe_stat = statistic,
+                   pe_p = p.value)
+        ) |>
+        mutate(
+          pairs = pairs,
+          itr = itr, 
+        ) |>
+          select(pairs, itr, starts_with("rt"), starts_with("pe")
+        )
+    })
+    
+  }, cl = cl) |> 
+    map_df(~.x) -> vary_diagnostic_lengths
+  
+  if(save_simulation_data){
+    write_parquet(vary_diagnostic_lengths, "../data/simulations/vary_diagnostic_length.parquet")
+  }
+  
+  stopCluster(cl)
+} 
+```
+
+
+```{r}
+#| echo: false
+vary_diagnostic_lengths |> 
+  summarise(
+    .by = pairs,
+    rt_pow = mean(rt_p<.05),
+    pe_pow = mean(pe_p<.05), 
+    across(c(starts_with("rt_"), starts_with("pe_")), mean)
+  ) -> sum_vary_diag_len
+sum_vary_diag_len
+```
+
+
+The relative power with respect to the simulated data as calculated from the estimate parameters. 
+
+```{r}
+#| echo: false
+
+sum_vary_diag_len |> 
+  pivot_longer(c(rt_pow, pe_pow)) |>
+  ggplot(aes(pairs, value, col=name))+
+  geom_line()+
+  scale_x_continuous(breaks=seq(0,90,10))+
+  scale_y_continuous(breaks=seq(0,1,.1))+
+  geom_hline(yintercept = .8)+
+  geom_vline(xintercept = 35, linetype="dashed")+
+  geom_vline(xintercept = 35 * .75, linetype="dashed", col="red")
+```
+
+According to the simulation, it would suffice with 60 pairs (120 trials) to have 80% power to detect a true effect.
+
+However, assuming we have 70 trials in the post-cue run, we will have 35 (forced) pairs. As we will lose 25% of the trials, we are left with 26.25 pairs, which has a power close to 50%. 
+
+We might remedy this problem by increasing the sample size. 
+
 
 
 ```{r}
 #| echo: false
 
-rt_m <- exp1_outcome$rt_d_m
-rt_sd <- 2
-pe_m <- exp1_outcome$pe_d_m
-pe_sd <- 7.6 
+l <- 
+  list( 
+    rt_m  = exp1_outcome$rt_d_m,
+    rt_sd = 2,
+    pe_m  = exp1_outcome$pe_d_m,
+    pe_sd = 7.6
+  )
 
-
+if(run_simulations){
+  
+  makeCluster(detectCores() * .9) -> cl
+  clusterExport(cl, c("l", "gen_data"))
+  clusterEvalQ(cl, {
+    library(tidyverse)
+    library(broom)
+  })
+  
+  pblapply(20:100, \(size){
+    
+    map_df(seq(1, 90, 1), \(pairs){
+      
+      map_df(1:300, \(itr){
+        gen_data(size, pairs, l$rt_m, l$rt_sd, l$pe_m, l$pe_sd) |> 
+          summarise(
+            .by = c(id, con), 
+            rt = mean(rt),
+            pe = mean(pe)
+          ) -> s_d
+        
+        s_d |>
+          pivot_wider(names_from = con, values_from = c(rt,pe)) |>
+          summarise(
+            rt_m = mean(rt_con-rt_incon),
+            rt_sd = sd(rt_con-rt_incon),
+            rt_d = rt_m / rt_sd,
+            pe_m = mean(pe_con-pe_incon),
+            pe_sd = sd(pe_con-pe_incon),
+            pe_d = pe_m / pe_sd,
+          ) |> 
+          cbind(
+            t.test(rt ~ con, s_d, paired=T, alternative="greater") |>
+              tidy() |> 
+              select(2:3) |>
+              rename(rt_stat = statistic,
+                     rt_p = p.value)
+          ) |>
+          cbind( 
+            t.test(pe ~ con, s_d, paired=T, alternative="greater") |>
+              tidy() |> 
+              select(2:3) |>
+              rename(pe_stat = statistic,
+                     pe_p = p.value)
+          ) |>
+          mutate(
+            pairs = pairs,
+            itr = itr, 
+          ) |>
+            select(pairs, itr, starts_with("rt"), starts_with("pe")
+          )
+      })
+    })
+  }, cl = cl) |> 
+    map_df(~.x) -> diag_lens_over_samp_sizes
+  
+  if(save_simulation_data){
+    write_parquet(vary_diagnostic_lengths, "../data/simulations/vary_diagnostic_length.parquet")
+  }
+  
+  stopCluster(cl)
+} 
 ```
 
 
