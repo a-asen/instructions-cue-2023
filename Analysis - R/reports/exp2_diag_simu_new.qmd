@@ -23,18 +23,20 @@ library(gt)
 library(gganimate)
 library(gifski)
 library(av)
+library(arrow) # load parquet files 
 
 save_animations <- FALSE
 run_simulations <- FALSE
 load_big_data <- FALSE
-
 ```
 
 ```{r load data}
 #| include: false
 load("../data/processed/exp1_data.rdata")
 load("../data/simulations/diag_simu_sum.rdata")
+
 if(load_big_data){ load("../data/simulations/diag_simu_raw.rdata") }
+read_parquet("../data/simulations/finding_parameter_values_for_exp1.parquet") -> test
 ```
 
 ```{r}
@@ -46,8 +48,6 @@ d <-
   filter(!is.na(correct_response)) |>
   mutate(rt = as.integer(rt)) 
 ```
-
-
 
 ```{r loss est}
 #| echo: false
@@ -145,79 +145,163 @@ d_ex |>
   ) |>
   pivot_wider(names_from = con, values_from = c(rt,pe)) |>
   summarise(
-    rt_con_m = mean(rt_TRUE),
-    rt_con_sd = sd(rt_TRUE),
-    rt_incon_m = mean(rt_FALSE),
-    rt_incon_sd = sd(rt_FALSE),
     rt_d_m = mean(rt_FALSE-rt_TRUE),
     rt_d_sd = sd(rt_FALSE-rt_TRUE),
-    pe_d2 = rt_d_m / rt_d_sd,
+    rt_d = rt_d_m / rt_d_sd,
     pe_d_m = mean(pe_FALSE-pe_TRUE),
     pe_d_sd = sd(pe_FALSE-pe_TRUE),
     pe_d = pe_d_m / pe_d_sd,
   ) -> exp1_outcome
 exp1_outcome
 ```
+
+```{r}
+d_ex |> 
+  summarise(
+    .by = c(id, con),
+    rt = mean(rt),
+    pe = 1 - mean(correct_response)
+  ) |> 
+  t.test(rt ~ con, data = _, paired = T)
+```
+
+
 These values are standardized, meaning these are the values we will simulate with (?).
 
 ```{r}
 #| echo: false
-
-exp1_outcome
-
-gen_data <- function(N, OBS, eff.rt, sd.rt, eff.pe, sd.pe){
+gen_data <- function(N, pair.obs, eff.rt, sd.rt, eff.pe, sd.pe){
   #' @param N Number of subjects
   #' @param OBS Number of observation per N
   #' @param eff.rt  Effect size of congruency on response time
   #' @param eff.pct Effect size of congruency on proportion of correct trials 
 
   tibble(
-    id  = rep(1:N, each = OBS*2),
-    con = rep.int( c("con","incon"), N*OBS),
-    rt  = rnorm(N*OBS*2, 0 + as.integer(con=="con") * eff.rt, sd.rt),
-    pe  = rnorm(N*OBS*2, 0 + as.integer(con=="con") * eff.pe, sd.pe),
+    id  = rep(1:N, each = pair.obs * 2),
+    con = rep.int( c("con","incon"), N * pair.obs),
+    rt  = rnorm(N * pair.obs * 2, 
+                0 + as.integer(con=="con") * eff.rt, 
+                sd.rt),
+    pe  = rnorm(N * pair.obs * 2, 
+                0 + as.integer(con=="con") * eff.pe, 
+                sd.pe),
   ) 
 }
 ```
 
-Simulate data to see GES vs effect size:
+Effect size of about .41 equals GES of .092. 
+
+```{r}
+#| echo: false
+N = 27
+OBS = 180/2
+eff.rt = .17
+eff.pe = .68
+
+library(parallel)
+library(arrow)
+library(broom)
+#library(tidymodels)
+
+if(run_simulations){
+  parallel::makeCluster( detectCores()*.9 ) -> cl
+  clusterExport(cl, varlist = c("N", "OBS", "eff.rt", "eff.pe"))
+   # Initiate libraries in clusters
+  clusterEvalQ(cl, {
+    library(tidyverse)
+    library(pbapply)
+    library(lsr)
+    library(broom)
+  })
+  
+  pblapply(seq(1,10,.02), \(x){
+    
+    map_df(1:200, \(itr){
+      
+      tibble(
+        id  = rep(1:N, each = OBS*2),
+        con = rep.int( c("con","incon"), N*OBS),
+        rt  = rnorm(N*OBS*2, 0 + as.integer(con=="con") * eff.rt, x),
+        pe  = rnorm(N*OBS*2, 0 + as.integer(con=="con") * eff.pe, x),
+      ) |> 
+        summarise( 
+          .by = c(id, con),
+          rt = mean(rt), 
+          pe = mean(pe)
+        ) -> trans
+        
+      
+      trans |>
+        pivot_wider(names_from=con, values_from=c(rt,pe)) |>
+        summarise( 
+          rt = mean(rt_con-rt_incon),
+          rt_sd = sd(rt_con-rt_incon),
+          rt_d = rt / rt_sd,
+          pe = mean(pe_con-pe_incon),
+          pe_sd = sd(pe_con-pe_incon),
+          pe_d = pe/pe_sd,
+        ) -> val
+      
+      trans |>
+        t.test(rt ~ con, data = _, paired = T) |>
+        broom::tidy() -> rt_test
+      
+      names(rt_test) <- paste0("rt_", names(rt_test)) 
+      
+      trans |>
+        t.test(pe~con, data=_, paired=T) |>
+        broom::tidy() -> pe_test
+      
+      rt_test |>
+        cbind(pe_test) |>
+        cbind(val) |>
+        mutate(itr = itr,
+               sd = x) 
+    })
+  }, cl = cl) |> 
+    map_df(~.x) -> finding_exp1_parameter_vals
+  
+  write_parquet(finding_exp1_parameter_vals, sink = "../data/simulations/finding_parameter_values_for_exp1.parquet")
+  
+  stopCluster(cl)
+}
+```
+
 ```{r}
 #| echo: false
 
-gen_data(
-  27,
-  1,
-  exp1_outcome$rt_d_m,
-  exp1_outcome$rt_d_sd,
-  exp1_outcome$pe_d_m,
-  exp1_outcome$pe_d_sd
-) -> single_dat_sim
-
-single_dat_sim |> 
+finding_exp1_parameter_vals |>
+  select(rt:sd, contains("p.value")) |>
   summarise(
-    .by = c(id, con),
-    rt_m = mean(rt),
-    pe_m = mean(pe)
-  ) |>
-  aov_car(rt_m~con + Error(id/(con)), data=_) # p = .035, GES = .09
-single_dat_sim |> 
-  summarise(
-    .by = c(id, con),
-    rt_m = mean(rt),
-    pe_m = mean(pe)
-  ) -> temptoin 
-  t.test(rt_m~con, data=temptoin , paired=T) #          p = .035,  d = .42
-
-  temptoin |>
-  pivot_wider(names_from=con, values_from = c(rt_m, pe_m)) |>
-  summarise(
-    m = mean(rt_m_con - rt_m_incon),
-    sd = sd(rt_m_con - rt_m_incon),
-    d = m / sd
-  ) |> pivot_longer(everything()) |> gt()
+    .by = sd, 
+    pe_pow = mean(p.value < .05),
+    rt_pow = mean(rt_p.value < .05),
+    across(everything(), mean)
+  )
 ```
 
-Effect size of about .41 equals GES of .092. 
+Closest RT parameters: mdiff = .166, sd = 2     (d = .58, pow = 80%).
+Closest PE parameters: mdiff = .65,  sd = 7.6   (d = .59, pow = 80%).
+
+That is, these parameter values correspond to the results from experiment 1 *with* 180 trials (or 90 pairs; assuming we have exactly 90 pairs). 
+
+With this, we can simulate data for the experiment *with less trials*. 
+
+Only the these parameter may highlight the problem with lacking trials for the post-cue diagnostic run. 
+
+
+```{r}
+#| echo: false
+
+rt_m <- exp1_outcome$rt_d_m
+rt_sd <- 2
+pe_m <- exp1_outcome$pe_d_m
+pe_sd <- 7.6 
+
+
+```
+
+
 
 
 ```{r}
