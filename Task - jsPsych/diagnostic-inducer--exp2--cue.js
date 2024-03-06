@@ -55,27 +55,23 @@ const inducer_colour_name  = ["red", "yellow", "blue"]
     // This is also what is DISPLAYED (i.e., text) to participants. Should therefore be a readable name. 
 
 ////    Diagnostic parameters   ////
-const number_of_inducers = 10;       // Number of inducers 
+const number_of_inducers = 24       // Number of inducers 
     // !!! CHANGE max trials !!! 
-const diagnostic_min_length = 3         // Min run length
+const diagnostic_min_length = 4         // Min run length
 const diagnostic_max_length = 16        // Max run length
-const max_diagnostic_trials = 110 //240     // Total max diagnostic trials
-const pre_cue_force_equal = true        // Force an equal distribution of left/right taps before the cue?
-    // max/2 * number_of_inducers
+const max_diagnostic_trials = 240     // Total max diagnostic trials
+const post_diagnostic_prop = .3 // proportion of the diagnostic trials dedicated to the post-cue run    
+    // equivalent to 72 trials
 
 ////    Inducer CUE      ////
 const cue_size = 70                     // appearance of the cue (in px)
 const cue_duration = 1250               // How long is the pre-cue present for? 
-const post_cue_force_equal = true       // Force equal number of right/left trials 
 
-
-const predictable_cue = true     // Use a predictable number of post-cues ? 
-// Predictable cue parameters:
-const pred_cue_len = 3           // predictable length
 // Randomized cue parameters:
 const cue_min_length = 0
-const cue_max_length = 5
-const tot_post_cue_len =  72 //70        // Number of cue trials 
+const cue_max_length = 4
+const tot_post_cue_len =  max_diagnostic_trials * post_diagnostic_prop
+
 
 
 ////    Practice parameters     ////
@@ -89,6 +85,7 @@ const prac_post_cue_num = 3         // Should equal predictable length if true.
 
 // Not used 
 const run_italic_bias = [1,1]           // Left value correspond to ITALIC probability, right correspond to UPRIGHT probability
+
 
 ////    Stimuli list    ////
 const stimuli = [
@@ -205,7 +202,8 @@ const jsPsych = initJsPsych({
     // experiment_width : 1280, 
         // w/e add later if necessary
     on_finish: function() {
-        jsPsych.data.displayData() }
+        jsPsych.data.displayData() 
+    }
 });
 const timeline = []; // Timeline
 
@@ -362,14 +360,14 @@ function inducer_instruction_FNC(run_stimuli, exp_block, trial_info){
     timeline.push(short_fixation)
 }
 
-function diagnostic_FNC(run_diagnostic_length, run_stimuli, exp_block, cue_diag_num, trial_info, force_equal=false, deadline=true, pre_cue_equal_list=null, post_cue_equal_list=null){
+function diagnostic_FNC(run_diagnostic_length, run_stimuli, exp_block, cue_diag_num, trial_info, prac_equal=false, deadline=true, pre_cue_equal_list=null, post_cue_equal_list=null){
     /**
      * @param {list} run_diagnostic_length  Length of the current diagnostic length
      * @param {list} run_stimuli            Run stimuli (list of two stimuli)
      * @param {string} inducer_round        Inducer block number 
      * @param {integer} cue_diag_num        Apperance of the cue relative to the *end* of the run 
      * @param {string} trial_info           General trial information 
-     * @param {boolean} force_equal         Force an equal number of right/left (combine with equal_list to specific the responses)
+     * @param {boolean} prac_equal         Force an equal number of right/left (combine with equal_list to specific the responses)
      * @param {boolean} deadline            Should the trials have a deadline? 
      * @param {list} pre_cue_equal_list     Supply a predetermined list of diagnostic responses (e.g., [0,1,1,0])
      * @param {list} post_cue_equal_list    Supply a predetermined list of diagnostic responses (e.g., [0,1,1,0])
@@ -381,48 +379,60 @@ function diagnostic_FNC(run_diagnostic_length, run_stimuli, exp_block, cue_diag_
     var rnd_prac_diag;
     var pre_cue_num = 0;
     var post_cue_num = 0; 
+
     
     // Randomly decide whether the stimulus should appear in italic or not.
-    if(force_equal && post_cue_equal_list == null){
+    if(prac_equal){
         // If only force equal: 
         // Generate array with equal italic/upright trials based on the supplied run_diagnostic_length 
         let prac_dia = Array(  Array(Math.floor(run_diagnostic_length/2)).fill(1) ,  Array( Math.ceil(run_diagnostic_length/2) ).fill(0)  ).flat()
         rnd_prac_diag = jsPsych.randomization.shuffle(prac_dia) // Randomize the equal italic/upright trials
         if(debug){ console.log("equal diag:", rnd_prac_diag) }
-    }
+    } 
     
     ////    Generate diagnostic trials  ////
     for(let exp_diag = 0; exp_diag < run_diagnostic_length; exp_diag++){
         // For each trial...
 
+        // Check if is post cue
         let is_post_cue = exp_diag >= run_diagnostic_length - cue_diag_num
-
+        
         // Randomly get a stimulus (from the stimuli list)
         let rnd_diag_stimulus = jsPsych.randomization.sampleWithReplacement(run_stimuli, 1)[0]
 
         // Select italic/upright based on condition: 
         let run_rnd_italic;
-        if(force_equal && post_cue_equal_list == null && pre_cue_equal_list == null){ // if not supplied list length (e.g., practice)
+
+        if(prac_equal){
             if(rnd_prac_diag[exp_diag] == 1){
                 run_rnd_italic = true
             } else {
                 run_rnd_italic = false
             }
-        } 
-        // Testing whether italic is forced equal or not
-        if (force_equal && pre_cue_equal_list != null && !is_post_cue){ // IF supplied pre-cue-list
-            run_rnd_italic = pre_cue_equal_list[pre_cue_num]
-            pre_cue_num++
-        } else {
-            run_rnd_italic = jsPsych.randomization.sampleWithReplacement([true,false], 1, run_italic_bias)[0]
-        }
-        if (force_equal && post_cue_equal_list != null && is_post_cue) {  // IF supplied post-cue-list
-            run_rnd_italic = post_cue_equal_list[post_cue_num]
-            post_cue_num++
-        } else {
-            run_rnd_italic = jsPsych.randomization.sampleWithReplacement([true,false], 1, run_italic_bias)[0]
+        } else if(!prac_equal){ // if not practice
+            if(pre_cue_equal_list==null && post_cue_equal_list==null){ 
+                // warning
+                console.log("WARNING \nWARNING \nWARNING \nWARNING \nForced_equal is true, but no list of responses are supplied\nWARNING\nWARNING\nWARNING\nWARNING")
+            }
+
+            if(!is_post_cue && pre_cue_equal_list != null){ // IF supplied pre-cue-list
+                run_rnd_italic = pre_cue_equal_list[pre_cue_num]
+                pre_cue_num++
+            } else if (!is_post_cue && pre_cue_equal_list == null){
+                run_rnd_italic = jsPsych.randomization.sampleWithReplacement([true,false], 1, run_italic_bias)[0]
+                if(debug){ console.log("PRE-cue is not foced equal. Random chosen to:", run_rnd_italic) }
+            }
+            if(is_post_cue && post_cue_equal_list != null) {  // IF supplied post-cue-list
+                run_rnd_italic = post_cue_equal_list[post_cue_num]
+                post_cue_num++
+            } else if(is_post_cue && post_cue_equal_list == null){
+                run_rnd_italic = jsPsych.randomization.sampleWithReplacement([true,false], 1, run_italic_bias)[0]
+                if(debug){ console.log("POST-cue is not foced equal. Random chosen to:", run_rnd_italic) }
+            }
         }
         
+        if(run_rnd_italic==0)       { run_rnd_italic=false } 
+        else if (run_rnd_italic==1) { run_rnd_italic=true }
         
         // Create trial:
         let diagnostic_run = { 
@@ -452,14 +462,14 @@ function diagnostic_FNC(run_diagnostic_length, run_stimuli, exp_block, cue_diag_
                 italic: run_rnd_italic,                 // Is the current trial an italic type? 
                 trial_info: trial_info,                 // Trial description
                 forced_equal_run: () => {                    // Is the current trial force to be equal in some way? 
-                    if(force_equal){ 
-                        if(post_cue_equal_list != null && pre_cue_equal_list != null){
-                            return "both pre & post"
-                        } else if(post_cue_equal_list != null ){
-                            return "only post"
-                        } else if(pre_cue_equal_list != null){
-                            return "only pre"
-                        }
+                    if(prac_equal){
+                        return "prac equal"
+                    } else if(post_cue_equal_list != null && pre_cue_equal_list != null){
+                        return "both pre & post"
+                    } else if(post_cue_equal_list != null ){
+                        return "only post"
+                    } else if(pre_cue_equal_list != null){
+                        return "only pre"
                     }
                 },
                 correct_inducer_response_side: () => {  // GET the correct inducer response side (in relation to the select stimulus)
@@ -623,33 +633,18 @@ for(let i = 0; i < number_of_inducers; i++){
 }
 if(debug){ console.log("Random diagnostic lengths list:", rnd_diagnostic_length) }
 
-//// IF PREDITABLE CUE!  //////
-// We want to check whether any pre-cue run is at least a length of 3. Then we can adjust the runs accordingly.
-if(predictable_cue){
-    var cue_array = Array(number_of_inducers).fill(pred_cue_len) // also set other parameter related to task predictability. 
-    var cue_n_trials = cue_array.reduce((list, i) => list+i)
-   
-    // Make sure there at least 3 trials before the cue appear
-    for(let num = 0; num < cue_array.length; num++){
-        while(rnd_diagnostic_length[num]-cue_array[num] < cue_array[num]){
-            rnd_diagnostic_length[num]++
-            if(debug){ console.log("Cue at location", num, "below minimum, increasing:", rnd_diagnostic_length[num]) }
-        }
-    }
-} else {
-    var cue_n_trials = tot_post_cue_len
-}
+var cue_n_trials = tot_post_cue_len
 
+var adj_max_diagnostic_trials = max_diagnostic_trials - tot_post_cue_len
 
 // Sum total diagnostic trials
 const sum_diags = rnd_diagnostic_length.reduce((list, i) => list + i, 0);
 if(debug){ console.log("Total diagnostic trials:", sum_diags) }
 
-
 // If the sum is more or less than the specified value, adjust accordingly
-if(sum_diags != max_diagnostic_trials){
-    let operation = (sum_diags < max_diagnostic_trials) ? "+" : (sum_diags > max_diagnostic_trials) ? "-" : "";
-    let diff = Math.abs(sum_diags - max_diagnostic_trials)
+if(sum_diags != adj_max_diagnostic_trials){
+    let operation = (sum_diags < adj_max_diagnostic_trials) ? "+" : (sum_diags > adj_max_diagnostic_trials) ? "-" : "";
+    let diff = Math.abs(sum_diags - adj_max_diagnostic_trials)
     var cond;
 
     if(debug){ console.log("Current operation", operation, "with a differences of", diff) }
@@ -663,12 +658,7 @@ if(sum_diags != max_diagnostic_trials){
                 var cond = rnd_diagnostic_length[loc] != diagnostic_max_length
                 break;
             case "-":
-                if(predictable_cue){
-                    // If predictable we add the pred cues to any run. 
-                    var cond = rnd_diagnostic_length[loc] != diagnostic_min_length + pred_cue_len
-                } else {
-                    var cond = rnd_diagnostic_length[loc] != diagnostic_min_length
-                }
+                var cond = rnd_diagnostic_length[loc] != diagnostic_min_length 
                 break;
         }
         if(cond){ //IF NOT EQUAL: Add one to the location and remove one to diff
@@ -702,93 +692,93 @@ const rnd_cue_stimulus = [draw_circle,draw_square,draw_triangle][rnd_cue_picker]
 const cue_stimulus_name = ["Circle", "Square", "Triangle"][rnd_cue_picker]
 
 if(debug){ console.log("Random cue stimulus:", cue_stimulus_name) }
+    
+// Pre-inducer cue trial length
+var cue_array = Array.from(Array(cue_max_length - cue_min_length+1), (x, i) => i + cue_min_length) 
+if(debug){ console.log("Cue num array:", cue_array) }
 
-if(!predictable_cue){
-    // Pre-inducer cue trial length
-    var cue_array = Array.from(Array(cue_max_length - cue_min_length+1), (x, i) => i + cue_min_length) 
-    if(debug){ console.log("Cue num array:", cue_array) }
-
-    var rnd_cue_array=[];
-    // We randomy sample "number_of_inducer" times from the "diagnostic_range"
-    // Including a test of fit
-    for(let i = 0; i < number_of_inducers; i++){
-        while(true){
-            // Sample a cue length
-            var cue_pre_trials = jsPsych.randomization.sampleWithReplacement(cue_array, 1)[0] 
-            
-            // Test whether the cue length can be put in the respective trial
-            if(rnd_diagnostic_length[i] - cue_pre_trials >= diagnostic_min_length ){
-                rnd_cue_array.push(cue_pre_trials)
-                if(debug){ console.log("Location:", i, 
-                "Diagnostic run length (at loc):", rnd_diagnostic_length[i], 
-                "Random cue length of:",  cue_pre_trials, 
-                "Differences of: ",rnd_diagnostic_length[i] - cue_pre_trials) }
-                break;
-            }
+var rnd_cue_array=[];
+// We randomy sample "number_of_inducer" times from the "diagnostic_range"
+// Including a test of fit
+for(let i = 0; i < number_of_inducers; i++){
+    while(true){
+        // Sample a cue length
+        var cue_pre_trials = jsPsych.randomization.sampleWithReplacement(cue_array, 1)[0] 
+        
+        // Test whether the cue length can be put in the respective trial
+        if(rnd_diagnostic_length[i] - cue_pre_trials >= diagnostic_min_length ){
+            rnd_cue_array.push(cue_pre_trials)
+            if(debug){ console.log("Location:", i, 
+            "Diagnostic run length (at loc):", rnd_diagnostic_length[i], 
+            "Random cue length of:",  cue_pre_trials, 
+            "Differences of: ",rnd_diagnostic_length[i] - cue_pre_trials) }
+            break;
         }
     }
-    if(debug){ console.log("cue_array:", rnd_cue_array)}
-    // Sum total diagnostic trials
-    const sum_rnd_cue_array = rnd_cue_array.reduce((list, i) => list + i, 0);
-    if(debug){ console.log("Total post-cue diag trials:", sum_rnd_cue_array) }
+}
+if(debug){ console.log("cue_array:", rnd_cue_array)}
+// Sum total diagnostic trials
+const sum_rnd_cue_array = rnd_cue_array.reduce((list, i) => list + i, 0);
+if(debug){ console.log("Total post-cue diag trials:", sum_rnd_cue_array) }
 
-    // If different than max length, adjust and test for fit:
-    if(sum_rnd_cue_array != cue_n_trials){
-        let operation = (sum_rnd_cue_array < cue_n_trials) ? "+" : "-";
-        let diff = Math.abs(sum_rnd_cue_array - cue_n_trials)
-        // Difference between the set number of trials and the calculated number
-        var cond;
+// If different than max length, adjust and test for fit:
+if(sum_rnd_cue_array != cue_n_trials){
+    let operation = (sum_rnd_cue_array < cue_n_trials) ? "+" : "-";
+    let diff = Math.abs(sum_rnd_cue_array - cue_n_trials)
+    // Difference between the set number of trials and the calculated number
+    var cond;
 
-        if(debug){ console.log("Sufficient cue-length is missing. Cue length operation is", operation, "with a differences of", diff) }
+    if(debug){ console.log("Sufficient cue-length is missing. Cue length operation is", operation, "with a differences of", diff) }
+    
+    // Dont need a break here, because it will always finish. 
+    do{
+        if(debug){ console.log("Diff: ", diff) }
+        // Randomly sample a location
+        let loc = Math.floor( Math.random() * rnd_cue_array.length )
+
+        // Test the sampled location length to not exceed the max length. 
+        switch(operation){ 
+            case "+":
+                var cond = rnd_cue_array[loc] != cue_max_length
+                var cue_add = 1
+                break;
+            case "-":	
+                var cond = rnd_cue_array[loc] != cue_min_length
+                var cue_add = -1
+                break;
+        }
+        let can_change = rnd_diagnostic_length[loc] - ( rnd_cue_array[loc] + cue_add ) >= diagnostic_min_length
+    
         
-        // Dont need a break here, because it will always finish. 
-        do{
-            if(debug){ console.log("Diff: ", diff) }
-            // Randomly sample a location
-            let loc = Math.floor( Math.random() * rnd_cue_array.length )
-
-            // Test the sampled location length to not exceed the max length. 
-            switch(operation){ 
-                case "+":
-                    var cond = rnd_cue_array[loc] != cue_max_length
-                    var cue_add = 1
-                    break;
-                case "-":	
-                    var cond = rnd_cue_array[loc] != cue_min_length
-                    var cue_add = -1
-                    break;
-            }
-            let can_change = rnd_diagnostic_length[loc] - ( rnd_cue_array[loc] + cue_add ) >= diagnostic_min_length
+        if(debug){ console.log("Cue at threshold:", cond, "Min pre-cue condition:",can_change,) }
         
+        // Test whether we can increase/decrease, if not skip. 
+        if(cond && can_change ){ 
+            if(debug){ console.log( 
+                "Location:", loc,"-> ",
+                "Adjusting:",          rnd_cue_array[loc], "to", rnd_cue_array[loc] + cue_add, 
+                "Total diag length:",  rnd_diagnostic_length[loc],
+                "Pre-cue length:",   rnd_diagnostic_length[loc] - ( rnd_cue_array[loc] + cue_add ),
+                "Post-cue length:", rnd_cue_array[loc]+ cue_add ) }
             
-            if(debug){ console.log("Cue at threshold:", cond, "Min pre-cue condition:",can_change,) }
-            
-            // Test whether we can increase/decrease, if not skip. 
-            if(cond && can_change ){ 
-                if(debug){ console.log( 
-                    "Location:", loc,"-> ",
-                    "Adjusting:",          rnd_cue_array[loc], "to", rnd_cue_array[loc] + cue_add, 
-                    "Total diag length:",  rnd_diagnostic_length[loc],
-                    "Pre-cue length:",   rnd_diagnostic_length[loc] - ( rnd_cue_array[loc] + cue_add ),
-                    "Post-cue length:", rnd_cue_array[loc]+ cue_add ) }
-                
-                rnd_cue_array[loc] += cue_add 
-                diff--;
-            }         
-        } while( diff > 0 ) 
+            rnd_cue_array[loc] += cue_add 
+            diff--;
+        }         
+    } while( diff > 0 ) 
 
-        if(debug){ console.log("Fixed post-cue diagnostic lengths:", rnd_cue_array) }
-    }
+    if(debug){ console.log("Fixed post-cue diagnostic lengths:", rnd_cue_array) }
 }
 
 ////    Force equal ?           ////
 // Pre-cue trials 
 if(pre_cue_force_equal){
-    let force_cue_resp_side = Array(  Array(Math.floor((max_diagnostic_trials-cue_n_trials)/2)).fill(1) ,  
-    Array( Math.ceil((max_diagnostic_trials-cue_n_trials)/2) ).fill(0)  ).flat()
+    let force_cue_resp_side = Array(  Array(Math.floor((cue_n_trials)/2)).fill(1) ,  
+    Array( Math.ceil((cue_n_trials)/2) ).fill(0)  ).flat()
     // Generate equal left/right inducer response trials
     var rnd_pre_cue_resp_side = jsPsych.randomization.shuffle(force_cue_resp_side)
-    if(debug){ console.log("Cue force resp side:", rnd_pre_cue_resp_side)}
+    if(debug){ 
+        console.log("Pre-Cue force resp side:", rnd_pre_cue_resp_side)
+    }
 }
 
 // Post-cue trials
@@ -796,7 +786,7 @@ if(post_cue_force_equal){
     let force_cue_resp_side = Array(  Array(Math.floor(cue_n_trials/2)).fill(1) ,  Array( Math.ceil(cue_n_trials/2) ).fill(0)  ).flat()
     // Generate equal left/right inducer response trials
     var rnd_post_cue_resp_side = jsPsych.randomization.shuffle(force_cue_resp_side)
-    if(debug){ console.log("Cue force resp side:", rnd_post_cue_resp_side)}
+    if(debug){ console.log("Post-cue force resp side:", rnd_post_cue_resp_side)}
 }
 
 
@@ -814,7 +804,6 @@ let run_stimuli;
     // Perhas we  trust prolifics inclusion/exclusion check ? 
 const check_browser = {
     type: jsPsychBrowserCheck,
-    data: { inducer_colour: rnd_inducer_colour, cue_colour: rnd_cue_col }, // Save colours
     inclusion_function: (data) => {
         data.trial_info = "technicals"
 
@@ -836,7 +825,7 @@ const check_browser = {
         } else {
             return `We failed to parse your browser information... Try using a different browser.`
         }
-    }
+    },  
 }
 timeline.push(check_browser)
 
@@ -897,7 +886,10 @@ const about_the_experiment_and_consent = {
         ]
     },
     show_clickable_nav: ["Next"],
-    data: { stimulus: "The experiment and consent", trial_info: "The experiment and consent" },
+    data: { 
+        stimulus: "The experiment and consent", 
+        trial_info: "The experiment and consent",
+    },
     on_finish: (data) => {
         if(debug){ console.log(data) }
     }
@@ -972,7 +964,10 @@ let diagnostic_task_instruction_description = {
     allow_keys: false, 
     show_clickable_nav: true,
     post_trial_gap: 1500,
-    data: { stimulus: "Instructions", trial_info: "Basic overview explanation" },
+    data: { 
+        stimulus: "Instructions", 
+        trial_info: "Basic overview explanation",
+    },
     on_finish: (data) => {
         if(debug){  console.log(data) }
     }
@@ -993,9 +988,51 @@ let diagnostic_task_instruction = {
     data: {
         stimulus: `If italic press ${rnd_response_sides[0]} | If upright press ${rnd_response_sides[1]}`,
         trial_info: "Diagnostic instructions",
+        exp_parameters: {       // save experiment params 
+            // general 
+            debug: debug,
+            skip_instructions: skip_instructions,
+            skip_practice: skip_practice,
+            save_local_data: save_local_data,
+            studu_name: study_name,
+            default_background_colour: default_background_colour,
+            wrong_response_colour: wrong_response_colour,
+            instruction_delay: instruction_delay,
+            trial_duration: trial_duration,
+            short_fixation: short_fixation_delay,
+            long_fixation: long_fixation_delay,
+            wrong_response_delay: wrong_response_delay,
+            too_slow_delay: too_slow_delay,
+            instruction_font_size: instruction_font_size,
+            general_font_size: general_font_size,
+            fixation_size: fixation_size,
+            allowed_responses: allowed_responses,
+            // cue
+            cue_min_length: cue_min_length,
+            cue_max_length: cue_max_length,
+            tot_post_cue_len: tot_post_cue_len,
+            cue_colour: rnd_cue_col,
+            cue_shape: cue_stimulus_name,
+            cue_size: cue_size,
+            cue_duration: cue_duration, 
+            number_of_cues: cue_n_trials,
+
+            // inducer & diag
+            inducer_colour: rnd_inducer_colour, 
+            number_of_inducers: number_of_inducers,
+            pre_cue_italic_forced_equal: pre_cue_force_equal,
+            post_cue_italic_forced_equal: post_cue_force_equal,
+
+            // practice
+            prac_diagnostic_rounds: prac_diagnostic_rounds,
+            prac_inducer_rounds: prac_inducer_rounds,
+            prac_cue_rounds: prac_cue_rounds,
+            prac_post_cue_num: prac_post_cue_num
+        } 
     },
     on_finish: (data) => { 
         if(debug){ console.log(data) }
+        
     }
 }
 timeline.push( diagnostic_task_instruction )
@@ -1161,29 +1198,31 @@ for(let block = 0; block < number_of_inducers; block++){
     // Block stimuli: 
     let run_stimuli = [rnd_stimuli[0], rnd_stimuli[1]]
     rnd_stimuli.splice(0,2) 
+    var pre_cue_resp_sides;
+    var post_cue_resp_sides;
     
-    if(predictable_cue){  // if predictable then "rnd_cue_array" is "cue_array"
-        var rnd_cue_array = cue_array
-    }
-
     if(pre_cue_force_equal){ //if forced equal pre-cue:
         let pre_cue_run = Array.from( Array(rnd_diagnostic_length[block]-rnd_cue_array[block]), (x, i) => i + 0) 
         // Nums to drag from the predetermined italic/upright list
-        var pre_cue_resp_sides = pre_cue_run.map(index => rnd_pre_cue_resp_side[index])  
+        pre_cue_resp_sides = pre_cue_run.map(index => rnd_pre_cue_resp_side[index])  
             // Get forced response side according to nums from the start. 
-        rnd_pre_cue_resp_side.splice(0,  pre_cue_run) 
+        rnd_pre_cue_resp_side.splice(0,  rnd_diagnostic_length[block]-rnd_cue_array[block]) 
             // Remove these response sides for future runs.
-    } else { var pre_cue_resp_sides = null }
+    } else { pre_cue_resp_sides = null }
 
     if(post_cue_force_equal){ // If forced equal post-cue: 
         let post_cue_run = Array.from( Array( rnd_cue_array[block]), (x, i) => i + 0) 
         // Nums to drag from the predetermined italic/upright list
-        var post_cue_resp_sides = post_cue_run.map(index => rnd_post_cue_resp_side[index])  
+        post_cue_resp_sides = post_cue_run.map(index => rnd_post_cue_resp_side[index])  
             // Get forced response side according to nums from the start. 
-        rnd_post_cue_resp_side.splice(0,  post_cue_run) 
+        rnd_post_cue_resp_side.splice(0,  rnd_cue_array[block]) 
             // Remove these response sides for future runs.
-    } else { var post_cue_resp_sides = null }
+    } else { post_cue_resp_sides = null }
 
+    if(debug){
+        console.log("inducer:", block, " with forced resp sides:", pre_cue_resp_sides)
+        console.log("inducer:", block, " with forced resp sides:", post_cue_resp_sides)
+    }
     
 
     ////    Timeline: 
@@ -1191,7 +1230,7 @@ for(let block = 0; block < number_of_inducers; block++){
     inducer_instruction_FNC( run_stimuli, block, "inducer instructions")
 
     // Diagnostic trials 
-    diagnostic_FNC( rnd_diagnostic_length[block], run_stimuli, block, rnd_cue_array[block], "diagnostic trial", true, true, pre_cue_resp_sides, post_cue_resp_sides)
+    diagnostic_FNC( rnd_diagnostic_length[block], run_stimuli, block, rnd_cue_array[block], "diagnostic trial", false, true, pre_cue_resp_sides, post_cue_resp_sides)
 
     // Inducer trial
     inducer_FNC( run_stimuli, block, "inducer trial")
