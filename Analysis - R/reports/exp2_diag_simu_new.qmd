@@ -7,11 +7,6 @@ editor:
       wrap: 62
 ---
 
-
-# Sampling from experiment 1
-
-First we can sample effects from experiment 1.
-
 ```{r libraries}
 #| include: false
 
@@ -30,9 +25,10 @@ library(arrow) # load parquet files
 #| include: false
 
 save_animations <- FALSE #?
-
 run_simulations <- FALSE
-save_simulation_data <- FALSE # if false, will load stored data
+
+save_simulation_data <- FALSE
+load_simulation_data <- FALSE
 ```
 
 ```{r load data}
@@ -40,12 +36,21 @@ save_simulation_data <- FALSE # if false, will load stored data
 load("../data/processed/exp1_data.rdata")
 load("../data/simulations/diag_simu_sum.rdata")
 
-if(!save_simulation_data){
+if(load_simulation_data){
   finding_exp1_parameter_vals <- read_parquet("../data/simulations/finding_parameter_values_for_exp1.parquet")
   vary_diagnostic_lengths <- read_parquet("../data/simulations/vary_diagnostic_length.parquet")
+  rnd_slice_diag_exclu <- read_parquet("../data/simulations/exp2_diagnostic_length_sampling_from_exp1_raw.parquet")
+  sum_rnd_slice_diag_exclu <- read_parquet("../data/simulations/exp2_diagnostic_length_sampling_from_exp1_sum.parquet")
+  rnd_extended_slice_diag_exclu <- read_parquet("../data/simulations/exp1_rnd_sampling_inc_samp_size.parquet")
+  sum_rnd_extended_slice_diag_exclu <- read_parquet("../data/simulations/exp1_sum_rnd_sampling_inc_samp_size.parquet")
+  
+  #    write_parquet(diag_lens_over_samp_sizes, "../data/simulations/diag_lens_over_sample_sizes.parquet")
+    #write_parquet(sum_diag_lens_over_samp_sizes, "../data/simulations/diag_lens_over_sample_sizes_sum.parquet")
 }
 
 ```
+
+
 
 # Experiment 1: 
 
@@ -117,7 +122,7 @@ d_ex |>
   ungroup() -> d_ex
 ```
 
-## Estimating lost trials: 
+## Estimating the expected loss of data (trials)
 ```{r}
 #| include: false
 d_ex |>
@@ -136,12 +141,11 @@ This corresponds to a loss of `r exp1_remaining_trials/240` (or `r exp1_remainin
 In other words, whatever post-cue run we decide, we need to estimate an expected loss of about .75. 
 
 
-# Parameter from exp1:
-
-## exp1 outcomes values 
+## mdiff/sd/d - Experiment 1 outcome values
 
 Calculate the standardized means and standard deviations, and effect sizes from experiment 1. 
 
+(note. this is for the *excluded* data)
 ```{r}
 #| echo: false
 
@@ -169,7 +173,7 @@ d_ex |>
 exp1_outcome
 ```
 
-## equivalent ANOVA value (GES) 
+## GES - Experiment 1 ANOVA outcome results
 
 ```{r}
 #| echo: false
@@ -198,8 +202,258 @@ exp1_anova_outcome
 RT has a GES of 0.00848
 PE has a GES of 0.117 
 
+
+# Sampling from exp1: 
+
+## Slice from the START of the experiment: 
+```{r}
+#| echo: false
+map_df(2:90, \(pairs){
+  d_ex |>
+    filter(inducer_run>0) |>
+    slice_head(n = pairs, by = c(id, con)) |>
+    summarise(
+      .by = c(id, con),
+      rt = mean(rt),
+      pe = 1 - mean(correct_response)
+    ) -> test
+  
+  test |>
+    t.test(rt ~ con, data=_, paired = T) |> 
+    tidy() |> mutate(.before=1, n = "rt") |>
+    rbind(
+      test |> 
+        t.test(pe ~ con, data=_, paired=T) |> 
+        tidy() |> mutate(.before=1, n="pe")
+    ) |> 
+    mutate(.before=1, pairs=pairs)
+}) -> head_slice_diag_exclu
+
+head_slice_diag_exclu |>
+  #pivot_wider(names_from=n, values_from = 3:10) |>
+  ggplot(aes(pairs, p.value, col = n)) + 
+  geom_line()+
+  geom_hline(yintercept=.05)
+```
+
+Slicing from the **start** (!) suggest that we need around 20 pairs (i.e., 40 trials) to a achieve significance result.  
+
+## Slice from the END of the experiment
+```{r}
+#| echo: false
+map_df(2:90, \(pairs){
+  d_ex |>
+    filter(inducer_run>0) |>
+    slice_tail(n = pairs, by = c(id, con)) |>
+    summarise(
+      .by = c(id, con),
+      rt = mean(rt),
+      pe = 1 - mean(correct_response)
+    ) -> test
+  
+  test |>
+    t.test(rt ~ con, data=_, paired = T) |> 
+    tidy() |> mutate(.before=1, n = "rt") |>
+    rbind(
+      test |> 
+        t.test(pe ~ con, data=_, paired=T) |> 
+        tidy() |> mutate(.before=1, n="pe")
+    ) |> 
+    mutate(.before=1, pairs=pairs)
+}) -> tail_slice_diag_exclu
+tail_slice_diag_exclu |>
+  #pivot_wider(names_from=n, values_from = 3:10) |>
+  ggplot(aes(pairs, p.value, col = n)) + 
+  geom_line()+
+  geom_hline(yintercept=.05)
+```
+
+Slicing from the **end** reveal a similar pattern, but reaches significance later. 
+
+
+## Randomly sample
+```{r rnd sampling}
+#| echo: false
+
+if(run_simulations){
+  
+  cl <- makeCluster(detectCores()*.9)
+  
+  clusterEvalQ(cl, {
+    library(tidyverse)
+    library(tidymodels)
+  })
+  clusterExport(cl, "d_ex")
+  
+  pblapply(2:90, \(pairs){
+    map_df(1:300, \(itr){
+      d_ex |>
+        filter(inducer_run>0) |>
+        slice_sample(n = pairs, by = c(id, con)) |>
+        summarise(
+          .by = c(id, con),
+          rt = mean(rt),
+          pe = 1 - mean(correct_response)
+        ) -> test
+      
+      test |>
+        t.test(rt ~ con, data=_, paired = T) |> 
+        tidy() |> mutate(.before=1, n = "rt") |>
+        rbind(
+          test |> 
+            t.test(pe ~ con, data=_, paired=T) |> 
+            tidy() |> mutate(.before=1, n="pe")
+        ) |> 
+        mutate(
+          .before=1, 
+          pairs=pairs,
+          itr = itr,
+        )
+    })
+  }, cl=cl) |> 
+      map_df(~.x) -> rnd_slice_diag_exclu
+  
+  stopCluster(cl)
+  
+  rnd_slice_diag_exclu |>
+  summarise(
+    .by = c(pairs,n),
+    power = mean(p.value<.05), 
+    across(where(is.double), mean)
+  ) -> sum_rnd_slice_diag_exclu
+
+  if(save_simulation_data){
+    write_parquet(rnd_slice_diag_exclu, "../data/simulations/exp2_diagnostic_length_sampling_from_exp1_raw.parquet")
+    write_parquet(sum_rnd_slice_diag_exclu,"../data/simulations/exp2_diagnostic_length_sampling_from_exp1_sum.parquet")
+  }
+}
+```
+
+```{r vis power}
+#| echo: false
+#| warning: false
+
+sum_rnd_slice_diag_exclu |>
+  ggplot(aes(pairs, power, col = n)) + 
+  geom_line()+
+  geom_hline(yintercept=.8)+
+  geom_vline(xintercept=27)
+```
+
+```{r vis p val}
+#| echo: false
+#| warning: false
+sum_rnd_slice_diag_exclu |>
+  ggplot(aes(pairs, p.value, col = n)) + 
+  geom_line()+
+  geom_hline(yintercept=.05)+
+  geom_vline(xintercept=27)
+```
+
+Randomly sampling suggest that only PE will be significant (at 80% power) with the expected loss of trials (25%) if we use 72 post-cue diagnostic trials (36 pairs -> 27 pairs remaining). At least if we only use 27 participants.
+
+
+## Randomly sample and increase sample size 
+e.g., randomly "sample" participants (fake "ids" based on the data)
+```{r}
+#| echo: false
+
+if(run_simulations){
+  
+  cl <- makeCluster(detectCores()*.95)
+  
+  clusterEvalQ(cl, {
+    library(tidyverse)
+    library(tidymodels)
+  })
+  clusterExport(cl, "d_ex")
+  
+  map_df(27:60, \(samp_s){
+    pblapply(2:90, \(pairs){
+      map_df(1:300, \(itr){
+        
+        # We create random "ids" by randomly sampling "samp_s" times,
+        # And create a fake id "rnd_id_" 
+        map_df(1:samp_s, \(rnd_samp){
+          d_ex |>
+            filter(inducer_run>0) |>
+            filter(!is.na(con)) |>
+            slice_sample(n = pairs, by = con) |> 
+            mutate(id = paste0("rnd_id_", rnd_samp))
+        }) |>
+          summarise(
+            .by = c(id, con),
+            rt = mean(rt),
+            pe = 1 - mean(correct_response)
+          ) -> test
+      
+        test |>
+          t.test(rt ~ con, data=_, paired = T) |> 
+          tidy() |> mutate(.before=1, n = "rt") |>
+          rbind(
+            test |> 
+              t.test(pe ~ con, data=_, paired=T) |> 
+              tidy() |> mutate(.before=1, n="pe")
+          ) |> 
+          mutate(
+            .before=1, 
+            samp  = samp_s,
+            pairs = pairs,
+            itr   = itr,
+          )
+      })
+    }, cl=cl) |> 
+      map_df(~.x)
+  }) -> rnd_extended_slice_diag_exclu
+  
+  stopCluster(cl)
+  
+  rnd_extended_slice_diag_exclu |>
+    na.omit() |> # omit nas
+    summarise(
+      .by = c(samp,pairs,n),
+      power = mean(p.value<.05), 
+      across(where(is.double), mean)
+    ) -> sum_rnd_extended_slice_diag_exclu
+  
+  if(save_simulation_data){
+    write_parquet(rnd_extended_slice_diag_exclu, "../data/simulations/exp1_rnd_sampling_inc_samp_size.parquet")
+    write_parquet(sum_rnd_extended_slice_diag_exclu, "../data/simulations/exp1_sum_rnd_sampling_inc_samp_size.parquet")
+  }
+}
+```
+
+```{r}
+#| include: false
+#| warning: false
+sum_rnd_extended_slice_diag_exclu |>
+  ggplot(aes(samp, power, col=pairs,group=pairs))+
+  facet_wrap(~n)+
+  geom_line()
+```
+
+```{r}
+#| echo: false
+sum_rnd_extended_slice_diag_exclu |> 
+  filter(pairs %in% c(27, 36)) |>
+  ggplot(aes(samp, power, col=factor(pairs),group=factor(pairs)))+
+  facet_wrap(~n)+
+  geom_line()+ 
+  geom_hline(yintercept=.8)+
+  geom_hline(yintercept=.9, linetype="dashed", col="darkblue")
+```
+
+In this plot, we have created hypothetical participants by randomly slicing pairs of congruency from the experiment 1. 
+The results suggest that only PE will achieve high power with a reasonable sample size (slighly more than 30). 
+On the other hand, response time barely reach 80% power with 36 pairs at 60 participants. 
+
+
+To futher explore, I move over to simulating data, rather than slicing (drawing from exp1). 
+
+
 ## Simulate exp1 data
 
+### Testing
 ```{r}
 #| echo: false
 gen_data <- function(N, pair.obs, eff.rt, sd.rt, eff.pe, sd.pe){
@@ -267,6 +521,7 @@ The only value that is approximating our results is the simulation with 1 (pair 
 
 For this reason, we need to simulate the amount of observations we have (~ 180 valid trials) and estimate the experiment parameters that create the results found in experiment 1. 
 
+### Finding the best simulation parameters from experiment 1
 
 ```{r find exp1 parameters}
 #| echo: false
@@ -345,7 +600,7 @@ if(run_simulations){
 ```
 
 ```{r}
-#| echo: false
+#| include: false
 
 finding_exp1_parameter_vals |>
   select(rt:sd, contains("p.value")) |>
@@ -367,7 +622,7 @@ With this, we can simulate data for the experiment *with less trials*.
 Only the these parameter may highlight the problem with lacking trials (i.e., post-cue trial) for the post-cue diagnostic run. 
 
 
-Simulate data with the paramaters as estimated above: 
+### Small simulation with parameter estimates
 
 ```{r}
 #| echo: false
@@ -434,17 +689,17 @@ if(run_simulations){
   }, cl = cl) |> 
     map_df(~.x) -> vary_diagnostic_lengths
   
+  stopCluster(cl)
+  
   if(save_simulation_data){
     write_parquet(vary_diagnostic_lengths, "../data/simulations/vary_diagnostic_length.parquet")
   }
   
-  stopCluster(cl)
 } 
 ```
 
-
-```{r}
-#| echo: false
+```{r summary of the above }
+#| include: false
 vary_diagnostic_lengths |> 
   summarise(
     .by = pairs,
@@ -452,9 +707,7 @@ vary_diagnostic_lengths |>
     pe_pow = mean(pe_p<.05), 
     across(c(starts_with("rt_"), starts_with("pe_")), mean)
   ) -> sum_vary_diag_len
-sum_vary_diag_len
 ```
-
 
 The relative power with respect to the simulated data as calculated from the estimate parameters. 
 
@@ -474,11 +727,11 @@ sum_vary_diag_len |>
 
 According to the simulation, it would suffice with 60 pairs (120 trials) to have 80% power to detect a true effect.
 
-However, assuming we have 70 trials in the post-cue run, we will have 35 (forced) pairs. As we will lose 25% of the trials, we are left with 26.25 pairs, which has a power close to 50%. 
+However, assuming we have 70 trials in the post-cue run, we will have 35 (forced) pairs (black dashed). As we will lose 25% of the trials, we are left with 26.25 pairs (red dashed), which has a power close to 50%. 
 
 We might remedy this problem by increasing the sample size. 
 
-
+### Big simulation with parameter estimates 
 
 ```{r}
 #| echo: false
@@ -537,94 +790,67 @@ if(run_simulations){
                      pe_p = p.value)
           ) |>
           mutate(
+            size = size,
             pairs = pairs,
             itr = itr, 
           ) |>
-            select(pairs, itr, starts_with("rt"), starts_with("pe")
+            select(size, pairs, itr, starts_with("rt"), starts_with("pe")
           )
       })
     })
   }, cl = cl) |> 
     map_df(~.x) -> diag_lens_over_samp_sizes
+
+  # summarise  
+  diag_lens_over_samp_sizes |>
+    summarise(
+      .by = c(size, pairs), 
+      rt_pow = mean(rt_p<.05), 
+      pe_pow = mean(pe_p<.05), 
+      across(where(is.double), mean)
+    ) -> sum_diag_lens_over_samp_sizes
   
   if(save_simulation_data){
-    write_parquet(vary_diagnostic_lengths, "../data/simulations/vary_diagnostic_length.parquet")
+    write_parquet(diag_lens_over_samp_sizes, "../data/simulations/diag_lens_over_sample_sizes.parquet")
+    write_parquet(sum_diag_lens_over_samp_sizes, "../data/simulations/diag_lens_over_sample_sizes_sum.parquet")
   }
   
   stopCluster(cl)
 } 
 ```
 
-
-
-
-```{r}
-gen_data(
-  27,
-  5,
-  exp1_outcome$rt_d_m,
-  exp1_outcome$rt_d_sd,
-  exp1_outcome$pe_d_m,
-  exp1_outcome$pe_d_sd
-) -> single_dat_sim
-
-single_dat_sim |> 
-  summarise(
-    .by = c(id, con),
-    rt_m = mean(rt),
-    pe_m = mean(pe)
-  ) -> single_dat_calc
-aov_car(rt_m~con + Error(id/(con)), data=single_dat_calc) # p = .035, GES = .09
-t.test(rt_m~con, data=single_dat_calc, paired=T) #          p = .035,  d = .42
-single_dat_calc |>
-  pivot_wider(names_from=con, values_from = c(rt_m, pe_m)) |>
-  summarise(
-      m = mean(rt_m_con - rt_m_incon),
-      sd = sd(rt_m_con - rt_m_incon),
-      d = m / sd
-    )
+```{r big simu general overview}
+#| echo: false
+sum_diag_lens_over_samp_sizes |>
+  pivot_longer(c(rt_pow, pe_pow)) |>
+  # filter(pairs %in% c(27, 36)) |>
+  ggplot(aes(size, value, col=pairs, group=pairs))+
+  facet_wrap(~name)+
+  geom_line()+
+  geom_hline(yintercept=.8)
 ```
 
-
-
+Power of RT over sample size and 36 (72 trials) and 27 pairs (54 trials):
 ```{r}
 #| echo: false
 
-single_dat_sim |> 
-  summarise(
-    .by = c(id, con),
-    rt_m = mean(rt),
-    pe_m = mean(pe)
-  ) |>
-  pivot_wider(names_from = con, values_from = c(rt_m, pe_m))  |>
-  summarise(
-    rt_md = mean(rt_m_incon - rt_m_con),
-    rt_sd = sd(rt_m_incon - rt_m_con),
-    pe_md = mean(pe_m_incon - pe_m_con),
-    pe_sd = sd(pe_m_incon - pe_m_con),
-  )
+sum_diag_lens_over_samp_sizes |>
+  filter(pairs %in% c(27, 36)) |>
+  pivot_longer(c(rt_pow, pe_pow)) |>
+  ggplot(aes(size, value, col=interaction(pairs, name), group=interaction(pairs,name)))+
+  # facet_wrap(~name)+
+  geom_line()+
+  geom_smooth()+
+  geom_hline(yintercept=.8)+
+  geom_vline(xintercept=45)
+```
 
-  pivot_wider(names_from = con, values_from = c(rt_m, pe_m)) |>
-  summarise(
-    rt_d = (rt_m_con - rt_m_incon),
-    m_rt = mean(rt_d),
-    sd_rt = sd(rt_d),
-    d = m_rt/sd_rt
-  )
+By simulating data according to the estimated parameters, we require around 45 participants to achieve 80% power for PE.
+RT would require closer to 55 participants. 
 
-d_ex |> 
-  filter(diagnostic_run > 0) |>
-  mutate(rt = scale(rt)) |>
-  summarise(
-    .by=c(id,con,inducer_run),
-    rt = mean(rt),
-    rt_sd = sd(rt),
-    pe = mean(correct_response)
-  ) |>
-  mutate( pe = scale(pe) )
-  pivot_wider(names_from = con, values_from=c(rt, correct_response))
+
+```{r}
 
 ```
 
 
-only output is displayed).
