@@ -1,0 +1,411 @@
+---
+title: "How many diagnostic pairs do we need?"
+subtitle: "Slicing from experiment 1"
+format: docx
+lang: en-GB
+editor: 
+  markdown:
+      wrap: 62
+---
+
+`r paste0("Document generated: ", Sys.time()`
+
+```{r params}
+#| include: false
+
+run_simulations <- FALSE
+
+save_simulation_data <- FALSE
+load_simulation_data <- FALSE
+```
+
+```{r libraries}
+#| include: false
+
+library(tidyverse)
+library(arrow)     # load parquet files 
+library(parallel)  #
+library(pbapply)
+library(lsr)
+library(afex)      
+```
+
+```{r load data}
+#| include: false
+load("../data/processed/exp1_data.rdata")
+load("../data/simulations/diag_simu_sum.rdata")
+
+if(load_simulation_data){
+  finding_exp1_parameter_vals <- read_parquet("../data/simulations/finding_parameter_values_for_exp1.parquet")
+  # vary_diagnostic_lengths <- read_parquet("../data/simulations/vary_diagnostic_length.parquet")
+  rnd_slice_diag_exclu <- read_parquet("../data/simulations/exp2_diagnostic_length_sampling_from_exp1_raw.parquet")
+  sum_rnd_slice_diag_exclu <- read_parquet("../data/simulations/exp2_diagnostic_length_sampling_from_exp1_sum.parquet")
+  rnd_extended_slice_diag_exclu <- read_parquet("../data/simulations/exp1_rnd_sampling_inc_samp_size.parquet")
+  sum_rnd_extended_slice_diag_exclu <- read_parquet("../data/simulations/exp1_sum_rnd_sampling_inc_samp_size.parquet")
+  
+  #    write_parquet(diag_lens_over_samp_sizes, "../data/simulations/diag_lens_over_sample_sizes.parquet")
+    #write_parquet(sum_diag_lens_over_samp_sizes, "../data/simulations/diag_lens_over_sample_sizes_sum.parquet")
+}
+```
+
+```{r preprocess}
+#| include: false
+# preprocess 
+source("rep_munge/preprocess.R")
+```
+
+# Experiment 1: 
+
+## Estimating the expected loss of data (trials)
+```{r}
+#| include: false
+d_ex |>
+  filter(trial_info=="Diagnostic trial") |>
+  group_by(id) |>
+  count() |>
+  ungroup() |>
+  pull(n) |> 
+  mean() -> exp1_remaining_trials
+```
+
+After the exclusion criteria, we are left with `r exp1_remaining_trials` trials.
+
+This corresponds to a loss of `r exp1_remaining_trials/240` (or `r exp1_remaining_trials/240*100` percent). We will assume a loss of .75 (75%). 
+
+In other words, whatever post-cue run we decide, we need to estimate an expected loss of about .75. 
+
+
+## Experiment 1 outcome values 
+### t.test 
+
+Calculate the standardized means and standard deviations, and effect sizes from experiment 1. 
+
+(note. this is for the *excluded* data)
+```{r}
+#| echo: false
+
+d_ex |> 
+  ungroup() |>
+  filter(!is.na(con)) |>
+  summarise(
+    rt = mean(rt), 
+    pe = 1 - mean(correct_response),
+    .by = c(id, con)
+  ) |> 
+  mutate(
+    rt = scale(rt),
+    pe = scale(pe)
+  ) |>
+  pivot_wider(names_from = con, values_from = c(rt,pe)) |>
+  summarise(
+    rt_d_m = mean(rt_FALSE-rt_TRUE),
+    rt_d_sd = sd(rt_FALSE-rt_TRUE),
+    rt_d = rt_d_m / rt_d_sd,
+    pe_d_m = mean(pe_FALSE-pe_TRUE),
+    pe_d_sd = sd(pe_FALSE-pe_TRUE),
+    pe_d = pe_d_m / pe_d_sd,
+  ) -> exp1_outcome
+exp1_outcome
+```
+
+### ANOVA - GES   
+
+```{r}
+#| echo: false
+d_ex |> 
+  filter(!is.na(con)) |>
+  summarise(
+    .by = c(id, con),
+    rt = mean(rt),
+    pe = 1 - mean(correct_response)
+  ) -> d_ex_sum
+d_ex_sum |>
+  aov_car(rt ~ con + Error(id/con), data = _) |>
+  pluck("anova_table") |>
+  as_tibble() |>
+  mutate( name = "rt", .before = 1) |>
+  rbind( 
+    d_ex_sum |>
+      aov_car(pe ~ con + Error(id/con), data = _) |> 
+      pluck("anova_table") |>
+      as.tibble() |>
+      mutate( name = "pe",.before = 1)
+    ) -> exp1_anova_outcome
+exp1_anova_outcome
+```
+
+RT has a GES of 0.00848
+PE has a GES of 0.117 
+
+```{r}
+
+pwr.anova.test(4, 27, .47)
+```
+
+
+
+# Sampling from experiment 1: 
+
+## Slice from the START              
+```{r}
+#| echo: false
+map_df(2:90, \(pairs){
+  d_ex |>
+    filter(inducer_run>0) |>
+    slice_head(n = pairs, by = c(id, con)) |>
+    summarise(
+      .by = c(id, con),
+      rt = mean(rt),
+      pe = 1 - mean(correct_response)
+    ) -> test
+  
+  test |>
+    t.test(rt ~ con, data=_, paired = T) |> 
+    tidy() |> mutate(.before=1, n = "rt") |>
+    rbind(
+      test |> 
+        t.test(pe ~ con, data=_, paired=T) |> 
+        tidy() |> mutate(.before=1, n="pe")
+    ) |> 
+    mutate(.before=1, pairs=pairs)
+}) -> head_slice_diag_exclu
+
+head_slice_diag_exclu |>
+  #pivot_wider(names_from=n, values_from = 3:10) |>
+  ggplot(aes(pairs, p.value, col = n)) + 
+  geom_line()+
+  geom_hline(yintercept=.05)
+```
+
+Slicing from the **start** (!) suggest that we need around 20 pairs (i.e., 40 trials) to a achieve significance result.  
+
+## Slice from the END             
+```{r}
+#| echo: false
+map_df(2:90, \(pairs){
+  d_ex |>
+    filter(inducer_run>0) |>
+    slice_tail(n = pairs, by = c(id, con)) |>
+    summarise(
+      .by = c(id, con),
+      rt = mean(rt),
+      pe = 1 - mean(correct_response)
+    ) -> test
+  
+  test |>
+    t.test(rt ~ con, data=_, paired = T) |> 
+    tidy() |> mutate(.before=1, n = "rt") |>
+    rbind(
+      test |> 
+        t.test(pe ~ con, data=_, paired=T) |> 
+        tidy() |> mutate(.before=1, n="pe")
+    ) |> 
+    mutate(.before=1, pairs=pairs)
+}) -> tail_slice_diag_exclu
+tail_slice_diag_exclu |>
+  #pivot_wider(names_from=n, values_from = 3:10) |>
+  ggplot(aes(pairs, p.value, col = n)) + 
+  geom_line()+
+  geom_hline(yintercept=.05)
+```
+
+Slicing from the **end** reveal a similar pattern, but reaches significance later. 
+
+
+## Randomly slicing
+
+Instead of slicing from the start/end, we can randomly slice. 
+
+```{r rnd sampling}
+#| echo: false
+
+if(run_simulations){
+  cl <- makeCluster(detectCores()*.9)
+  clusterEvalQ(cl, {
+    library(tidyverse)
+    library(tidymodels)
+  })
+  clusterExport(cl, "d_ex")
+  
+  pblapply(2:90, \(pairs){
+    map_df(1:300, \(itr){
+      d_ex |>
+        filter(inducer_run>0) |>
+        slice_sample(n = pairs, by = c(id, con)) |>
+        summarise(
+          .by = c(id, con),
+          rt = mean(rt),
+          pe = 1 - mean(correct_response)
+        ) -> test
+      
+      test |>
+        t.test(rt ~ con, data=_, paired = T) |> 
+        tidy() |> mutate(.before=1, n = "rt") |>
+        rbind(
+          test |> 
+            t.test(pe ~ con, data=_, paired=T) |> 
+            tidy() |> mutate(.before=1, n="pe")
+        ) |> 
+        mutate(
+          .before=1, 
+          pairs=pairs,
+          itr = itr,
+        )
+    })
+  }, cl=cl) |> 
+      map_df(~.x) -> rnd_slice_diag_exclu
+  
+  stopCluster(cl)
+  
+  rnd_slice_diag_exclu |>
+  summarise(
+    .by = c(pairs,n),
+    power = mean(p.value<.05), 
+    across(where(is.double), mean)
+  ) -> sum_rnd_slice_diag_exclu
+
+  if(save_simulation_data){
+    write_parquet(rnd_slice_diag_exclu, "../data/simulations/exp2_diagnostic_length_sampling_from_exp1_raw.parquet")
+    write_parquet(sum_rnd_slice_diag_exclu,"../data/simulations/exp2_diagnostic_length_sampling_from_exp1_sum.parquet")
+  }
+}
+```
+
+```{r vis power}
+#| echo: false
+#| warning: false
+
+sum_rnd_slice_diag_exclu |>
+  ggplot(aes(pairs, power, col = n)) + 
+  geom_line()+
+  geom_hline(yintercept=.8)+
+  geom_vline(xintercept=36, linetype="dashed")+
+  geom_vline(xintercept=27, linetype="dashed", col="red")
+```
+
+```{r vis p val}
+#| echo: false
+#| warning: false
+sum_rnd_slice_diag_exclu |>
+  ggplot(aes(pairs, p.value, col = n)) + 
+  geom_line()+
+  geom_hline(yintercept=.05)+
+  geom_vline(xintercept=27)
+```
+
+Randomly sampling suggest that only PE will be significant (at 80% power) with the expected loss of trials (25%) if we use 72 post-cue diagnostic trials (36 pairs -> 27 pairs remaining). At least if we only use 27 participants.
+
+
+## Randomly slicing congruency & and increase sample size 
+
+
+Here I slice only on congruency, and create "hypothetical persons", by giving them an ID. This means that some "persons" can contain congruent outcomes from one ID while incongruent from another ID. 
+
+```{r}
+#| echo: false
+
+if(run_simulations){
+  
+  cl <- makeCluster(detectCores()*.95)
+  
+  clusterEvalQ(cl, {
+    library(tidyverse)
+    library(tidymodels)
+  })
+  clusterExport(cl, "d_ex")
+  
+  map_df(27:60, \(samp_s){
+    pblapply(2:90, \(pairs){
+      map_df(1:300, \(itr){
+        
+        # We create random "ids" by randomly sampling "samp_s" times,
+        # And create a fake id "rnd_id_" 
+        map_df(1:samp_s, \(rnd_samp){
+          d_ex |>
+            filter(inducer_run>0) |>
+            filter(!is.na(con)) |>
+            slice_sample(n = pairs, by = con) |> 
+            mutate(id = paste0("rnd_id_", rnd_samp))
+        }) |>
+          summarise(
+            .by = c(id, con),
+            rt = mean(rt),
+            pe = 1 - mean(correct_response)
+          ) -> test
+      
+        test |>
+          t.test(rt ~ con, data=_, paired = T) |> 
+          tidy() |> mutate(.before=1, n = "rt") |>
+          rbind(
+            test |> 
+              t.test(pe ~ con, data=_, paired=T) |> 
+              tidy() |> mutate(.before=1, n="pe")
+          ) |> 
+          mutate(
+            .before=1, 
+            samp  = samp_s,
+            pairs = pairs,
+            itr   = itr,
+          )
+      })
+    }, cl=cl) |> 
+      map_df(~.x)
+  }) -> rnd_extended_slice_diag_exclu
+  
+  stopCluster(cl)
+  
+  rnd_extended_slice_diag_exclu |>
+    na.omit() |> # omit nas
+    summarise(
+      .by = c(samp,pairs,n),
+      power = mean(p.value<.05), 
+      across(where(is.double), mean)
+    ) -> sum_rnd_extended_slice_diag_exclu
+  
+  if(save_simulation_data){
+    write_parquet(rnd_extended_slice_diag_exclu, "../data/simulations/exp1_rnd_sampling_inc_samp_size.parquet")
+    write_parquet(sum_rnd_extended_slice_diag_exclu, "../data/simulations/exp1_sum_rnd_sampling_inc_samp_size.parquet")
+  }
+}
+```
+
+Power increase over pairs, split by sample size. 
+```{r}
+#| echo: false
+sum_rnd_extended_slice_diag_exclu |> 
+  ggplot(aes(pairs, power, col=samp,group=samp))+
+  facet_wrap(~n)+
+  geom_line()+
+  geom_hline(yintercept=.8)+
+  geom_vline(xintercept=27)
+```
+
+Power over sample size split by pairs. 
+```{r summarise}
+#| echo: false
+#| warning: false
+sum_rnd_extended_slice_diag_exclu |>
+  ggplot(aes(samp, power, col=pairs,group=pairs))+
+  facet_wrap(~n)+
+  geom_line()
+```
+
+Power over sample size split by 36 and 26 pairs of observations.
+
+```{r}
+#| echo: false
+sum_rnd_extended_slice_diag_exclu |> 
+  filter(pairs %in% c(27, 36)) |>
+  ggplot(aes(samp, power, col=factor(pairs),group=factor(pairs)))+
+  facet_wrap(~n)+
+  geom_line()+ 
+  geom_hline(yintercept=.8)+
+  geom_hline(yintercept=.9, linetype="dashed", col="darkblue")+
+  geom_vline(xintercept=32)
+```
+
+Random slicing from the first experiment suggest a similar 30 participants to have 80% power for PE.
+
+RT, however, remains below 80% power even for 60 participants. 
+
+
