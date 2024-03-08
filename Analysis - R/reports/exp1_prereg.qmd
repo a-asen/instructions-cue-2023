@@ -7,6 +7,8 @@ editor:
       wrap: 62
 ---
 
+Document generated: `r Sys.time()`.
+
 ```{r libraries }
 #| include: FALSE
 library(tidyverse)
@@ -428,7 +430,8 @@ p2 <-
   theme(axis.text.x = element_text(size = 10), legend.position = "none")+
   labs(x = "", y = "Proportion of Error") 
 
-p1+p2
+p1# problem with patchwork
+p2
 
 if(save_outputs){ ggsave("../outputs/figs/exp1_rt-pe_line.jpeg", p1+p2, width=8, height=5) }
 ```
@@ -488,7 +491,8 @@ p2 <-
   annotate("segment", x=-0.1, xend=1.1, y=.13, yend=.13, size=1)+
   annotate(geom = "text", x = .5, y=.137, label="**", size=5)
     
-p1+p2
+p1 # problem with patchwork
+p2
 
 if(save_outputs){ ggsave("../outputs/figs/exp1_rt-pe_bar.jpeg", p1+p2, width=8, height=5) }
 ```
