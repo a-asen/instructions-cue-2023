@@ -1,0 +1,275 @@
+---
+title: "sim_act_exp"
+format: docx
+lang: en-GB
+editor: 
+  markdown:
+      wrap: 62
+---
+
+```{r libraries}
+#| include: false
+
+library(tidyverse)
+library(lsr)
+library(pbapply)
+library(afex)
+library(gt)
+library(gganimate)
+library(gifski)
+library(av)
+library(arrow) # load parquet files 
+```
+
+```{r params}
+#| include: false
+
+save_animations <- FALSE #?
+run_simulations <- FALSE
+
+save_simulation_data <- FALSE
+load_simulation_data <- FALSE
+```
+
+```{r}
+load("../data/processed/exp1_data.rdata")
+```
+
+```{r preprocessing}
+# preprocess 
+source("rep_munge/preprocess.R")
+```
+
+
+## Estimating the expected loss of data (trials)
+
+
+```{r}
+#| include: false
+d_ex |>
+  filter(trial_info=="Diagnostic trial") |>
+  group_by(id) |>
+  count() |>
+  ungroup() |>
+  pull(n) |> 
+  mean() -> exp1_remaining_trials
+```
+
+After the exclusion criteria, we are left with `r exp1_remaining_trials` trials.
+
+This corresponds to a loss of `r exp1_remaining_trials/240` (or `r exp1_remaining_trials/240*100` percent). We will assume a loss of .75 (75%).
+
+In other words, whatever post-cue run we decide, we need to estimate an expected loss of about .75.
+
+## mdiff/sd/d - Experiment 1 outcome values
+
+Calculate the standardized means and standard deviations, and effect sizes from experiment 1.
+
+
+## mdiff/sd/d - Experiment 1 outcome values
+
+Calculate the standardized means and standard deviations, and effect sizes from experiment 1. 
+
+(note. this is for the *excluded* data)
+```{r}
+#| echo: false
+
+d_ex |> 
+  ungroup() |>
+  filter(!is.na(con)) |>
+  summarise(
+    .by = con,
+    rt_sd = sd(rt),
+    rt = mean(rt), 
+    pe_sd = sd(correct_response),
+    pe = 1 - mean(correct_response),
+  ) |>
+  pivot_wider(names_from = con, values_from = c(rt,rt_sd, pe_sd,pe)) |>
+  reframe(
+    rt_m = rt_FALSE,
+    rt_sd = rt_sd_FALSE,
+    pe_m = pe_FALSE,
+    pe_sd = pe_sd_FALSE,
+    rt_d = rt_TRUE-rt_FALSE,
+    rt_sd_d = rt_sd_TRUE-rt_sd_FALSE,
+    pe_d = pe_TRUE-pe_FALSE,
+    pe_sd_d = pe_sd_TRUE-pe_sd_FALSE,
+  ) -> exp1_outcome_raw_diff
+
+
+exp1_outcome_raw_diff
+```
+
+```{r}
+rnorm(exp1_outcome_raw$pe)
+```
+
+
+```{r}
+gen_data2 <- function(N, pair.obs){
+  #' @param N Number of subjects
+  #' @param OBS Number of observation per N
+  #' @param eff.rt  Effect size of congruency on response time
+  #' @param eff.pct Effect size of congruency on proportion of correct trials 
+
+  tibble(
+    id  = rep(1:N, each = pair.obs*2),
+    con = rep.int( c("con","incon"), N * pair.obs),
+    rt  = rnorm(N * pair.obs * 2, # Num 
+                exp1_outcome_raw_diff$rt_m + as.integer(con=="con")  * exp1_outcome_raw_diff$rt_d, 
+                exp1_outcome_raw_diff$rt_sd + as.integer(con=="con") * exp1_outcome_raw_diff$rt_sd_d
+                ),
+    pe  = rbinom(n = N * pair.obs * 2, 
+                 size = 1,
+                 prob = (exp1_outcome_raw_diff$pe_m + as.integer(con=="con") * exp1_outcome_raw_diff$pe_d), 
+                 ),
+  ) 
+}
+```
+
+```{r}
+gen_data2(20,20)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+# Bk:
+
+```{r}
+#| echo: false
+
+l <- 
+  list( 
+    rt_m  = exp1_outcome$rt_d_m,
+    rt_sd = 2,
+    pe_m  = exp1_outcome$pe_d_m,
+    pe_sd = 7.6
+  )
+
+if(run_simulations){
+  
+  makeCluster(detectCores() * .9) -> cl
+  clusterExport(cl, c("l", "gen_data"))
+  clusterEvalQ(cl, {
+    library(tidyverse)
+    library(broom)
+  })
+  
+
+  
+  pblapply(20:100, \(size){
+    
+    map_df(seq(1, 90, 1), \(pairs){
+      
+      map_df(1:300, \(itr){
+        gen_data(size, pairs, l$rt_m, l$rt_sd, l$pe_m, l$pe_sd) |> 
+          summarise(
+            .by = c(id, con), 
+            rt = mean(rt),
+            pe = mean(pe)
+          ) -> s_d
+        
+        # Grand calc # BIS calc
+        s_d_g_sum <- 
+          s_d |>
+          summarize(
+            g_rt = mean(rt),
+            g_rt_sd = sd(rt),
+            g_pe = mean(pe),
+            g_pc = 1 - g_pe,
+            g_pe_sd =  sd(pe))
+        
+        # Indiv calc # LISAS calc
+        s_d_ind_sum <- 
+          s_d |> 
+          summarize(
+            .by=id, 
+            i_g_rt = mean(rt),
+            i_g_rt_sd = sd(rt),
+            i_g_pe = mean(pe), 
+            i_g_pe_sd =  sd(pe))
+        
+        s_d |>
+          left_join(s_d_ind_sum, by="id") |>
+          cbind(s_d_sum) 
+          mutate(LISAS = rt + (i_g_rt_sd / i_g_pe_sd) * pe,
+                 BIS   = ( (pe - g_pe) / g_pc_sd ) - ( (rt - g_rt) / g_rt_sd ) )
+        
+          
+        d |>
+          filter(trial_info=="Diagnostic trial") |>
+          group_by(id, con) |>
+          summarize(rt = mean(rt, na.rm = TRUE),
+                    pe = 1 - mean(correct_response) ) -> lisas_ind
+        
+        
+        
+        
+        
+        s_d |>
+          pivot_wider(names_from = con, values_from = c(rt,pe)) |>
+          summarise(
+            rt_m = mean(rt_con-rt_incon),
+            rt_sd = sd(rt_con-rt_incon),
+            rt_d = rt_m / rt_sd,
+            pe_m = mean(pe_con-pe_incon),
+            pe_sd = sd(pe_con-pe_incon),
+            pe_d = pe_m / pe_sd,
+          ) |> 
+          cbind(
+            t.test(rt ~ con, s_d, paired=T, alternative="greater") |>
+              tidy() |> 
+              select(2:3) |>
+              rename(rt_stat = statistic,
+                     rt_p = p.value)
+          ) |>
+          cbind( 
+            t.test(pe ~ con, s_d, paired=T, alternative="greater") |>
+              tidy() |> 
+              select(2:3) |>
+              rename(pe_stat = statistic,
+                     pe_p = p.value)
+          ) |>
+          mutate(
+            size = size,
+            pairs = pairs,
+            itr = itr, 
+          ) |>
+            select(size, pairs, itr, starts_with("rt"), starts_with("pe")
+          )
+      })
+    })
+  }, cl = cl) |> 
+    map_df(~.x) ->awdb
+
+  # summarise  
+  diag_lens_over_samp_sizes |>
+    summarise(
+      .by = c(size, pairs), 
+      rt_pow = mean(rt_p<.05), 
+      pe_pow = mean(pe_p<.05), 
+      across(where(is.double), mean))
+  
+  
+  stopCluster(cl)
+} 
+```
+```
+

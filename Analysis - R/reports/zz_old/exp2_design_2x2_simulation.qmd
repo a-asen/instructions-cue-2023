@@ -7,14 +7,14 @@ editor:
     wrap: 62
 ---
 
-```{r}
+```{r rep parameters}
 #| echo: false
 save_animations <- FALSE
 run_simulations <- FALSE
 load_big_data <- TRUE
 ```
 
-```{r}
+```{r libraries}
 #| include: false
 library(tidyverse)
 library(lsr)
@@ -25,107 +25,83 @@ library(parallel)
 library(gifski)
 library(av)
 library(gganimate)
+```
+
+```{r citations}
+#| include: false
+
 
 ```
 
-```{r}
+```{r load data}
 #| include: false
-load("../data/processed/exp1_data.rdata") # actual data
+load("../../data/processed/exp1_data.rdata") # actual data
 
-load("../data/simulations/exp2_estimate_effect_500.rdata")
-load("../data/simulations/exp2_gpower_effect_500.rdata")
+load("../../data/simulations/exp2_estimate_effect_500.rdata")
+load("../../data/simulations/exp2_gpower_effect_500.rdata")
 
 if(load_big_data){
   # Big sim
-  load("../data/simulations/exp2_simulation_over_effect_sizes_and_sample_sizes.rdata")
-  load("../data/simulations/exp2_simulation_w_postprop_sum.rdata")
+  load("../../data/simulations/exp2_simulation_over_effect_sizes_and_sample_sizes.rdata")
+  load("../../data/simulations/exp2_simulation_w_postprop_sum.rdata")
 }
 ```
 
-
-## Exclusion
-```{r exclusion start - accuracy}
-#| include: FALSE
-
-d <-
-  exp1_d |>
-  dplyr::select(id, trial_info, inducer_run, diagnostic_run, correct_response, rt, con) |>
-  mutate(rt = as.numeric( ifelse(rt=="null", NA, rt)) ) |>
-  filter(trial_info == "Diagnostic trial" | trial_info == "Inducer trial") |>
-  filter(!is.na(correct_response))
-
-loss <- list()
-loss$data_trials <- nrow(d)
-
-# Remove practice
-loss[["inducer_practice_pct"]] <- (1 - (nrow(d |> filter(inducer_run > 0)) / nrow(d))) * 100
-loss[["inducer_practice_trials"]] <- nrow(d) - nrow(d |> filter(inducer_run > 0))
-
-d <- 
-  d |> 
-  filter(inducer_run > 0)
-
-### Overall accuracy      ====
-exp1_d |>
-  filter( trial_info == "Diagnostic trial" | trial_info == "Inducer trial" ) |>
-  group_by( id ) |>
-  mutate( correct_response = ifelse( trial_info=="Inducer trial" & is.na(rt), 0, correct_response) ) |>
-  summarize( acc = sum(correct_response, na.rm = TRUE) / length( !is.na(correct_response) ) ) |>
-  filter( acc < .7 ) |>
-  pull( id ) -> loss$exclude_par
-
-loss[["exclude_par_trials"]] <- length( d$rt[d$id == loss$exclude_par] )
-loss[["exclude_par_pct"]]    <- length( d$rt[d$id == loss$exclude_par] ) / loss$data_trials * 100
-
-d |> filter( !(id %in% loss$exclude_par) ) -> d
-#id
-d |>
-  group_by(id) |>
-  mutate(
-    rt_crit = ifelse( 
-      trial_info == "Diagnostic trial",
-      mean( rt, na.rm = TRUE ) + sd( rt, na.rm = TRUE ) * 2.5,
-      NA ),
-      retain_trials = ifelse(
-        (rt > rt_crit & trial_info == "Diagnostic trial") | # **OR**
-          (is.na(rt) & trial_info == "Diagnostic trial"),
-        0, 1 ) 
-    ) -> d
-
-sum(d$retain_trials == 0) -> loss[["rt_sd_trials"]]
-sum(d$retain_trials == 0) / loss$data_trials * 100 -> loss[["rt_sd_pct"]]
-
-d |> 
-  filter( retain_trials == 1 ) -> d
-d |>
-  mutate( valid_trials = case_when( trial_info=="Inducer trial" & correct_response==1 ~ 1,
-                                    trial_info=="Inducer trial" & correct_response==0 ~ 0,
-                                    trial_info=="Inducer trial" & is.na(correct_response) ~ 0,
-                                      # non-responses count as a wrong response
-                                    T ~ NA ) ) |>
-  fill(valid_trials, .direction = "up") -> d
-
-sum(d$valid_trials==0) -> loss[["inducer_fail_trials"]]
-sum(d$valid_trials==0) / loss$data_trials * 100 -> loss[["inducer_fail_pct"]]
-
-d |> 
-  filter( valid_trials == 1 ) |> 
-  ungroup() -> d
+```{r preprocessing}
+# preprocess 
+source("rep_munge/preprocess.R")
 ```
 
 
-# Estimating effect size for ANOVA: 
+# Estimating effect size for ANOVA
+
+## GES 
+```{r}
+#| echo: false
+d_ex |> 
+  filter(!is.na(con)) |>
+  summarise(
+    .by = c(id, con),
+    rt = mean(rt),
+    pe = 1 - mean(correct_response)
+  ) -> d_ex_sum
+d_ex_sum |>
+  aov_car(rt ~ con + Error(id/con), data = _) |>
+  pluck("anova_table") |>
+  as_tibble() |>
+  mutate( name = "rt", .before = 1) |>
+  rbind( 
+    d_ex_sum |>
+      aov_car(pe ~ con + Error(id/con), data = _) |>
+      pluck("anova_table") |>
+      as.tibble() |>
+      mutate( name = "pe",.before = 1)
+    ) -> exp1_anova_outcome
+exp1_anova_outcome
+```
+
+## Partial eta squared 
 ```{r}
 #| echo: false
 #| message: false
-d |>
+d_ex |>
   filter(!is.na(con)) |>
-  group_by(id, con) |> 
-  summarise(rt = mean(rt)) |>
+  summarise(
+    .by = c(id, con), 
+    rt = mean(rt),
+    pe = mean(correct_response)) -> anova_test_res
+anova_test_res |>
   aov(rt ~ con + Error(id/con), data=_ ) |>
-  DescTools::EtaSq(x=_, type=1)
+  DescTools::EtaSq(x=_, type=1) |> as_tibble() |>
+  mutate(.before = 1, n = "rt") |>
+  rbind(
+    anova_test_res |>
+    aov(pe ~ con + Error(id/con), data=_ ) |>
+    DescTools::EtaSq(x=_, type=1) |> 
+      as_tibble() |>
+      mutate(.before = 1, n = "pe")
+  )
 ```
-Partial eta square of .21 (Lakens, 2013)
 
 According to gpower, an effect size of .14 correspond to an effect size of .4:
 ```{r}
@@ -133,53 +109,47 @@ con_eff <- .21
 gpow_eff <- .14
 ```
 
+# Simulating
 
+```{r  on hold? }
+exp2_sim2x2 <- function(N, blocks, block.len, post.cue.len, eff.con.pre, eff.con.post, eff.con.cue.intr){
+  #' @param N                 Number of subjects
+  #' @param blocks            Number of blocks 
+  #' @param block.len         Length of each block -- this is split, half the trials are pre and half are post
+  #' @param post.cue.len      N of observation after the cue. 
+  #' @param eff.con.pre       Effect size of the congruency effect
+  #' @param eff.cue.post      Effect size of the pre-post cue
+  #' @param eff.con.cue.intr  Effect size of the interaction
 
-```{r}
-#| echo: false
-
-map_df(1:16, \(x){
-  d |> 
-    filter(diagnostic_run < x) |>
-    filter(!is.na(con)) |>
-    summarise(
-      .by=c(id, con),
-      rt = mean(rt), 
-      pe = 1 - mean(correct_response)
-    ) |>
-    aov_car(pe ~ con + Error(id/(con)), data=_) -> test2
-  
-  d |> 
-    filter(diagnostic_run < x) |>
-    filter(!is.na(con)) |>
-    summarise(
-      .by=c(id, con),
-      rt = mean(rt), 
-      pe = 1 - mean(correct_response)
-    ) |>
-    aov_car(rt ~ con + Error(id/(con)), data=_) -> test
-  
   tibble(
-    id = x,
-    rt_ges = test$anova_table$ges,
-    pe_ges = test2$anova_table$ges,
-  )
-}) -> ges_diag_lens
-ges_diag_lens |>
-  summarise(across(everything(), mean))
-
-d |> 
-  filter(diagnostic_run <4) |>
-  filter(!is.na(con)) |>
-  summarise(
-    .by=c(id, con),
-    rt = mean(rt), 
-    pe = 1 - mean(correct_response)
-  ) |>
-  aov_car(rt ~ con + Error(id/(con)), data=_)
-
-
+    id     = rep(1:N, each = blocks * block.len),
+    block  = rep.int( rep(1:blocks, each = block.len), N),
+    cue    = rep.int( rep(c("pre", "post"), each = block.len/2), blocks * N),
+    con    = rep.int( c("con", "incon"), N * blocks * block.len/2),
+    rt     = rnorm(N * blocks * block.len, 
+                   0 + 
+                     - as.integer(con=="con") * eff.con.pre + 
+                     + as.integer(cue=="post") * eff.con.post + 
+                     - as.integer(con=="con" & cue=="post") * eff.con.cue.intr,
+                   1)
+  ) -> d
+  
+  # Here we remove some post trials equal to half 
+  # First we take all the pre trials: 
+  d |> 
+    filter(cue=="pre") |>
+  # Then we combine the filtered post trials: 
+  rbind(
+    d |> 
+      # We filter in such a way that we slice the first trials for each id in each trial:
+      filter(cue=="post") |>
+      group_by(id, block) |>
+      slice_head(n = post.cue.len)
+  ) -> test
+}
 ```
+
+
 
 
 # Simulation 2x2 rmANOVA (Congruency X cue)
@@ -228,6 +198,85 @@ exp2_sim2x2 <- function(N, blocks, block.len, post.cue.len, eff.con.pre, eff.con
   ) -> test
 }
 ```
+
+### based on params from diag simu: 
+
+```{r not ran? }
+
+l <- 
+list( 
+  rt_m  = exp1_outcome$rt_d_m,
+  rt_sd = 2,
+  pe_m  = exp1_outcome$pe_d_m,
+  pe_sd = 7.6
+)
+
+if(run_simulations){
+  
+  makeCluster(detectCores() * .9) -> cl
+  clusterExport(cl, c("l", "gen_data"))
+  clusterEvalQ(cl, {
+    library(tidyverse)
+    library(broom)
+  })
+  
+  pblapply(seq(1, 90, 1), \(pairs){
+    
+    map_df(1:300, \(itr){
+      exp2_sim2x2(27, )
+      gen_data(27, pairs, l$rt_m, l$rt_sd, l$pe_m, l$pe_sd) |> 
+        summarise(
+          .by = c(id, con), 
+          rt = mean(rt),
+          pe = mean(pe)
+        ) -> s_d
+      
+      s_d |>
+        pivot_wider(names_from = con, values_from = c(rt,pe)) |>
+        summarise(
+          rt_m = mean(rt_con-rt_incon),
+          rt_sd = sd(rt_con-rt_incon),
+          rt_d = rt_m / rt_sd,
+          pe_m = mean(pe_con-pe_incon),
+          pe_sd = sd(pe_con-pe_incon),
+          pe_d = pe_m / pe_sd,
+        ) |> 
+        cbind(
+          t.test(rt ~ con, s_d, paired=T, alternative="greater") |>
+            tidy() |> 
+            select(2:3) |>
+            rename(rt_stat = statistic,
+                   rt_p = p.value)
+        ) |>
+        cbind( 
+          t.test(pe ~ con, s_d, paired=T, alternative="greater") |>
+            tidy() |> 
+            select(2:3) |>
+            rename(pe_stat = statistic,
+                   pe_p = p.value)
+        ) |>
+        mutate(
+          pairs = pairs,
+          itr = itr, 
+        ) |>
+          select(pairs, itr, starts_with("rt"), starts_with("pe")
+        )
+    })
+    
+  }, cl = cl) |> 
+    map_df(~.x) -> vary_diagnostic_lengths
+  
+  stopCluster(cl)
+  
+  if(save_simulation_data){
+    write_parquet(vary_diagnostic_lengths, "../data/simulations/vary_diagnostic_length.parquet")
+  }
+  
+} 
+```
+
+
+
 
 ### Effect based on estimate
 Here we assume the effect as calculated by the one-way ANOVA (.21 post-cue , and .07 pre-cue)
@@ -309,26 +358,6 @@ if(create_animations){
 }
 ```
 
-
-```{r}
-test |> 
-  summarise(
-    .by = c(id, cue, con),
-    rt = mean(rt)
-  ) |>
-  pivot_wider(names_from = con, values_from = rt) |>
-  summarise(
-    m = mean(con-incon),
-    sd = sd(con-incon),
-    d = m/sd
-  )
-  
-  filter(cue=="post") |>
-  t.test(rt~con, data=_, paired=T)
-  aov_car(rt ~ con*cue + Error(id/(con*cue)), data=_)
-```
-
-
 ```{r power}
 #| echo: false
 
@@ -347,7 +376,7 @@ exp2_simu_w_post_sum |>
 
 ```
 
-```{r}
+```{r create animation of effect size increase}
 #| echo: false
 
 if(save_animations){
@@ -382,7 +411,7 @@ if(save_animations){
 }
 ```
 
-```{r}
+```{r create animation of sample size increase}
 #| echo: false
 
 if(save_animations){
