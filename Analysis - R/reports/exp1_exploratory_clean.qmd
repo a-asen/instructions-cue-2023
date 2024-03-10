@@ -7,8 +7,6 @@ editor:
       wrap: 62
 ---
 
-Document generated: `r Sys.time()`
-
 ```{r libraries }
 #| include: FALSE
 library(tidyverse)
@@ -283,7 +281,7 @@ d |>
   filter(trial_info=="Diagnostic trial") |>
   group_by(id, con) |>
   summarize(rt = mean(rt, na.rm = TRUE),
-            pc = mean(correct_response) ) -> ind_bis # |>
+            pc = mean(correct_response) ) -> ind_bis ## |>
   #pivot_wider( names_from = con, values_from = c(rt, pe) ) -> ind_bis
 
 BIS <- 
@@ -705,3 +703,4 @@ In this way, including a random intercept for each block explains more variance.
 
 
 
+~Document generated: `r Sys.time()`~
