@@ -5,7 +5,7 @@
 const debug = true                  // Show debug information?
 const skip_instructions = false     // Skip intro? 
 const skip_practice = false         // Skip practice? 
-const save_local_data = true        // Save local file? 
+const save_local_data = false        // Save local file? 
 
 const study_name = "exp2_pilot" // add to filename 
 // const redirect_link = ## NT &&//"https://app.prolific.com/submissions/complete?cc=" 
@@ -612,35 +612,40 @@ function inducer_FNC(run_stimuli, exp_block, trial_info, force_resp_side = null,
 
 // Stimuli equal: 
 function force_stim_equal(array){
-    console.log("Array length of: ", array.length,)
+    let total_1 = array.filter(x => x==1).length
+    let total_0 = array.filter(x => x==0).length
 
-    const arr1 =  Array( Math.floor( array.length/2/2 ) ).fill(0)
-    const arr2 =  Array( Math.ceil(  array.length/2/2) ).fill(1)
-    const arr4 =  Array( Math.floor( array.length/2/2 ) ).fill(1)
-    const arr3 =  Array( Math.ceil(  array.length/2/2 ) ).fill(0)
-    var max_list = [[arr1,arr2],[arr3,arr4]]
+    let arr1 =  Array( Math.floor( array.length/2/2 ) ).fill(0)
+    let arr2 =  Array( Math.ceil(  array.length/2/2 ) ).fill(1)
+    let arr4 =  Array( Math.floor( array.length/2/2 ) ).fill(1)
+    let arr3 =  Array( Math.ceil(  array.length/2/2 ) ).fill(0)
+    let max_list = [[arr1,arr2],[arr3,arr4]]
     
     var list = []
-    for(let i = 0; i < array.length; i++){
-        // let count = 0;
 
-        let ita_or_not = array[i] == 1 ? 1 : 0
-        console.log("Current italic/upright:", array[i])
-        
-        while(true){
-            // Randomly sample left/right
+    for(let i = 0; i < array.length; i++){
+        ita_or_not = array[i] == 1 ? 1 : 0
+        let cond = true
+        let count = 0;
+        while(cond){
+            // Randomly sample left/right response to the italic/italic trial
             let left_or_right = jsPsych.randomization.randomInt(0,1)
-            console.log(left_or_right, "testing item")
+
             if(max_list[ita_or_not][left_or_right].length > 0 ){
-                console.log("Length of:", max_list[ita_or_not][left_or_right], "Is more than 0; adding to list:", list) 
+                if(ita_or_not == 1){ total_1-- } else if (ita_or_not==0) { total_0-- }
+                if(debug){  
+                    console.log("total1:",  total_1, "total0:", total_0)
+                }
                 list.push( max_list[ita_or_not][left_or_right][0] ) // Add stimulus response side 
                 max_list[ita_or_not][left_or_right].splice(0,1) // remove from pre-determined-list
+                cond = false
             }
 
-            // console.log("count", count)
-            // count++
-            // if(count>500){ break}
-            break
+            count++
+            if(count>500){ 
+                console.log("\nWARNING\nWARNING\nWARNING\nWARNING\n COUNT ABOVE 500 \nWARNING\nWARNING\nWARNING\nWARNING")
+                cond = false
+            }
         }
     }
     if(debug){ console.log( "Controlled random stimuli presentation:", list) }
@@ -686,8 +691,9 @@ for(let i = 0; i < number_of_inducers; i++){
 if(debug){ console.log("Random diagnostic lengths list:", rnd_diagnostic_length) }
 
 var adj_max_diagnostic_trials = max_diagnostic_trials - tot_post_cue_len
-console.log(tot_post_cue_len, " ADJUSTED")
-console.log(adj_max_diagnostic_trials, " ADJUSTED")
+if(debug){
+    console.log("Post-cue length of:", tot_post_cue_len, "Pre-cue lenght of:", adj_max_diagnostic_trials)
+}
 
 // Sum total diagnostic trials
 const sum_diags = rnd_diagnostic_length.reduce((list, i) => list + i, 0);
@@ -702,7 +708,7 @@ if(sum_diags != adj_max_diagnostic_trials){
 
     if(debug){ console.log("Current operation", operation, "with a differences of", diff) }
 
-    do{
+    while(diff > 0 & break_count < 1000){
         if(debug){ console.log("Pre-cue diff: ", diff) }
         // Randomly sample a location
         let loc = Math.floor(Math.random() * rnd_diagnostic_length.length)
@@ -716,20 +722,22 @@ if(sum_diags != adj_max_diagnostic_trials){
                 var calc_oper = -1
                 break;
         }
-        // if(debug){ console.log("At location", loc, ", value: ", rnd_diagnostic_length[loc], "is at threshold. Skipping...") } 
 
         if(cond){ //IF NOT EQUAL: Add one to the location and remove one to diff
             if(debug){ console.log("At location", loc, " -> Adjusting:",  rnd_diagnostic_length[loc], "to", rnd_diagnostic_length[loc] + calc_oper) }
             rnd_diagnostic_length[loc] += calc_oper
             diff--;
+        } else { break_count++ }
+
+        if(break_count >= 1000){
+            console.log("WARNING\nWARNING\nWARNING\nCOULD NOT EQUALIZE DIAGNOSTIC LENGTHS, CHECK PARAMETERS\nWARNING\nWARNING\nWARNING") 
+            console.log("@ pre-cue array")
         }
-        break_count+=1 // in case 
-    } while( diff > 0 & break_count < 1000)
+    }
 
     if(debug){ 
         console.log("Fixed pre-cue diagnostic lengths:", rnd_diagnostic_length,
         ". A total of:", rnd_diagnostic_length.reduce((list, l) => list + l) ) }
-    if(break_count >= 500){ console.log("WARNING\nWARNING\nWARNING\nCOULD NOT EQUALIZE DIAGNOSTIC LENGTHS, CHECK PARAMETERS\nWARNING\nWARNING\nWARNING") }
 }
 
 ////        CUE          ///
@@ -771,13 +779,14 @@ if(sum_rnd_cue_array != tot_post_cue_len){
     let operation = (sum_rnd_cue_array < tot_post_cue_len) ? "+" : "-";
     let diff = Math.abs(sum_rnd_cue_array - tot_post_cue_len)
     // Difference between the set number of trials and the calculated number
+
     var cond;
+    let break_count=0
 
     if(debug){ console.log("Sufficient cue-length is missing. Cue length operation is", operation, "with a differences of", diff) }
     
-    let break_count=0
     // Dont need a break here, because it will always finish. 
-    do{
+    while( diff > 0 & break_count < 1000 ){
         if(debug){ console.log("Post-cue diff of: ", diff) }
         // Randomly sample a location
         let loc = Math.floor( Math.random() * rnd_cue_array.length )
@@ -801,13 +810,16 @@ if(sum_rnd_cue_array != tot_post_cue_len){
                 console.log( 
                     "At location:", loc,"-> ", "Adjusting:", rnd_cue_array[loc], "to", rnd_cue_array[loc], 
                     "Pre-cue length:",   rnd_diagnostic_length[loc],
-                    "Post-cue length:", rnd_cue_array[loc] 
-                ) 
+                    "Post-cue length:", rnd_cue_array[loc] ) 
             }
             diff--;
+        } else { break_count++ }
+
+        if(break_count>=1000){
+            console.log("WARNING\nWARNING\nWARNING\nCOULD NOT EQUALIZE DIAGNOSTIC LENGTHS, CHECK PARAMETERS\nWARNING\nWARNING\nWARNING") 
+            console.log("@ cue array")
         }
-        break_count--
-    } while( diff > 0 & break_count < 1000 ) 
+    } 
 
     if(debug){ console.log("Fixed post-cue diagnostic lengths:", rnd_cue_array) }
 }
