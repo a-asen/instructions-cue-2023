@@ -3,8 +3,8 @@
 
 // CHANGE THESE BEFORE EXPERIMENT!
 const debug = true                  // Show debug information?
-const skip_instructions = true     // Skip intro? 
-const skip_practice = true         // Skip practice? 
+const skip_instructions = false     // Skip intro? 
+const skip_practice = false         // Skip practice? 
 const save_local_data = true        // Save local file? 
 
 const study_name = "exp2_pilot" // add to filename 
@@ -53,11 +53,11 @@ const inducer_colours      = ["red", "yellow", "blue"]      // Inducer colour ra
 const inducer_colour_name  = ["red", "yellow", "blue"]
     // This is also what is DISPLAYED (i.e., text) to participants. Should therefore be a readable name. 
 
-const number_of_inducers = 24       // Number of inducers 
+const number_of_inducers = 10       // Number of inducers 
 
 
 ////    Diagnostic parameters   ////
-const max_diagnostic_trials = 240     // Overall max run length
+const max_diagnostic_trials = 100     // Overall max run length
 
 // pre-cue: 
 const diagnostic_min_length = 4         // Min run length
@@ -71,7 +71,7 @@ const cue_min_length = 0
 const cue_max_length = 4
 const post_diagnostic_prop = .3 
     // The proportion of the overall trials that should be "post-cue".
-const tot_post_cue_len =  max_diagnostic_trials * post_diagnostic_prop
+const tot_post_cue_len = max_diagnostic_trials * post_diagnostic_prop
 
 const post_cue_force_equal_italic = true
 const post_cue_force_equal_stimuli = true
@@ -612,33 +612,39 @@ function inducer_FNC(run_stimuli, exp_block, trial_info, force_resp_side = null,
 
 // Stimuli equal: 
 function force_stim_equal(array){
+    console.log("Array length of: ", array.length,)
+
+    const arr1 =  Array( Math.floor( array.length/2/2 ) ).fill(0)
+    const arr2 =  Array( Math.ceil(  array.length/2/2) ).fill(1)
+    const arr4 =  Array( Math.floor( array.length/2/2 ) ).fill(1)
+    const arr3 =  Array( Math.ceil(  array.length/2/2 ) ).fill(0)
+    var max_list = [[arr1,arr2],[arr3,arr4]]
+    
     var list = []
-    let max_list = {
-        it: {
-            0: Array( Math.floor( array.length/2/2 ) ).fill(0),
-            1: Array( Math.floor( array.length/2/2 ) ).fill(1),
-        },
-        n_it: {
-            0: Array( Math.floor( array.length/2/2 ) ).fill(0),
-            1: Array( Math.floor( array.length/2/2 ) ).fill(1),
+    for(let i = 0; i < array.length; i++){
+        // let count = 0;
+
+        let ita_or_not = array[i] == 1 ? 1 : 0
+        console.log("Current italic/upright:", array[i])
+        
+        while(true){
+            // Randomly sample left/right
+            let left_or_right = jsPsych.randomization.randomInt(0,1)
+            console.log(left_or_right, "testing item")
+            if(max_list[ita_or_not][left_or_right].length > 0 ){
+                console.log("Length of:", max_list[ita_or_not][left_or_right], "Is more than 0; adding to list:", list) 
+                list.push( max_list[ita_or_not][left_or_right][0] ) // Add stimulus response side 
+                max_list[ita_or_not][left_or_right].splice(0,1) // remove from pre-determined-list
+            }
+
+            // console.log("count", count)
+            // count++
+            // if(count>500){ break}
+            break
         }
     }
-    for(let i = 0; i < array.length; i++){
-        let loc_val = array[i] == 1 ? "it" : "n_it" 
-        do{
-            // Randomly sample left/right
-            let rnd_left_or_right = jsPsych.randomization.randomInt(0,1)
-            if(max_list[loc_val][rnd_left_or_right].length > 0){
-                // Add stimulus response side 
-                list.push( max_list[loc_val][rnd_left_or_right][0] )
-                // remove from pre-determined-list
-                max_list[loc_val][rnd_left_or_right].splice(0,1)
-                break;
-            }
-        } while(true)
-        
-    }
     if(debug){ console.log( "Controlled random stimuli presentation:", list) }
+    
     return list
 }
 
@@ -680,6 +686,7 @@ for(let i = 0; i < number_of_inducers; i++){
 if(debug){ console.log("Random diagnostic lengths list:", rnd_diagnostic_length) }
 
 var adj_max_diagnostic_trials = max_diagnostic_trials - tot_post_cue_len
+console.log(tot_post_cue_len, " ADJUSTED")
 console.log(adj_max_diagnostic_trials, " ADJUSTED")
 
 // Sum total diagnostic trials
@@ -717,7 +724,7 @@ if(sum_diags != adj_max_diagnostic_trials){
             diff--;
         }
         break_count+=1 // in case 
-    } while( diff > 0 & break_count < 500)
+    } while( diff > 0 & break_count < 1000)
 
     if(debug){ 
         console.log("Fixed pre-cue diagnostic lengths:", rnd_diagnostic_length,
@@ -768,6 +775,7 @@ if(sum_rnd_cue_array != tot_post_cue_len){
 
     if(debug){ console.log("Sufficient cue-length is missing. Cue length operation is", operation, "with a differences of", diff) }
     
+    let break_count=0
     // Dont need a break here, because it will always finish. 
     do{
         if(debug){ console.log("Post-cue diff of: ", diff) }
@@ -797,8 +805,9 @@ if(sum_rnd_cue_array != tot_post_cue_len){
                 ) 
             }
             diff--;
-        }         
-    } while( diff > 0 ) 
+        }
+        break_count--
+    } while( diff > 0 & break_count < 1000 ) 
 
     if(debug){ console.log("Fixed post-cue diagnostic lengths:", rnd_cue_array) }
 }
