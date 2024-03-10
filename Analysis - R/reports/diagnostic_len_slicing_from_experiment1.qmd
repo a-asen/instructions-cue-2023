@@ -54,6 +54,19 @@ if(load_simulation_data){
 source("rep_munge/preprocess.R")
 ```
 
+```{r create cluster}
+#| include: false
+if(run_simulations){
+  cl <- makeCluster(detectCores()*.95)
+  clusterEvalQ(cl, {
+    library(tidyverse)
+    library(tidymodels)
+  })
+  clusterExport(cl, "d_ex")
+} else { cl <- NULL }
+```
+
+
 # Experiment 1: 
 
 ## Estimating the expected loss of data (trials)
@@ -81,7 +94,7 @@ In other words, whatever post-cue run we decide, we need to estimate an expected
 Calculate the standardized means and standard deviations, and effect sizes from experiment 1. 
 
 (note. this is for the *excluded* data)
-```{r}
+```{r exp1 outcomes}
 #| echo: false
 
 d_ex |> 
@@ -110,7 +123,7 @@ exp1_outcome
 
 ### ANOVA - GES   
 
-```{r}
+```{r anova ges}
 #| echo: false
 d_ex |> 
   filter(!is.na(con)) |>
@@ -137,14 +150,13 @@ exp1_anova_outcome
 RT has a GES of 0.00848
 PE has a GES of 0.117 
 
-```{r}
-
+```{r aov power}
+#| include: false
 pwr.anova.test(4, 27, .47)
 ```
 
 
-
-# Sampling from experiment 1: 
+# Slicing from experiment 1: 
 
 ## Slice from the START              
 ```{r}
@@ -220,15 +232,8 @@ Instead of slicing from the start/end, we can randomly slice.
 #| echo: false
 
 if(run_simulations){
-  cl <- makeCluster(detectCores()*.9)
-  clusterEvalQ(cl, {
-    library(tidyverse)
-    library(tidymodels)
-  })
-  clusterExport(cl, "d_ex")
-  
   pblapply(2:90, \(pairs){
-    map_df(1:300, \(itr){
+    map_df(1:500, \(itr){
       d_ex |>
         filter(inducer_run>0) |>
         slice_sample(n = pairs, by = c(id, con)) |>
@@ -253,16 +258,15 @@ if(run_simulations){
         )
     })
   }, cl=cl) |> 
-      map_df(~.x) -> rnd_slice_diag_exclu
-  
-  stopCluster(cl)
+      map_df(~.x) -> 
+    rnd_slice_diag_exclu
   
   rnd_slice_diag_exclu |>
-  summarise(
-    .by = c(pairs,n),
-    power = mean(p.value<.05), 
-    across(where(is.double), mean)
-  ) -> sum_rnd_slice_diag_exclu
+    summarise(
+      .by = c(pairs,n),
+      power = mean(p.value<.05), 
+      across(where(is.double), mean)
+    ) -> sum_rnd_slice_diag_exclu
 
   if(save_simulation_data){
     write_parquet(rnd_slice_diag_exclu, "../data/simulations/exp2_diagnostic_length_sampling_from_exp1_raw.parquet")
@@ -283,41 +287,21 @@ sum_rnd_slice_diag_exclu |>
   geom_vline(xintercept=27, linetype="dashed", col="red")
 ```
 
-```{r vis p val}
-#| echo: false
-#| warning: false
-sum_rnd_slice_diag_exclu |>
-  ggplot(aes(pairs, p.value, col = n)) + 
-  geom_line()+
-  geom_hline(yintercept=.05)+
-  geom_vline(xintercept=27)
-```
+For 27 participants, with less pairs, we will have less than 50% power for RT. 
 
 Randomly sampling suggest that only PE will be significant (at 80% power) with the expected loss of trials (25%) if we use 72 post-cue diagnostic trials (36 pairs -> 27 pairs remaining). At least if we only use 27 participants.
 
 
 ## Randomly slicing congruency & and increase sample size 
 
-
 Here I slice only on congruency, and create "hypothetical persons", by giving them an ID. This means that some "persons" can contain congruent outcomes from one ID while incongruent from another ID. 
 
-```{r}
+```{r rnd sample and increase}
 #| echo: false
-
 if(run_simulations){
-  
-  cl <- makeCluster(detectCores()*.95)
-  
-  clusterEvalQ(cl, {
-    library(tidyverse)
-    library(tidymodels)
-  })
-  clusterExport(cl, "d_ex")
-  
-  map_df(27:60, \(samp_s){
-    pblapply(2:90, \(pairs){
+  pblapply(27:60, \(samp_s){
+    map_df(2:90, \(pairs){
       map_df(1:300, \(itr){
-        
         # We create random "ids" by randomly sampling "samp_s" times,
         # And create a fake id "rnd_id_" 
         map_df(1:samp_s, \(rnd_samp){
@@ -348,11 +332,10 @@ if(run_simulations){
             itr   = itr,
           )
       })
-    }, cl=cl) |> 
-      map_df(~.x)
-  }) -> rnd_extended_slice_diag_exclu
-  
-  stopCluster(cl)
+    })
+  }, cl=cl) |> 
+    map_df(~.x) -> 
+    rnd_extended_slice_diag_exclu
   
   rnd_extended_slice_diag_exclu |>
     na.omit() |> # omit nas
@@ -408,4 +391,121 @@ Random slicing from the first experiment suggest a similar 30 participants to ha
 
 RT, however, remains below 80% power even for 60 participants. 
 
+## Randomly slicing w/integrated score
 
+```{r}
+#| echo: false
+if(run_simulations){
+  pblapply(27:56, \(samp_s){
+    map_df(10:80, \(pairs){
+      map_df(1:500, \(itr){
+        # We create random "ids" by randomly sampling "samp_s" times,
+        # And create a fake id "rnd_id_" 
+        map_df(1:samp_s, \(rnd_samp){
+          d_ex |>
+            filter(inducer_run>0) |>
+            filter(!is.na(con)) |>
+            slice_sample(n = pairs, by = con) |> 
+            rename(original_id = id) |>
+            mutate(id = paste0("rnd_id_", rnd_samp))
+        }) -> test
+
+        # Grand:
+        grand <- 
+          test |>
+          summarize(
+            g_rt = mean(rt),
+            g_rt_sd = sd(rt),
+            g_pc = mean(correct_response),
+            g_pe = 1 - g_pc,
+            g_pc_sd =  sd(correct_response) )
+        
+        # LISAS:
+        lisas <- 
+          test |>
+          summarize(
+            .by = id,
+            l_rt = mean(rt),
+            l_rt_sd = sd(rt),
+            l_pe = 1 - mean(correct_response), 
+            l_pe_sd =  sd(correct_response) )
+          
+        # Calculation
+        res <-
+          test |>
+          summarise(
+            .by = c(id, con), 
+            rt_sd = sd(rt),
+            rt = mean(rt),
+            pe_sd = sd(correct_response),
+            pe = 1 - mean(correct_response),
+            pc = mean(correct_response),
+          ) |> 
+          left_join(lisas, by="id") |> 
+          cbind(grand) |>
+          as_tibble() |>
+          mutate(
+            lisas  = ifelse(is.infinite(l_rt_sd/l_pe_sd), rt, rt + (l_rt_sd/l_pe_sd) * pe), 
+            BIS    = ( (pc - g_pc) / g_pc_sd ) - ( (rt - g_rt) / g_rt_sd ) )
+          
+        res |>
+          t.test(lisas ~ con, data=_, paired = T) |> 
+          tidy() |> 
+          mutate(.before=1, n = "LISAS") |>
+          rbind(
+            res |> 
+              t.test(BIS ~ con, data=_, paired=T) |> 
+              tidy() |> 
+              mutate(.before=1, n="BIS")
+          ) |> 
+          mutate(
+            .before=1, 
+            samp  = samp_s,
+            pairs = pairs,
+            itr   = itr,
+          )
+      }) -> testrun
+    })
+  }, cl = cl) |> 
+    map_df(~.x) -> 
+    rnd_int_scores_extended_slice_diag_exclu
+  
+  rnd_int_scores_extended_slice_diag_exclu |>
+    na.omit() |> # omit nas
+    summarise(
+      .by = c(samp,pairs,n),
+      power = mean(p.value<.05), 
+      across(where(is.double), mean)
+    ) -> sum_rnd_int_scores_extended_slice_diag_exclu
+  
+  if(save_simulation_data){
+    write_parquet(rnd_int_scores_extended_slice_diag_exclu, "../data/simulations/exp1_rnd_sampling_inc_samp_size_integrated_scores.parquet")
+    write_parquet(sum_rnd_int_scores_extended_slice_diag_exclu, "../data/simulations/exp1_sum_rnd_sampling_inc_samp_size_integrated_scores.parquet")
+  }
+}
+```
+
+
+Power over sample size split by pairs. 
+```{r summarise integrated score}
+#| echo: false
+#| warning: false
+sum_rnd_int_scores_extended_slice_diag_exclu |>
+  ggplot(aes(samp, power, col=pairs,group=pairs))+
+  facet_wrap(~n)+
+  geom_line()
+```
+
+Power over sample size split by 36 and 26 pairs of observations.
+
+```{r integrated scores summary of relevant pairs}
+#| echo: false
+sum_rnd_int_scores_extended_slice_diag_exclu |> 
+  filter(pairs %in% c(27, 36)) |>
+  ggplot(aes(samp, power, col=factor(pairs),group=factor(pairs)))+
+  facet_wrap(~n)+
+  geom_line()+ 
+  geom_hline(yintercept=.8)+
+  geom_hline(yintercept=.9, linetype="dashed", col="darkblue")+
+  geom_vline(xintercept=32)
+```
