@@ -30,6 +30,8 @@ library(broom)     # tidying
 ```{r load data}
 #| include: false
 load("../data/processed/exp1_data.rdata")
+
+mult_test <- read_parquet("../data/simulations/sample_based_on_exp1_parames_by_congruency.parquet")
 ```
 
 ```{r preprocessing}
@@ -47,9 +49,9 @@ if(run_simulations){
     library(broom)
     library(lsr)
   })
-}
-```
+} else {cl <- NULL}
 
+```
 
 ```{r exp1 outcomes}
 #| echo: false
@@ -92,6 +94,67 @@ exp1_outcome
 
 ##  Simulate via raw scores:
 
+### RT 
+```{r}
+#| echo: false
+exp1_outcome
+
+clusterExport(cl, "exp1_outcome")
+pblapply(27:50, \(size){
+  map_df(1:900,\(x){
+    rnorm(size, exp1_outcome$rt_d_m, exp1_outcome$rt_d_sd) -> test
+    t.test(rep(0,size), test, paired=T) |> 
+      tidy()
+  }) |> mutate(size = size) 
+}, cl = cl) |> 
+  map_df(~.x) -> 
+  rt_rep_sim
+
+rt_rep_sim |> 
+  summarise(
+    .by = size,
+    pow = mean(p.value<.05),
+    across(everything(), mean)
+  ) |> 
+  ggplot(aes(size, pow))+
+  geom_line() + 
+  geom_hline(yintercept=.8)
+```
+
+To get 80% on RT, we need 37 participants (or so).
+
+### PE
+```{r}
+#| echo: false
+
+pblapply(27:50, \(size){
+  map_df(1:900,\(x){
+    rnorm(size, exp1_outcome$pe_d_m, exp1_outcome$pe_d_sd) -> test
+    t.test(rep(0,size), test, paired=T) |> 
+      tidy()
+  }) |> mutate(size = size) 
+}, cl = cl) |> 
+  map_df(~.x) -> 
+  pe_rep_sim
+
+pe_rep_sim |> 
+  summarise(
+    .by = size,
+    pow = mean(p.value<.05),
+    across(everything(), mean)
+  ) |> 
+  ggplot(aes(size, pow))+
+  geom_line() + 
+  geom_hline(yintercept=.8)
+```
+
+#### Integrated score?
+
+
+
+
+
+## No?
 ### 27 par varying pairs 
 
 ```{r Raw score data sim func}
@@ -159,33 +222,50 @@ rep_27_samp_over_pairs |>
 
 ```{r testing over varying sample sizes }
 #| echo: false
-clusterExport(cl, c("gen_data_raw", "exp1_outcome_raw"))
-pblapply(27:90, \(samp){
-  map_df(1:500, \(rep){
-    map_df(1:90, \(pairs){
-      gen_data_raw(samp, pairs) -> test
-      test |> 
-        summarise(.by = id, 
-                  across(where(is.double), mean)) -> test
-      t.test(test$rt_con, test$rt_incon, paired=T) |> 
-        tidy() |> 
-        mutate(x = samp, 
-               pair=pairs,
-               rep = rep,
-               d = cohensD(test$rt_con, test$rt_incon,method = "paired"))
+
+if(run_simulations){
+  clusterExport(cl, c("gen_data_raw", "exp1_outcome_raw"))
+  pblapply(27:90, \(samp){
+    map_df(1:500, \(rep){
+      map_df(1:90, \(pairs){
+        gen_data_raw(samp, pairs) -> test
+        test |> 
+          summarise(.by = id, 
+                    across(where(is.double), mean)) -> test
+        t.test(test$rt_con, test$rt_incon, paired=T) |> 
+          tidy() |> 
+          mutate(size = samp, 
+                 pair = pairs,
+                 rep = rep,
+                 d = cohensD(test$rt_con, test$rt_incon,method = "paired"))
+      })
     })
-  })
-}, cl = cl) |> 
-  map_df(~.x) -> 
-  mult_test
+  }, cl = cl) |> 
+    map_df(~.x) -> 
+    mult_test
+  
+  mult_test |>
+    summarise(
+      .by = c(x, pair),
+      pow = mean(p.value<.05),
+      across(everything(), mean)) -> 
+  sum_mult_test
+  
+  if(save_simulation_data){
+    write_parquet(mult_test, "../data/simulations/sample_based_on_exp1_parames_by_congruency.parquet")
+    write_parquet(sum_mult_test, "../data/simulations/sample_based_on_exp1_parames_by_congruency_sum.parquet")
+  }
+}
 ```
 
 ```{r}
-mult_test |>
-  summarise(.by=x, 
-            pow = mean(p.value<.05),
-            across(everything(), mean)) |>
-  ggplot(aes(x, pow))+ geom_line()
+#| echo: false
+sum_mult_test |>
+  filter(pair==37 | pair == 26)  |>
+  # filter(pair<37, pair > 10) |>
+  mutate(pair = factor(pair)) |>
+  ggplot(aes(x, pow, col=pair, group=pair))+ 
+  geom_line()
 ```
 
 
