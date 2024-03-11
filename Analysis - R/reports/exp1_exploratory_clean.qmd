@@ -7,6 +7,11 @@ editor:
       wrap: 62
 ---
 
+```{r param}
+#| include: false
+save_outputs <- FALSE
+```
+
 ```{r libraries }
 #| include: FALSE
 library(tidyverse)
@@ -18,8 +23,6 @@ library(lsr)
 library(lme4)
 library(jsonlite)
 source("../lib/helper_functions.R")
-
-save_outputs <- FALSE
 ```
 
 ```{r citation}
@@ -35,10 +38,10 @@ citation("lme4")
 citation("jsonlite")
 ```
 
+# Data prep
 
 ```{r load data }
 #| include: FALSE
-
 list.files("../data/raw/experiment1/task", pattern = "*.csv", full.names = T) -> fnames
 
 map_df(fnames, \(x){
@@ -104,21 +107,13 @@ d <-
   d |> 
   mutate(inducer_run = as.numeric(inducer_run)) |>
   left_join(raw_d, by=c("id","inducer_run", "diagnostic_run"))
+# trials: 7656
 ```
-
 # Exclusion
 ```{r exclusion start - accuracy}
 #| include: FALSE
 loss <- list()
 loss$data_trials <- nrow(d)
-
-loss[["inducer_practice_pct"]] <- (1 - (nrow(d |> filter(inducer_run > 0)) / nrow(d))) * 100
-loss[["inducer_practice_trials"]] <- nrow(d) - nrow(d |> filter(inducer_run > 0))
-
-d <- 
-  d |> 
-  filter(inducer_run > 0)
-
 ### Overall accuracy      ====
 d |>
   filter( trial_info == "Diagnostic trial" | trial_info == "Inducer trial" ) |>
@@ -133,11 +128,17 @@ loss[["exclude_par_trials"]] <- length( d$rt[d$id == loss$exclude_par] )
 loss[["exclude_par_prop"]]    <- length( d$rt[d$id == loss$exclude_par] ) / loss$data_trials * 100
 
 d |> filter( !(id %in% loss$exclude_par) ) -> d
+# trials: 7128
+
+loss[["inducer_practice_pct"]] <- (1 - (nrow(d |> filter(inducer_run > 0)) / nrow(d))) * 100
+loss[["inducer_practice_trials"]] <- nrow(d) - nrow(d |> filter(inducer_run > 0))
+
+d <- d |> filter(inducer_run > 0)
+# trials: 6801
 ```
 
 ```{r due to high SD & NA responses }
 #| include: FALSE
-
 # Removing trials deviating more than 2.5 SD from each participants mean. 
 # Also remove NA responses
 d |>
@@ -176,8 +177,8 @@ d |>
 sum(d$retain_trials == 0) -> loss[["rt_sd_trials"]]
 sum(d$retain_trials == 0) / loss$data_trials * 100 -> loss[["rt_sd_prop"]]
 
-d |> 
-  filter( retain_trials == 1 ) -> d
+d <- d |>  filter( retain_trials == 1 )
+# trials: 6650
 ```
 
 ```{r only correct inducers}
@@ -193,9 +194,9 @@ d |>
 sum(d$valid_trials==0) -> loss[["inducer_fail_trials"]]
 sum(d$valid_trials==0) / loss$data_trials * 100 -> loss[["inducer_fail_prop"]]
 
-d |> filter( valid_trials == 1 ) -> d
+d <- d |> filter( valid_trials == 1 )
+# Trials: 5053
 ```
-
 # Integrated measures:
 ## LISAS 
 
@@ -206,29 +207,28 @@ d |> filter( valid_trials == 1 ) -> d
 
 # Linear integrated speed-accuracy score (LISAS) 
 # See Vandierendonck 2017 @ https://doi.org/10.3758/s13428-016-0721-5
+# Calculation according to: Liesefeld & Janczyk 2023 @ https://doi.org/10.3758/s13428-022-01843-2
 
-d |>
+lisas_grand <- d |>
   filter(trial_info=="Diagnostic trial") |>
   group_by(id) |>
-  summarize(g_rt = mean(rt, na.rm = TRUE),
-            g_rt_sd = sd(rt),
-            # err
-            g_pe = 1 - mean(correct_response), 
-            g_pe_sd =  sd(correct_response)) ->  lisas_grand
+  summarize(
+    l_rt_sd = sd(rt),
+    l_pe_s  = sqrt( mean(correct_response) * (1 - mean(correct_response)) ) 
+  )
 
-d |>
+lisas_ind <- d |>
   filter(trial_info=="Diagnostic trial") |>
   group_by(id, con) |>
   summarize(rt = mean(rt, na.rm = TRUE),
-            pe = 1 - mean(correct_response) ) -> lisas_ind
+            pe = 1 - mean(correct_response) )
   #pivot_wider( names_from = con, values_from = c(rt, pe) ) -> lisas_ind
 
 lisas <- 
   lisas_ind |>
   left_join(lisas_grand, by="id") |> ungroup() |>
   # group_by(id, con) |>
-  mutate(lisas   = rt + (g_rt_sd/g_pe_sd) * pe, 
-         lisas  = ifelse(is.nan(lisas), rt, lisas))
+  mutate(lisas  = ifelse(is.infinite(l_rt_sd/l_pe_s), rt, rt + (l_rt_sd/l_pe_s) * pe)) 
 
 
 w_lisas <- 
@@ -269,20 +269,31 @@ w_lisas |>
 
 # Calculation: 
 # See Liesefeld & Janczyk 2019 @ https://doi.org/10.3758/s13428-018-1076-x
-d |>
+# See Liesefeld & Janczyk 2023 @ https://doi.org/10.3758/s13428-022-01843-2
+# 
+g_bis <- 
+  d |>
   filter(trial_info=="Diagnostic trial") |>
   ungroup() |>
   summarize(g_rt = mean(rt, na.rm = TRUE),
             g_rt_sd = sd(rt),
             g_pc = mean(correct_response),
-            g_pc_sd =  sd(correct_response),) -> g_bis
+            g_pc_sd =  sd(correct_response),)
 
-d |>
+d_ex |>
+  filter(trial_info=="Diagnostic trial") |>
+  ungroup() |>
+  summarize(g_rt = mean(rt, na.rm = TRUE),
+            g_rt_sd = sd(rt),
+            g_pc = mean(correct_response),
+            g_pc_sd =  sd(correct_response),)
+
+ind_bis <- 
+  d |>
   filter(trial_info=="Diagnostic trial") |>
   group_by(id, con) |>
   summarize(rt = mean(rt, na.rm = TRUE),
-            pc = mean(correct_response) ) -> ind_bis ## |>
-  #pivot_wider( names_from = con, values_from = c(rt, pe) ) -> ind_bis
+            pc = mean(correct_response) )
 
 BIS <- 
   ind_bis  |>
@@ -302,13 +313,11 @@ bis__lisas <-
   left_join(BIS, by=c("id", "con")) |>
   mutate(BIS_inv = -1*BIS,
           # inverse
-         BIS_lisas = (-1*BIS) * g_rt_sd.y + g_rt.y ,
+         BIS_lisas = (-1*BIS) * g_rt_sd + g_rt ,
           # Inverse & RT correct
          ) |>
   rename(rt = rt.x) |>
   dplyr::select(id, con, rt, pe, lisas, BIS_lisas, BIS) 
-      # join by two conds. 
-  # select(!name) |> 
 ```
 
 
@@ -320,8 +329,8 @@ comb_table <-
   bis__lisas |> 
   pivot_longer(c(rt,pe,lisas,BIS,BIS_lisas))  |>
   pivot_wider(names_from=con, values_from=value ) |>
+  mutate(diff = Incongruent - Congruent) |>
   rowwise() |>
-  mutate(diff = Incongruent - Congruent) |> 
   group_by(name) |>
   reframe(
     m_incon   = mean(Incongruent),
@@ -339,7 +348,7 @@ comb_table <-
             map(fmt_APA_numbers)  |> 
             paste0(collapse=", "), 
       "]", sep="" ),
-    d         = cohensD(Incongruent, Congruent, method = "corrected"),
+    d         = cohensD(Incongruent, Congruent, method = "paired"),
   ) |>
   mutate( across( where(is.numeric), fmt_APA_numbers) ) 
   

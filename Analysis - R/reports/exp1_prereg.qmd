@@ -77,9 +77,8 @@ dem$age
 
 We recruited `r length(demo$Age)+4`, participants from the United Kingdom via Prolific. Due to a coding mistake, four participants did not generate any data. This left us with a mean age of `r dem$age` (SD = `r dem$age_sd`; `r dem$femaleS` females) from the United Kingdom via Prolific. Note that two participants were excluded from the data analysis, but cannot be removed from the demographics due to non-connections between data points and demographics variables. 
 
-
-
 # Data 
+## Data prep
 ```{r base data }
 #| include: false
 # Select the relevant columns & rows
@@ -90,7 +89,6 @@ d <-
     # note. Congruent has a conding error. Recalculating congruency is done below
   filter(trial_info == "Diagnostic trial" | trial_info == "Inducer trial")
 ```
-
 
 ```{r recalculating the congruency effect}
 #| include: false
@@ -127,7 +125,6 @@ raw_d <-
   mutate(con = ifelse(inducer_tap==diag_tap, T,F)) |>
   dplyr::select(id, inducer_run, diagnostic_run, con)
 
-
 d <- 
   d |> 
   mutate(inducer_run = as.numeric(inducer_run)) |>
@@ -163,11 +160,11 @@ loss[["exclude_par_prop"]]    <- length( d$rt[d$id == loss$exclude_par] ) / loss
 d |> filter( !(id %in% loss$exclude_par) ) -> d
 ```
 
-The first inducer block was considered practice and excluded, representing `r loss[["inducer_practice_prop"]]` percent of the data. 
-
 In total, `r length(loss[["exclude_par"]])`
 `r ifelse(length(loss[["data_trials"]]) > 1, "participants", "participant")`
 where excluded due to low accuracy (> 30% error). 
+
+The first inducer block was considered practice and excluded, representing `r loss[["inducer_practice_prop"]]` percent of the data. 
 
 <!-- Does not result in any loss of data, since they are replaced --> 
 
@@ -221,7 +218,6 @@ to deviating (2.5 SD) response times and none response(s).
 Representing a loss of `r round(loss[["rt_sd_prop"]], 2)`
 percent of the data.
 
-
 ```{r only correct inducers}
 #| include: FALSE
 d |>
@@ -244,8 +240,8 @@ Representing a loss of
 `r round(loss[["inducer_fail_prop"]], 2)` percent of the data.
 
 A total of
-`r loss$rt_sd_trials + loss$inducer_fail_trials + loss$inducer_practice_trials` trials were lost. Representing a loss of
-`r round(loss$rt_sd_prop + loss$inducer_fail_prop + loss$inducer_practice_prop, 2)` percent of the data.
+`r loss$inducer_practice_trials + loss$rt_sd_trials + loss$inducer_fail_trials + loss$inducer_practice_trials` trials were lost. Representing a loss of
+`r round(loss$inducer_practice_pct + loss$rt_sd_prop + loss$inducer_fail_prop + loss$inducer_practice_prop, 2)` percent of the data.
 
 ## Summary
 
@@ -255,10 +251,11 @@ A total of
 d |> 
   ungroup() |>
   filter(trial_info=="Diagnostic trial") |>
-  group_by(id, con) |>
-  summarize(rt = mean(rt),
-            pe = 1 - mean(correct_response)) |>
-  ungroup() |>
+  summarize(
+    .by = c(id, con),
+    rt = mean(rt),
+    pe = 1 - mean(correct_response)) |> 
+  # mutate(rt = scale(rt), pe = scale(pe)) |>
     #' na.rm is not necessary, because problems related to missing trials 
     #' should be handled by the above criteria.
   pivot_wider( names_from = con, values_from = c(rt, pe) ) |>
@@ -268,6 +265,8 @@ d |>
 ### Table
 ```{r RT tables}
 #| echo: false
+
+rt_test      <- t.test(  d3$rt_FALSE, d3$rt_TRUE, paired = TRUE, alternative = "greater" )
 
 # Freq:
 ## response times
@@ -430,8 +429,7 @@ p2 <-
   theme(axis.text.x = element_text(size = 10), legend.position = "none")+
   labs(x = "", y = "Proportion of Error") 
 
-p1# problem with patchwork
-p2
+p1 + p2
 
 if(save_outputs){ ggsave("../outputs/figs/exp1_rt-pe_line.jpeg", p1+p2, width=8, height=5) }
 ```
@@ -491,8 +489,7 @@ p2 <-
   annotate("segment", x=-0.1, xend=1.1, y=.13, yend=.13, size=1)+
   annotate(geom = "text", x = .5, y=.137, label="**", size=5)
     
-p1 # problem with patchwork
-p2
+p1+p2
 
 if(save_outputs){ ggsave("../outputs/figs/exp1_rt-pe_bar.jpeg", p1+p2, width=8, height=5) }
 ```
