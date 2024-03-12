@@ -38,7 +38,6 @@ citation("dplyr")
 citation("ggplot2")
 ```
 
-
 ```{r load data }
 #| include: FALSE
 
@@ -59,6 +58,7 @@ data |>
 ```
 
 # Demographics
+
 ```{r}
 #| include: false
 demo |> 
@@ -75,22 +75,27 @@ demo |>
 dem$age
 ```
 
-We recruited `r length(demo$Age)+4`, participants from the United Kingdom via Prolific. Due to a coding mistake, four participants did not generate any data. This left us with a mean age of `r dem$age` (SD = `r dem$age_sd`; `r dem$femaleS` females) from the United Kingdom via Prolific. Note that two participants were excluded from the data analysis, but cannot be removed from the demographics due to non-connections between data points and demographics variables. 
+We recruited `r length(demo$Age)+4`, participants from the
+United Kingdom via Prolific. Due to a coding mistake, four
+participants did not generate any data. This left us with a
+mean age of `r dem$age` (SD = `r dem$age_sd`; `r dem$femaleS`
+females) from the United Kingdom via Prolific. Note that two
+participants were excluded from the data analysis, but cannot
+be removed from the demographics due to non-connections
+between data points and demographics variables.
 
+# Data
 
-
-# Data 
 ```{r base data }
 #| include: false
 # Select the relevant columns & rows
 # Remove the first inducer_run (i.e., 0th)
-d <- 
+d_t <- 
   data |>
   dplyr::select(id, trial_info, inducer_run, diagnostic_run, correct_response, rt, congruent) |>
     # note. Congruent has a conding error. Recalculating congruency is done below
   filter(trial_info == "Diagnostic trial" | trial_info == "Inducer trial")
 ```
-
 
 ```{r recalculating the congruency effect}
 #| include: false
@@ -129,25 +134,22 @@ raw_d <-
 
 
 d <- 
-  d |> 
+  d_t |> 
   mutate(inducer_run = as.numeric(inducer_run)) |>
   left_join(raw_d, by=c("id","inducer_run", "diagnostic_run"))
 ```
 
 ## Exclusion
+
 ```{r exclusion start - accuracy}
 #| include: FALSE
 loss <- list()
-loss$data_trials <- nrow(d)
-
-loss[["inducer_practice_prop"]] <- (1 - (nrow(d |> filter(inducer_run > 0)) / nrow(d))) * 100
-loss[["inducer_practice_trials"]] <- nrow(d) - nrow(d |> filter(inducer_run > 0))
-
-d <- 
+loss$raw_data_trials <- 
   d |> 
-  filter(inducer_run > 0)
+  filter(diagnostic_run >= 0) |>
+  nrow()
 
-### Overall accuracy      ====
+### participants excluding - accuracy      ====
 d |>
   filter( trial_info == "Diagnostic trial" | trial_info == "Inducer trial" ) |>
   group_by( id ) |>
@@ -157,42 +159,66 @@ d |>
   filter( acc > .3 ) |>
   pull( id ) -> loss$exclude_par
 
-loss[["exclude_par_trials"]] <- length( d$rt[d$id == loss$exclude_par] )
-loss[["exclude_par_prop"]]    <- length( d$rt[d$id == loss$exclude_par] ) / loss$data_trials * 100
+# Count
+loss$exclude_par_trials <- d |> 
+  filter(id %in% loss$exclude_par) |>
+  filter(diagnostic_run >= 0) |>
+  nrow()
 
-d |> filter( !(id %in% loss$exclude_par) ) -> d
+# Exclude: 
+d <- d |> 
+  filter(!(id %in% loss$exclude_par))
+
+# RELEVANT DATA START HERE
+loss$data_trials <- 
+  d |> 
+  filter(diagnostic_run >= 0) |> 
+  nrow()
+
+# Inducer practice
+loss$inducer_practice_trials <- 
+  d |> 
+  filter(diagnostic_run >= 0) |>
+  filter(inducer_run == 0) |>
+  nrow()
+
+loss$inducer_practice_prop <- 
+  loss$inducer_practice_trials / loss$data_trials * 100
+
+# Exclude: 
+d <- d |> 
+  filter(inducer_run > 0)
 ```
 
-The first inducer block was considered practice and excluded, representing `r loss[["inducer_practice_prop"]]` percent of the data. 
+The first inducer block was considered practice and excluded,
+representing `r loss[["inducer_practice_prop"]]` percent of
+the data.
 
 In total, `r length(loss[["exclude_par"]])`
 `r ifelse(length(loss[["data_trials"]]) > 1, "participants", "participant")`
-where excluded due to low accuracy (> 30% error). 
+where excluded due to low accuracy (\> 30% error).
 
-<!-- Does not result in any loss of data, since they are replaced --> 
+<!-- Does not result in any loss of data, since they are replaced -->
 
 ```{r due to high SD & NA responses }
 #| include: FALSE
 
 # Removing trials deviating more than 2.5 SD from each participants mean. 
 # Also remove NA responses
-d |>
+d <- d |>
   group_by(id) |>
   mutate(
     # Calculate: rt + SD * 2.5
-    rt_crit = ifelse( 
+    rt_crit = ifelse(
       trial_info == "Diagnostic trial",
-      mean( rt, na.rm = TRUE ) + sd( rt, na.rm = TRUE ) * 2.5,
-      NA ),
+      mean( rt, na.rm = TRUE ) + sd( rt, na.rm = TRUE ) * 2.5, NA ),
       # Trials to retain/remove: 
       retain_trials = ifelse(
-        # Remove trials deviating **more** than 2.5 SD
-        (rt > rt_crit & trial_info == "Diagnostic trial") | # **OR**
-          # Remove slow (i.e., NA) responses
-          (is.na(rt) & trial_info == "Diagnostic trial"),
-        # !! Supposed to be *not* missing !! 
+        # Diag trial *AND* RT above critical (rt * 2.5SD) OR is missing 
+        str_equal(trial_info, "Diagnostic trial") & 
+        ( (rt >= rt_crit) | (is.na(rt)) ),
         0, 1 ) 
-    ) -> d
+    )
 
 # IMPORTANT NOTE: 
   #' Removing null RT responses are, in all theory, not preregistered. 
@@ -209,11 +235,20 @@ d |>
   #' be to exclude (remove) these trials). Even though this may be assumed from
   #' the preregistration, it is *not* preregistered.
 
-sum(d$retain_trials == 0) -> loss[["rt_sd_trials"]]
-sum(d$retain_trials == 0) / loss$data_trials * 100 -> loss[["rt_sd_prop"]]
 
-d |> 
-  filter( retain_trials == 1 ) -> d
+# lost trials
+loss$rt_sd_trials <- d |> 
+  filter(diagnostic_run >= 0) |> 
+  filter(retain_trials == 0) |>
+  nrow()
+
+loss$rt_sd_prop <- 
+  loss$rt_sd_trials / loss$data_trials * 100
+
+
+# Exclude
+d <- d |>
+  filter(retain_trials == 1) 
 ```
 
 Furthermore, `r loss[["rt_sd_trials"]]` trials were lost due
@@ -221,21 +256,25 @@ to deviating (2.5 SD) response times and none response(s).
 Representing a loss of `r round(loss[["rt_sd_prop"]], 2)`
 percent of the data.
 
-
 ```{r only correct inducers}
 #| include: FALSE
-d |>
+d <- d |>
   mutate( valid_trials = case_when( trial_info=="Inducer trial" & correct_response==1 ~ 1,
                                     trial_info=="Inducer trial" & correct_response==0 ~ 0,
                                     trial_info=="Inducer trial" & is.na(correct_response) ~ 0,
                                       # non-responses count as a wrong response
                                     T ~ NA ) ) |>
-  fill(valid_trials, .direction = "up") -> d
+  fill(valid_trials, .direction = "up")
 
-sum(d$valid_trials==0) -> loss[["inducer_fail_trials"]]
-sum(d$valid_trials==0) / loss$data_trials * 100 -> loss[["inducer_fail_prop"]]
+loss$inducer_fail_trials <- d |>
+  filter(diagnostic_run >= 0) |>
+  filter(valid_trials == 0) |> 
+  nrow()
+  
+loss$inducer_fail_prop <- 
+  loss$inducer_fail_trials / loss$data_trials * 100
 
-d |> filter( valid_trials == 1 ) -> d
+d <- d |> filter( valid_trials == 1 )
 ```
 
 Lastly, `r round(loss[["inducer_fail_trials"]], 2)` trials
@@ -244,8 +283,10 @@ Representing a loss of
 `r round(loss[["inducer_fail_prop"]], 2)` percent of the data.
 
 A total of
-`r loss$rt_sd_trials + loss$inducer_fail_trials + loss$inducer_practice_trials` trials were lost. Representing a loss of
-`r round(loss$rt_sd_prop + loss$inducer_fail_prop + loss$inducer_practice_prop, 2)` percent of the data.
+`r loss$rt_sd_trials + loss$inducer_fail_trials + loss$inducer_practice_trials`
+trials were lost. Representing a loss of
+`r round(loss$rt_sd_prop + loss$inducer_fail_prop + loss$inducer_practice_prop, 2)`
+percent of the data.
 
 ## Summary
 
@@ -266,12 +307,13 @@ d |>
 ```
 
 ### Table
+
 ```{r RT tables}
 #| echo: false
 
 # Freq:
 ## response times
-rt_test      <- t.test(  d2$rt_FALSE, d2$rt_TRUE, paired = TRUE, alternative = "greater" )
+rt_test      <- t.test(  d2$rt_FALSE, d2$rt_TRUE, paired = TRUE, alternative = "greater")
 rt_test_b    <- ttestBF( d2$rt_FALSE, d2$rt_TRUE, paired = TRUE, iterations = 10000, posterior = F )
 rt_test_b2   <- ttestBF( d2$rt_FALSE, d2$rt_TRUE, paired = TRUE, iterations = 10000, posterior = T )
 rt_test_hdi  <- hdi(rt_test_b2)
@@ -327,9 +369,8 @@ d2 |>
 
 ```
 
+Table XX \n *Test statistics for the experimental conditions*
 
-Table XX \n
-*Test statistics for the experimental conditions*
 ```{r stat table}
 #| echo: false
 rbind(d_rt, d_pe) -> b
@@ -366,12 +407,13 @@ exp1_table_simple
 
 if(save_outputs){ gtsave(exp1_table_simple, filename = "../outputs/tables/exp1_table_simple.docx") }
 ```
-*Note.* <br/>
-`r fmt_APA_p_table_fig(p_min)` <br/>
 
+*Note.* <br/> `r fmt_APA_p_table_fig(p_min)` <br/>
 
 ### Figures
+
 #### Linerange
+
 ```{r}
 #| echo: false
 #| warning: false
@@ -436,8 +478,8 @@ p2
 if(save_outputs){ ggsave("../outputs/figs/exp1_rt-pe_line.jpeg", p1+p2, width=8, height=5) }
 ```
 
-
 #### Bar plot
+
 ```{r}
 #| echo: false
 #| warning: false
@@ -491,11 +533,12 @@ p2 <-
   annotate("segment", x=-0.1, xend=1.1, y=.13, yend=.13, size=1)+
   annotate(geom = "text", x = .5, y=.137, label="**", size=5)
     
-p1 # problem with patchwork
+p1 
 p2
 
 if(save_outputs){ ggsave("../outputs/figs/exp1_rt-pe_bar.jpeg", p1+p2, width=8, height=5) }
 ```
 
+--------------------------------------------------------------
 
-
+~Document generated: `r Sys.time()`~
