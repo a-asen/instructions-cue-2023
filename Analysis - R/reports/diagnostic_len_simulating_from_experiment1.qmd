@@ -8,10 +8,13 @@ editor:
       wrap: 62
 ---
 
+# Start
+
 ```{r params}
 #| include: false
 run_simulations <- FALSE
 
+make_cluster <- TRUE
 save_simulation_data <- FALSE
 load_simulation_data <- FALSE
 ```
@@ -27,21 +30,9 @@ library(afex)      # Stats
 library(broom)     # tidying
 ```
 
-```{r load data}
-#| include: false
-load("../data/processed/exp1_data.rdata")
-
-mult_test <- read_parquet("../data/simulations/sample_based_on_exp1_parames_by_congruency.parquet")
-```
-
-```{r preprocessing}
-# preprocess 
-source("rep_munge/preprocess.R")
-```
-
 ```{r start cluster. if simulating data}
 #| include: false
-if(run_simulations){
+if(make_cluster){
   cl <- makeCluster(detectCores()*.95)
   clusterEvalQ(cl, {
     library(tidyverse)
@@ -51,6 +42,20 @@ if(run_simulations){
   })
 } else {cl <- NULL}
 
+```
+
+# Data
+
+```{r load data}
+#| include: false
+load("../data/processed/exp1_data.rdata")
+
+mult_test <- read_parquet("../data/simulations/sample_based_on_exp1_parames_by_congruency.parquet")
+```
+
+```{r preprocessing}
+# preprocess 
+source("rep_munge/exp1_preprocess.R")
 ```
 
 ```{r exp1 outcomes}
@@ -90,27 +95,125 @@ exp1_intermediate_step |>
 exp1_outcome
 ```
 
-# Simulate experiment 1 
+```{r integrated score outcome}
+#| echo: false
+# Grand:
+grand <- 
+  d_ex |>
+  filter(trial_info=="Diagnostic trial") |>
+  summarize(
+    g_rt = mean(rt),
+    g_rt_sd = sd(rt),
+    g_pc = mean(correct_response),
+    g_pe = 1 - g_pc,
+    g_pc_sd =  sd(correct_response) )
 
-##  Simulate via raw scores:
+# LISAS:
+lisas <- 
+  d_ex |>
+  filter(trial_info=="Diagnostic trial") |>
+  summarize(
+    .by = id,
+    l_rt_sd = sd(rt),
+    l_pe_s = sqrt( mean(correct_response) * (1 - mean(correct_response)) ))
+  
+# Calculation
+res <-
+  d_ex |>
+  filter(trial_info=="Diagnostic trial") |>
+  filter(!is.na(con)) |>
+  summarise(
+    .by = c(id, con), 
+    rt_sd = sd(rt),
+    rt = mean(rt),
+    pe_sd = sd(correct_response),
+    pe = 1 - mean(correct_response),
+    pc = mean(correct_response),
+  ) |>
+  left_join(lisas, by="id") |> 
+  bind_cols(grand) |>
+  mutate(
+    lisas  = ifelse(is.infinite(l_rt_sd/l_pe_s), rt, rt + (l_rt_sd/l_pe_s) * pe), 
+    BIS    = ( (pc - g_pc) / g_pc_sd ) - ( (rt - g_rt) / g_rt_sd ) )
+  
+res |>
+  t.test(lisas ~ con, data=_, paired = T, alternative="greater") |> 
+  tidy() |> 
+  mutate(.before=1, n = "LISAS") |>
+  rbind(
+    res |> 
+      t.test(BIS ~ con, data=_, paired=T, alternative="greater") |> 
+      tidy() |> 
+      mutate(.before=1, n="BIS")
+  ) |> 
+  bind_cols(
+    res |>
+      summarise(
+        .by = con, 
+        lisas_sd = sd(lisas),
+        lisas = mean(lisas),
+        bis_sd = sd(BIS),
+        bis = mean(BIS),
+      )
+  ) -> exp1_outcome_int_score
 
-### RT 
+res |> 
+  select(con, BIS, lisas, id) |> 
+  pivot_longer(c(BIS, lisas)) |>
+  pivot_wider(names_from=con, values_from=value) |>
+  rename(Incongruent = `FALSE`, Congruent = `TRUE`) |>
+  summarise(
+    .by=name,
+    mdiff = mean(Incongruent - Congruent),
+    sd    = sd(Incongruent - Congruent),
+    d = cohensD(Incongruent, Congruent, method="paired") ,
+    d2 = cohensD(Incongruent, Congruent, method="paired") 
+  ) -> 
+exp1_outcome_int_score
+```
+
+# Simulate experiment 1
+
+```{r}
+#| echO: false
+rnd_slice_diag_exclu
+
+test |> 
+  summarise(
+    .by = c(pairs,n),
+    pow = mean(p.value<.05),
+    across(everything(), mean)
+  ) |>
+  ggplot(aes(pairs, pow, col=n))+
+  geom_line()
+  
+
+
+tibble(
+  id       = seq(1,27),
+  pre_cue  = rnorm(27, exp1_outcome$rt_d_m, exp1_outcome$rt_d_sd),
+  post_cue = rnorm(27, exp1_outcome$rt_d_m, exp1_outcome$rt_d_sd)
+)
+test
+
+
+exp1_outcome 
+```
 ```{r}
 #| echo: false
-exp1_outcome
-
 clusterExport(cl, "exp1_outcome")
 pblapply(27:50, \(size){
   map_df(1:900,\(x){
-    rnorm(size, exp1_outcome$rt_d_m, exp1_outcome$rt_d_sd) -> test
-    t.test(rep(0,size), test, paired=T) |> 
+    rnorm(size, exp1_outcome$pe_d_m-.4, exp1_outcome$pe_d_sd) -> pre_cue_run
+    rnorm(size, exp1_outcome$pe_d_m, exp1_outcome$pe_d_sd-.8) -> post_cue_run
+    t.test(pre_cue_run, post_cue_run, paired=T) |> 
       tidy()
-  }) |> mutate(size = size) 
+  }) |> mutate(size = size)
 }, cl = cl) |> 
   map_df(~.x) -> 
-  rt_rep_sim
+  pre_post_rep_sim
 
-rt_rep_sim |> 
+pre_post_rep_sim |> 
   summarise(
     .by = size,
     pow = mean(p.value<.05),
@@ -120,49 +223,11 @@ rt_rep_sim |>
   geom_line() + 
   geom_hline(yintercept=.8)
 ```
-
-To get 80% on RT, we need 37 participants (or so).
-
-### PE
-```{r}
-#| echo: false
-
-pblapply(27:50, \(size){
-  map_df(1:900,\(x){
-    rnorm(size, exp1_outcome$pe_d_m, exp1_outcome$pe_d_sd) -> test
-    t.test(rep(0,size), test, paired=T) |> 
-      tidy()
-  }) |> mutate(size = size) 
-}, cl = cl) |> 
-  map_df(~.x) -> 
-  pe_rep_sim
-
-pe_rep_sim |> 
-  summarise(
-    .by = size,
-    pow = mean(p.value<.05),
-    across(everything(), mean)
-  ) |> 
-  ggplot(aes(size, pow))+
-  geom_line() + 
-  geom_hline(yintercept=.8)
-```
-
-#### Integrated score?
-
-
-
-
-
-## No?
-### 27 par varying pairs 
 
 ```{r Raw score data sim func}
 gen_data_raw <- function(N, obs){
   #' @param N Number of subjects
   #' @param OBS Number of observation per N
-  #' @param eff.rt  Effect size of congruency on response time
-  #' @param eff.pct Effect size of congruency on proportion of correct trials 
 
   tibble(
     id  = rep(1:N, each = obs),
@@ -183,36 +248,156 @@ gen_data_raw <- function(N, obs){
 }
 ```
 
-Simulate data for 27 participants with varying diagnostic length (varying pairs of observation). 
+
+## Simulate via raw difference (not like this)
+
+### RT
+
+```{r}
+#| echo: false
+clusterExport(cl, "exp1_outcome")
+pblapply(27:50, \(size){
+  map_df(1:900,\(x){
+    rnorm(size, exp1_outcome$rt_d_m, exp1_outcome$rt_d_sd) -> test
+    t.test(test, mu = 0) |> 
+      tidy()
+  }) |> mutate(size = size) 
+}, cl = cl) |> 
+  map_df(~.x) -> 
+  rt_rep_sim
+
+rt_rep_sim |> 
+  summarise(
+    .by = size,
+    pow = mean(p.value<.05),
+    across(everything(), mean)
+  ) |> 
+  ggplot(aes(size, pow))+
+  geom_line() + 
+  geom_hline(yintercept=.8)
+```
+
+To get 80% on RT, we need 37 participants (or so).
+
+### PE
+
+```{r pe data sim}
+#| echo: false
+pblapply(27:50, \(size){
+  map_df(1:900,\(x){
+    rnorm(size, exp1_outcome$pe_d_m, exp1_outcome$pe_d_sd) -> test
+    t.test(test, mu = 0) |> 
+      tidy() |> 
+      mutate(m = mean(test), sd = sd(test))
+  }) |> mutate(size = size) 
+}, cl = cl) |> 
+  map_df(~.x) -> 
+  pe_rep_sim
+
+pe_rep_sim |> 
+  summarise(
+    .by = size,
+    pow = mean(p.value<.05),
+    across(everything(), mean)
+  ) |> 
+  ggplot(aes(size, pow))+
+  geom_line() + 
+  geom_hline(yintercept=.8)
+```
+
+### Integrated score?
+
+```{r integrated score outcome calc}
+exp1_outcome_int_score
+
+clusterExport(cl, "exp1_outcome_int_score")
+pblapply(27:50, \(size){
+  map_df(1:900,\(x){
+    rnorm(size, 
+          exp1_outcome_int_score$mdiff[str_equal(exp1_outcome_int_score$name, "BIS")],
+          exp1_outcome_int_score$sd[str_equal(exp1_outcome_int_score$name, "BIS")]) -> test
+    rnorm(size, 
+          exp1_outcome_int_score$mdiff[str_equal(exp1_outcome_int_score$name, "lisas")],
+          exp1_outcome_int_score$sd[str_equal(exp1_outcome_int_score$name, "lisas")]) -> test2
+    
+    t.test(rep(0,size), test, paired=T) |> 
+      tidy() |>
+      mutate(n = "BIS") |>
+      bind_rows(
+        t.test(rep(0,size), test2, paired=T) |>
+          tidy() |> 
+          mutate(n = "lisas")
+      )
+  }) |> mutate(size = size) 
+}, cl = cl) |> 
+  map_df(~.x) -> 
+  int_sco_rep_sim
+
+int_sco_rep_sim |> 
+  summarise(
+    .by = c(n, size),
+    pow = mean(p.value<.05),
+    across(everything(), mean)
+  ) |> 
+  ggplot(aes(size, pow, col = n))+
+  geom_line() + 
+  geom_hline(yintercept=.8)
+```
+
+## Simulate conditions (not like this either)
+### 27 par varying pairs
+```{r Raw score data sim func}
+gen_data_raw <- function(N, obs){
+  #' @param N Number of subjects
+  #' @param OBS Number of observation per N
+
+  tibble(
+    id  = rep(1:N, each = obs),
+    pairs = rep.int(1:obs, N),
+    rt_con  = rnorm(N * obs, 
+                    exp1_outcome_raw$rt[exp1_outcome_raw$con==T],
+                    exp1_outcome_raw$rt_sd[exp1_outcome_raw$con==T]),
+    rt_incon = rnorm(N * obs,
+                    exp1_outcome_raw$rt[exp1_outcome_raw$con==F],
+                    exp1_outcome_raw$rt_sd[exp1_outcome_raw$con==F]),
+    pe_con = rnorm(N * obs, 
+                    exp1_outcome_raw$pe[exp1_outcome_raw$con==T],
+                    exp1_outcome_raw$pe_sd[exp1_outcome_raw$con==T]),
+    pe_incon = rnorm(N * obs, 
+                    exp1_outcome_raw$pe[exp1_outcome_raw$con==F],
+                    exp1_outcome_raw$pe_sd[exp1_outcome_raw$con==F])
+    )
+}
+```
+
+Simulate data for 27 participants with varying diagnostic
+length (varying pairs of observation).
 
 ```{r gen data for 27 participants over varying pair lengths}
 #| echo: false
 
-pblapply(1:300, \(rep){
-  map(1:90, \(pairs){
-    gen_data_raw(27,pairs) -> test
-    test |> 
+clusterExport(cl, c("gen_data_raw", "exp1_outcome_raw"))
+pblapply(10:70, \(pairs){
+  map(1:300, \(rep){
+    gen_data_raw(27,pairs) |> 
       summarise(.by = id, 
                 across(where(is.double), mean)) -> test
     t.test(test$pe_con, test$pe_incon, paired=T) |> 
       tidy() |> 
-      mutate(x = rep, 
+      mutate(.before = 1, 
              pairs = pairs, 
+             rep = rep, 
              d = cohensD(test$rt_con, test$rt_incon,method = "paired"))
   })
 }, cl = cl) |>
   map_df(~.x) -> 
   rep_27_samp_over_pairs
-# rep_27_samp_over_pairs <- rep_pairs
-```
 
-```{r vis}
-#| echo: false
 rep_27_samp_over_pairs |>
   summarise(
-    .by=pairs, 
-    pow = mean(p.value<.05),
-    across(everything(), mean)
+    .by = pairs, 
+    pow = p.value<.05,
+    across(everything(), mean),
   ) |>
   ggplot(aes(pairs, pow)) +
   geom_line()
@@ -268,11 +453,10 @@ sum_mult_test |>
   geom_line()
 ```
 
-
-
-## Simulate via difference:
+## Simulate via difference (not like this)
 
 ### Function
+
 ```{r}
 gen_data <- function(N, pair.obs, eff.rt, sd.rt, eff.pe, sd.pe){
   #' @param N Number of subjects
@@ -299,6 +483,7 @@ gen_data <- function(N, pair.obs, eff.rt, sd.rt, eff.pe, sd.pe){
 #| echo: false
 if(run_simulations){
   clusterExport(cl, c("gen_data", "exp1_outcome"))
+  
   pblapply(20:60, \(samp_size){
     map_df(1:4, \(retest){
       map_df(1:600, \(rep){
@@ -373,25 +558,20 @@ exp1_simulated_sample_sizes |>
   
 ```
 
+Increasing the amount of observations merely decreases the SD,
+making all results more significant. The only value that is
+approximating our results is the simulation with 1 (pair of)
+observation(s).
 
+For this reason, we need to simulate the amount of
+observations we have (\~ 180 valid trials) and estimate the
+experiment parameters that create the results found in
+experiment 1.
 
-Increasing the amount of observations merely decreases the SD, making all results more significant. 
-The only value that is approximating our results is the simulation with 1 (pair of) observation(s). 
+## Simulate via parameters that (in the end) recreat experiment 1 results (close, but not like this)
 
-For this reason, we need to simulate the amount of observations we have (~ 180 valid trials) and estimate the experiment parameters that create the results found in experiment 1. 
-
-### Experiment 1 params 
-
-```{r}
-
-
-```
-
-
-
-### Finding the best simulation parameters from experiment 1
-
-Simulate the parameters that create the results (in the long run). 
+Simulate the parameters that create the results (in the long
+run).
 
 ```{r find exp1 parameters}
 #| echo: false
@@ -466,15 +646,20 @@ finding_exp1_parameter_vals |>
   )
 ```
 
-Closest RT parameters: mdiff = .166, sd = 2     (d = .58, pow = 80%).
-Closest PE parameters: mdiff = .65,  sd = 7.6   (d = .59, pow = 80%).
+Closest RT parameters: mdiff = .166, sd = 2 (d = .58, pow =
+80%). Closest PE parameters: mdiff = .65, sd = 7.6 (d = .59,
+pow = 80%).
 
-That is, these parameter values correspond to the results from experiment 1 *with* 180 trials (or 90 pairs; assuming we have exactly 90 pairs). 
+That is, these parameter values correspond to the results from
+experiment 1 *with* 180 trials (or 90 pairs; assuming we have
+exactly 90 pairs).
 
-With this, we can simulate data for the experiment *with less trials*. 
+With this, we can simulate data for the experiment *with less
+trials*.
 
-Only the these parameter may highlight the problem with lacking trials (i.e., post-cue trial) for the post-cue diagnostic run. 
-
+Only the these parameter may highlight the problem with
+lacking trials (i.e., post-cue trial) for the post-cue
+diagnostic run.
 
 ### Small simulation with parameter estimates
 
@@ -553,7 +738,8 @@ vary_diagnostic_lengths |>
   ) -> sum_vary_diag_len
 ```
 
-The relative power with respect to the simulated data as calculated from the estimate parameters. 
+The relative power with respect to the simulated data as
+calculated from the estimate parameters.
 
 ```{r}
 #| echo: false
@@ -569,13 +755,17 @@ sum_vary_diag_len |>
   geom_vline(xintercept = 35 * .75, linetype="dashed", col="red")
 ```
 
-According to the simulation, it would suffice with 60 pairs (120 trials) to have 80% power to detect a true effect.
+According to the simulation, it would suffice with 60 pairs
+(120 trials) to have 80% power to detect a true effect.
 
-However, assuming we have 70 trials in the post-cue run, we will have 35 (forced) pairs (black dashed). As we will lose 25% of the trials, we are left with 26.25 pairs (red dashed), which has a power close to 50%. 
+However, assuming we have 70 trials in the post-cue run, we
+will have 35 (forced) pairs (black dashed). As we will lose
+25% of the trials, we are left with 26.25 pairs (red dashed),
+which has a power close to 50%.
 
-We might remedy this problem by increasing the sample size. 
+We might remedy this problem by increasing the sample size.
 
-### Big simulation with parameter estimates 
+### Big simulation with parameter estimates
 
 ```{r}
 #| echo: false
@@ -662,7 +852,9 @@ sum_diag_lens_over_samp_sizes |>
   geom_hline(yintercept=.8)
 ```
 
-Power of RT over sample size and 36 (72 trials) and 27 pairs (54 trials):
+Power of RT over sample size and 36 (72 trials) and 27 pairs
+(54 trials):
+
 ```{r}
 #| echo: false
 
@@ -677,19 +869,17 @@ sum_diag_lens_over_samp_sizes |>
   geom_vline(xintercept=45)
 ```
 
-By simulating data according to the estimated parameters, we require around 45 participants to achieve 80% power for PE.
-RT would require closer to 55 participants. 
-
+By simulating data according to the estimated parameters, we
+require around 45 participants to achieve 80% power for PE. RT
+would require closer to 55 participants.
 
 ### Simulate integrated score
-
-
 
 ```{r stopp cluster end }
 #| include: false
 if(run_simulations){ stopCluster(cl) }
 ```
 
----
+--------------------------------------------------------------
 
-`r paste("Document generated:", Sys.time())`
+~Document generated `r Sys.time())`~
