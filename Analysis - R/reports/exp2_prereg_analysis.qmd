@@ -33,7 +33,7 @@ read_csv("../data/raw/experiment2/exp2_demo.csv") -> demo
 # Behaviour data
 # list.files("../data/raw/experiment2/pilots/", full.names = T)  -> fnames
 list.files("../data/raw/experiment2/task/", full.names = T)  -> fnames
-map_df(fnames, \(x){
+map_df(fnames[1:4], \(x){
   read_csv(x)
 }) -> exp2_d
 ```
@@ -57,112 +57,147 @@ dem$age
 
 We recruited `r length(demo$Age)+4`, participants from the United Kingdom via Prolific. Due to a coding mistake, four participants did not generate any data. This left us with a mean age of `r dem$age` (SD = `r dem$age_sd`; `r dem$females` females) from the United Kingdom via Prolific. Note that two participants were excluded from the data analysis, but cannot be removed from the demographics due to non-connections between data points and demographics variables. 
 
-# Exclusion
-```{r transformation}
-#| include: FALSE
-# Pre-transformation
-data <- 
-  exp2_d |>
-  filter(trial_info == "diagnostic trial" | trial_info == "inducer trial") |>
-  select(id, trial_info, inducer_run, diagnostic_run, stimulus, congruent, post_cue, rt, correct_response) |>
-  mutate(inducer_run = as.integer(inducer_run),
-         rt = as.integer( ifelse(str_equal(rt, "null"), NA, rt) ) )
-```
-
+## Exclusion
 ```{r exclusion start - accuracy}
 #| include: FALSE
 loss <- list()
-loss$data_trials <- nrow(data)
+loss$raw_data_trials <- 
+  d |> 
+  filter(diagnostic_run >= 0) |>
+  nrow()
 
-### Overall accuracy      ====
-data |>
+### participants excluding - accuracy      ====
+d |>
+  filter( trial_info == "Diagnostic trial" | trial_info == "Inducer trial" ) |>
   group_by( id ) |>
   mutate( correct_response = ifelse( trial_info=="Inducer trial" & is.na(rt), 0, correct_response) ) |>
     #' !  Non-responses count as a wrong response & are subject to the exclusion criteria.  !
-  summarise( acc = sum(correct_response, na.rm = TRUE) / length( !is.na(correct_response) ) ) |>
-  mutate(qua = quantile(acc)[2]) |>
-    # If we use boxplot exclusion
-  filter( acc < .7 ) |>
+  summarise( acc = 1 - mean(correct_response, na.rm = TRUE) ) |>
+  filter( acc > .3 ) |>
   pull( id ) -> loss$exclude_par
 
-loss[["exclude_par_trials"]] <- length( data$rt[data$id == loss$exclude_par] )
-loss[["exclude_par_pct"]]    <- length( data$rt[data$id == loss$exclude_par] ) / loss$data_trials * 100
+# Count
+loss$exclude_par_trials <- d |> 
+  filter(id %in% loss$exclude_par) |>
+  filter(diagnostic_run >= 0) |>
+  nrow()
 
-d_ex <- 
-  data |>
-  filter( !(id %in% loss$exclude_par) )
+# Exclude: 
+d <- d |> 
+  filter(!(id %in% loss$exclude_par))
+
+# RELEVANT DATA START HERE
+loss$data_trials <- 
+  d |> 
+  filter(diagnostic_run >= 0) |> 
+  nrow()
+
+# Inducer practice
+loss$inducer_practice_trials <- 
+  d |> 
+  filter(diagnostic_run >= 0) |>
+  filter(inducer_run == 0) |>
+  nrow()
+
+loss$inducer_practice_prop <- 
+  loss$inducer_practice_trials / loss$data_trials * 100
+
+# Exclude: 
+d <- d |> 
+  filter(inducer_run > 0)
 ```
+
+The first inducer block was considered practice and excluded, representing `r loss[["inducer_practice_prop"]]` percent of the data. 
 
 In total, `r length(loss[["exclude_par"]])`
 `r ifelse(length(loss[["data_trials"]]) > 1, "participants", "participant")`
-where excluded due to low accuracy (> 70%). 
+where excluded due to low accuracy (> 30% error). 
+
 <!-- Does not result in any loss of data, since they are replaced --> 
 
 ```{r due to high SD & NA responses }
 #| include: FALSE
+
 # Removing trials deviating more than 2.5 SD from each participants mean. 
 # Also remove NA responses
-d_ex |>
+d <- d |>
   group_by(id) |>
   mutate(
     # Calculate: rt + SD * 2.5
-    rt_crit = ifelse( trial_info == "diagnostic trial",
-      mean( rt, na.rm = TRUE ) + sd( rt, na.rm = TRUE ) * 2.5, NA 
-    ),
-    # Trials to retain/remove: 
-    retain_trials = ifelse(
-      (rt > rt_crit & trial_info == "Diagnostic trial") | (is.na(rt) & trial_info == "Diagnostic trial"), 
-        # Remove trials deviating **more** than 2.5 SD | OR | Remove slow (i.e., NA) responses
+    rt_crit = ifelse(
+      trial_info == "Diagnostic trial",
+      mean( rt, na.rm = TRUE ) + sd( rt, na.rm = TRUE ) * 2.5, NA ),
+      # Trials to retain/remove: 
+      retain_trials = ifelse(
+        # Diag trial *AND* RT above critical (rt * 2.5SD) OR is missing 
+        str_equal(trial_info, "Diagnostic trial") & 
+        ( (rt >= rt_crit) | (is.na(rt)) ),
         0, 1 ) 
-    ) -> d_ex
+    )
 
-sum(d_ex$retain_trials == 0) -> loss[["rt_sd_trials"]]
-sum(d_ex$retain_trials == 0) / loss$data_trials * 100 -> loss[["rt_sd_pct"]]
+# IMPORTANT NOTE: 
+  #' Removing null RT responses are, in all theory, not preregistered. 
+  #' While there is a solution to "non-responses" for error (count them as wrong), 
+  #' there is no stated solution to response time. Generally, this leads to problems 
+  #' because a trial can be considered wrong under error conditions, while the accompanied 
+  #' "error" for response time is not obvious. Should the RT be 2000ms (max trial length)? 
+  #' Or should it be closer to infinity? 
+  #' 
+  #' Assuming a max trial length of 2000ms would highly likely yield exclusion based on 
+  #' the max rt * 2.5 SD (but that is not a given). 
+  #' 
+  #' It is not obvious what to do in such a case, and the simplest solution will 
+  #' be to exclude (remove) these trials). Even though this may be assumed from
+  #' the preregistration, it is *not* preregistered.
 
-d_ex |> 
-  filter(retain_trials == 1 ) -> d_ex
+
+# lost trials
+loss$rt_sd_trials <- d |> 
+  filter(diagnostic_run >= 0) |> 
+  filter(retain_trials == 0) |>
+  nrow()
+
+loss$rt_sd_prop <- 
+  loss$rt_sd_trials / loss$data_trials * 100
+
+
+# Exclude
+d <- d |>
+  filter(retain_trials == 1) 
 ```
 
 Furthermore, `r loss[["rt_sd_trials"]]` trials were lost due
 to deviating (2.5 SD) response times and none response(s).
-Representing a loss of `r round(loss[["rt_sd_pct"]], 2)`
+Representing a loss of `r round(loss[["rt_sd_prop"]], 2)`
 percent of the data.
+
 
 ```{r only correct inducers}
 #| include: FALSE
-d_ex |>
-  mutate( 
-    valid_trials = case_when( 
-      trial_info=="inducer trial" & correct_response==1 ~ 1,
-      trial_info=="inducer trial" & correct_response==0 ~ 0,
-      trial_info=="inducer trial" & is.na(correct_response) ~ 0,
-      # non-responses count as a wrong response
-      T ~ NA ) ) |>
-  fill(valid_trials, .direction = "up") -> d_ex
+d <- d |>
+  mutate( valid_trials = case_when( trial_info=="Inducer trial" & correct_response==1 ~ 1,
+                                    trial_info=="Inducer trial" & correct_response==0 ~ 0,
+                                    trial_info=="Inducer trial" & is.na(correct_response) ~ 0,
+                                      # non-responses count as a wrong response
+                                    T ~ NA ) ) |>
+  fill(valid_trials, .direction = "up")
 
-sum(d_ex$valid_trials==0) -> loss[["inducer_fail_trials"]]
-sum(d_ex$valid_trials==0) / loss$data_trials * 100 -> loss[["inducer_fail_pct"]]
+loss$inducer_fail_trials <- d |>
+  filter(diagnostic_run >= 0) |>
+  filter(valid_trials == 0) |> 
+  nrow()
+  
+loss$inducer_fail_prop <- 
+  loss$inducer_fail_trials / loss$data_trials * 100
 
-d_ex |> 
-  filter( valid_trials == 1 ) -> d_ex
+d <- d |> filter( valid_trials == 1 )
 ```
-
-Lastly, `r round(loss[["inducer_fail_trials"]], 2)` trials
-were removed due to a wrong response on the inducer trial.
-Representing a loss of
-`r round(loss[["inducer_fail_pct"]], 2)` percent of the data.
-
-A total of
-`r loss$rt_sd_trials + loss$inducer_fail_trials` trials were lost. Representing a loss of
-`r round(loss$rt_sd_pct + loss$inducer_fail_pct, 2)`percent of the data.
-
 # Summary
 
 ```{r }
 #| include: FALSE
 # data summary
 d_ex |> 
-  ungroup() |>
   filter(trial_info=="diagnostic trial") |>
   summarize(
     .by = c(id, post_cue, congruent), 
@@ -181,14 +216,16 @@ d_ex_test |>
   aov_car(rt ~ post_cue*congruent + Error(id/(post_cue*congruent)), data=_) -> test
 
 d_ex_test |> 
-  rbind(d_ex_test |> 
-          mutate(id = "waht")) |> 
-  mutate(post_cue = factor(post_cue), 
-         congruent = factor(congruent),
-         id = factor(id)) -> testing2
+  mutate(post_cue = factor( ifelse(post_cue==F, 0, 1)) ) |>
+  ggplot(aes(congruent, rt, col = post_cue)) +
+  geom_point(alpha = .3)+
+  geom_line(aes(group=interaction(id,post_cue)), alpha = .3)+
+  stat_summary(position=position_dodge2nudge(.1, x=.1))
+  geom_line(position = position_jitterdodge(.1, dodge.width = ,2)) +
+  geom_point(position = position_jitterdodge(.1, dodge.width = ,2)) +
 
-anovaBF(rt ~post_cue*congruent + id, data= testing2, whichRandom = "id")
-brms::brm(rt ~ post_cue*congruent + id, data = testing2)
+anovaBF(rt ~post_cue*congruent, data= testing2, whichRandom = "id")
+brms::brm(rt ~ post_cue*congruent + (1|id), data = testing2) -> brm_test
 
 d2 |>
   summarise(
