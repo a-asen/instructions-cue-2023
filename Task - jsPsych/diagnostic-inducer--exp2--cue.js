@@ -910,8 +910,9 @@ const about_the_experiment_and_consent = {
         We are investigating concentration and memory. 
         <br><br>
 
-        In this (experimental) study, we will ask you to complete two categorization tasks in parallel,<br>
-        with instructions for one categorization changing during the task. <br>
+        In this (experimental) study, we will ask you to complete two categorization tasks in parallel.<br>
+        One categorization task will change throughout the task, and the other will remain the same. <br>
+        Your task is to respond to the current relevant task that is informed based on the situation. <br>
         The task is difficult (especially at the start), but feedback will be provided. <br>
         The task takes about 15 minutes. <br>
         If you are up for a challenge, check it out - and do your best! :)
@@ -1171,8 +1172,8 @@ if(!skip_practice){
         rnd_stimuli.splice(0,2) 
             // Remove added inducer stimuli from the main list 
     
-        inducer_instruction_FNC(run_stimuli,"prac", "inducer practice")
-        inducer_FNC(run_stimuli, "prac", "inducer practice", force_stimuli_inducer, false)
+        inducer_instruction_FNC(run_stimuli,"Practice", "Inducer practice")
+        inducer_FNC(run_stimuli, "Practice", "Inducer practice", force_stimuli_inducer, false)
     }
     
     // Cue instructions
@@ -1199,7 +1200,7 @@ if(!skip_practice){
             <br>
             The <b><span style="color:${rnd_cue_col}"> ${rnd_cue_col_n} ${cue_stimulus_name.toLowerCase() }</span></b> indicate that the
             <b><span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour_name.toLowerCase()+ " coloured"}</span></b> 
-            non-word will appear within a couple of screen.
+            non-word will appear within a couple of screens.
             <br>
             The <b><span style="color:${rnd_cue_col}"> ${rnd_cue_col_n} ${cue_stimulus_name.toLowerCase() }</span></b> cannot be responded to. 
     
@@ -1221,14 +1222,14 @@ if(!skip_practice){
     run_stimuli = [rnd_stimuli[0], rnd_stimuli[1]]
     // Remove added inducer stimuli from the main list 
     rnd_stimuli.splice(0,2) 
-    inducer_instruction_FNC(run_stimuli, "prac", "cue practice")
+    inducer_instruction_FNC(run_stimuli, "Practice", "Cue practice")
 
     // equal resp after cue
     let prac_cue_run = Array( Array( Math.floor( prac_post_cue_num/2 ) ).fill(0), Array( Math.ceil( prac_post_cue_num/2 ) ).fill(1) ).flat()
     let rnd_prac_cue_run = jsPsych.randomization.shuffle( prac_cue_run )
     if(debug){ console.log( "prac cue run:", rnd_prac_cue_run) }
-    diagnostic_FNC(prac_cue_rounds, run_stimuli, "prac", prac_post_cue_num, "cue practice", false, false, rnd_prac_cue_run)
-    inducer_FNC(run_stimuli, "prac", "inducer practice", false)
+    diagnostic_FNC(prac_cue_rounds, run_stimuli, "Practice", prac_post_cue_num, "Cue practice", false, false, rnd_prac_cue_run)
+    inducer_FNC(run_stimuli, "Practice", "Inducer practice", false)
     
     
     //// Proper task start instructions
@@ -1321,13 +1322,13 @@ for(let block = 0; block < number_of_inducers; block++){
 
     ////    Timeline: 
     // Inducer instructions
-    inducer_instruction_FNC( run_stimuli, block, "inducer instructions")
+    inducer_instruction_FNC( run_stimuli, block, "Inducer instructions")
 
     // Diagnostic trials 
-    diagnostic_FNC( total_diag_in_each_run[block], run_stimuli, block, rnd_cue_array[block], "diagnostic trial", false, true, pre_cue_italic_resp_sides, post_cue_italic_resp_sides, pre_cue_stimuli_resp_sides, post_cue_stimuli_resp_sides)
+    diagnostic_FNC( total_diag_in_each_run[block], run_stimuli, block, rnd_cue_array[block], "Diagnostic trial", false, true, pre_cue_italic_resp_sides, post_cue_italic_resp_sides, pre_cue_stimuli_resp_sides, post_cue_stimuli_resp_sides)
 
     // Inducer trial
-    inducer_FNC( run_stimuli, block, "inducer trial")
+    inducer_FNC( run_stimuli, block, "Inducer trial")
 }
 
 
@@ -1371,7 +1372,7 @@ const experiment_feedback  = {
             ]
         ]
     },
-    data: { stimulus: "feedback", trial_info: "Feedback" },
+    data: { stimulus: "Feedback", trial_info: "End of experiment feedback" },
     on_finish: (data) => {
         // Add ID to all entries: 
         jsPsych.data.get().addToAll({ id:                   ID });
