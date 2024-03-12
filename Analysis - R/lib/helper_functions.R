@@ -74,7 +74,7 @@ generate_word_list <- function(data, length = NULL){
 }
 
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ###
-fmt_APA_numbers <- function(num, .p = FALSE, .low_val = FALSE, .chr = FALSE){
+fmt_APA_numbers <- function(num, .p = FALSE, .psym = FALSE, .low_val = FALSE, .chr = FALSE){
   require(purrr)
 
   purrr::map(num, \(num){
@@ -87,12 +87,20 @@ fmt_APA_numbers <- function(num, .p = FALSE, .low_val = FALSE, .chr = FALSE){
       # if is not numeric after transformation, return original
     }
     # p
-    if(.p){
-      p <- round(num, 3)
-      if(p < .001){
-        p <- "< .001"
+    if(.p | .psym){
+      if(num < .001){
+        if(.psym){
+          p <- "p < .001"
+        } else {
+          p <- "< .001"
+        }
       } else {
-        p <- p |> as.character(num) |> sub("0.",".", x = _)
+        p <- round(num, 3)
+        if(.psym){
+          p <- as.character(p) |> str_replace("0.", "p = ")
+        } else {
+          p <- as.character(p) |> str_replace("0.", ".")
+        }
       }
       return( p )
     }
