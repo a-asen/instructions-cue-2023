@@ -162,22 +162,40 @@ d <- d |>
 
 ```{r due to high SD & NA responses }
 #| include: FALSE
+
 # Removing trials deviating more than 2.5 SD from each participants mean. 
 # Also remove NA responses
-d <- d |>
-  group_by(id) |>
-  mutate(
-    # Calculate: rt + SD * 2.5
-    rt_crit = ifelse(
-      trial_info == "Diagnostic trial",
-      mean( rt, na.rm = TRUE ) + sd( rt, na.rm = TRUE ) * 2.5, NA ),
-      # Trials to retain/remove: 
-      retain_trials = ifelse(
-        # Diag trial *AND* RT above critical (rt * 2.5SD) OR is missing 
-        str_equal(trial_info, "Diagnostic trial") & 
-        ( (rt >= rt_crit) | (is.na(rt)) ),
-        0, 1 ) 
-    )
+d <- d |> 
+  left_join( 
+    by = c("id","inducer_run","diagnostic_run"),
+    d |>
+      filter(trial_info == "Diagnostic trial") |>
+      mutate(
+        .by = id, 
+        rt_crit_low   = mean(rt) - sd(rt) * 2.5,
+        rt_crit_high  = mean(rt) + sd(rt) * 2.5,
+        retain_trials = ifelse(
+          ( ( rt >= rt_crit_high) | (rt <= rt_crit_low) & (is.na(rt)) ),
+            0, 1) 
+      ) |>
+      select(id,inducer_run, diagnostic_run, retain_trials) 
+  )
+
+# IMPORTANT NOTE: 
+  #' Removing null RT responses are, in all theory, not preregistered. 
+  #' While there is a solution to "non-responses" for error (count them as wrong), 
+  #' there is no stated solution to response time. Generally, this leads to problems 
+  #' because a trial can be considered wrong under error conditions, while the accompanied 
+  #' "error" for response time is not obvious. Should the RT be 2000ms (max trial length)? 
+  #' Or should it be closer to infinity? 
+  #' 
+  #' Assuming a max trial length of 2000ms would highly likely yield exclusion based on 
+  #' the max rt * 2.5 SD (but that is not a given). 
+  #' 
+  #' It is not obvious what to do in such a case, and the simplest solution will 
+  #' be to exclude (remove) these trials). Even though this may be assumed from
+  #' the preregistration, it is *not* preregistered.
+
 
 # lost trials
 loss$rt_sd_trials <- d |> 
@@ -188,9 +206,10 @@ loss$rt_sd_trials <- d |>
 loss$rt_sd_prop <- 
   loss$rt_sd_trials / loss$data_trials * 100
 
+
 # Exclude
 d <- d |>
-  filter(retain_trials == 1) 
+  filter(retain_trials == 1 | is.na(retain_trials) ) 
 ```
 
 ```{r only correct inducers}
@@ -299,7 +318,7 @@ g_bis <-
             g_pc = mean(correct_response),
             g_pc_sd =  sd(correct_response),)
 
-d_ex |>
+d |>
   filter(trial_info=="Diagnostic trial") |>
   ungroup() |>
   summarize(g_rt = mean(rt, na.rm = TRUE),
@@ -344,7 +363,7 @@ bis__lisas <-
 ```{r}
 #| echo: false
 
-comb_table <- 
+tab <- 
   bis__lisas |> 
   pivot_longer(c(rt,pe,lisas,BIS,BIS_lisas))  |>
   pivot_wider(names_from=con, values_from=value ) |>
@@ -371,8 +390,8 @@ comb_table <-
   ) |>
   mutate( across( where(is.numeric), fmt_APA_numbers) ) 
   
-mean(comb_table$df) -> tab_df
-comb_table |> 
+mean(tab$df) -> tab_df
+tab |> 
   mutate(name = factor(name, levels=c("rt","pe","lisas","BIS_lisas","BIS") ), 
          e1="",e2="",e3="", e4="",
          p.val = fmt_APA_numbers(p.val, .p=T),
@@ -398,6 +417,8 @@ exp1_table_complex
 
 if(save_outputs){ gtsave(exp1_table_complex, filename = "../outputs/tables/exp1_table_complex.docx") }
 ```
+
+The paired-sample t-test for the LISAS, revealed a significant difference (*M* = `r tab$mdiff[3]`, t(`r tab$df[3]`) = `r tab$t.val[3]`, `r fmt_APA_numbers(tab$p.val[3], .psym=T)`, BF~10~ = `r tab$b.est[3]`, Cohen's *d* = `r tab$d[3]`) between the incongruent (*M* = `r tab$m_incon[3]`, *SD* = `r tab$sd_incon[3]`) and the congruent (*M* = `r tab$m_con[3]`, *SD* = `r tab$sd_con[3]`) condition. The respective test for the proportion of error revealed a significant difference (*M* = `r tab$mdiff[1]`, t(`r tab$df[1]`) = `r tab$t.val[1]`, `r fmt_APA_numbers(tab$p.val[1], .psym=T)`, BF10 = `r tab$b.est[1]`, Cohen's *d* = `r tab$d[1]`) between the incongruent (*M* = `r tab$m_incon[1]`, *SD* = `r tab$sd_incon[1]`) and the congruent (*M* = `r tab$m_con[1]`, *SD* = `r tab$sd_con[1]`) condition (see Appendix B).
 
 # Feedback
 

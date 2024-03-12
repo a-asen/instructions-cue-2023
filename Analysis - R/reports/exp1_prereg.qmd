@@ -27,15 +27,13 @@ save_outputs <- FALSE
 
 library(NCmisc)
 
-citation("tidyverse")
+citation("tidyverse") 
 citation("patchwork")
-citation("gt")
-citation("BayesFactor")
+citation("BayesFactor") 
 citation("bayestestR")
+citation("gt")
 citation("lsr")
 
-citation("dplyr")
-citation("ggplot2")
 ```
 
 ```{r load data }
@@ -198,27 +196,26 @@ In total, `r length(loss[["exclude_par"]])`
 `r ifelse(length(loss[["data_trials"]]) > 1, "participants", "participant")`
 where excluded due to low accuracy (\> 30% error).
 
-<!-- Does not result in any loss of data, since they are replaced -->
-
 ```{r due to high SD & NA responses }
 #| include: FALSE
 
 # Removing trials deviating more than 2.5 SD from each participants mean. 
 # Also remove NA responses
-d <- d |>
-  group_by(id) |>
-  mutate(
-    # Calculate: rt + SD * 2.5
-    rt_crit = ifelse(
-      trial_info == "Diagnostic trial",
-      mean( rt, na.rm = TRUE ) + sd( rt, na.rm = TRUE ) * 2.5, NA ),
-      # Trials to retain/remove: 
-      retain_trials = ifelse(
-        # Diag trial *AND* RT above critical (rt * 2.5SD) OR is missing 
-        str_equal(trial_info, "Diagnostic trial") & 
-        ( (rt >= rt_crit) | (is.na(rt)) ),
-        0, 1 ) 
-    )
+d <- d |> 
+  left_join( 
+    by = c("id","inducer_run","diagnostic_run"),
+    d |>
+      filter(trial_info == "Diagnostic trial") |>
+      mutate(
+        .by = id, 
+        rt_crit_low   = mean(rt) - sd(rt) * 2.5,
+        rt_crit_high  = mean(rt) + sd(rt) * 2.5,
+        retain_trials = ifelse(
+          ( ( rt >= rt_crit_high) | (rt <= rt_crit_low) & (is.na(rt)) ),
+            0, 1) 
+      ) |>
+      select(id,inducer_run, diagnostic_run, retain_trials) 
+  )
 
 # IMPORTANT NOTE: 
   #' Removing null RT responses are, in all theory, not preregistered. 
@@ -248,7 +245,7 @@ loss$rt_sd_prop <-
 
 # Exclude
 d <- d |>
-  filter(retain_trials == 1) 
+  filter(retain_trials == 1 | is.na(retain_trials) ) 
 ```
 
 Furthermore, `r loss[["rt_sd_trials"]]` trials were lost due
@@ -274,7 +271,12 @@ loss$inducer_fail_trials <- d |>
 loss$inducer_fail_prop <- 
   loss$inducer_fail_trials / loss$data_trials * 100
 
-d <- d |> filter( valid_trials == 1 )
+loss$total_lost_trials <- loss$inducer_practice_trials + loss$rt_sd_trials + loss$inducer_fail_trials
+loss$total_lost_prop <- loss$inducer_practice_prop + loss$rt_sd_prop + loss$inducer_fail_prop
+
+d <- d |> 
+  filter( valid_trials == 1 ) |>
+  ungroup() 
 ```
 
 Lastly, `r round(loss[["inducer_fail_trials"]], 2)` trials
@@ -287,18 +289,22 @@ trials were lost. Representing a loss of
 `r round(loss$rt_sd_prop + loss$inducer_fail_prop + loss$inducer_practice_prop, 2)`
 percent of the data.
 
+### Paragraph: 
+
+The exclusion criteria resulted in the removal of `r fmt_APA_numbers(loss$total_lost_prop)` % (`r loss$total_lost_trials` trials) of the data. The first round was considered practice and resulted in the loss of `r fmt_APA_numbers(loss$inducer_practice_prop)` % (`r loss$inducer_practice_trials` trials), while highly deviating response times and non-responses accounted for `r fmt_APA_numbers(loss$rt_sd_prop)` % (`r loss$rt_sd_trials` trials), and a wrong response on the inducer trial resulted in a loss of `r fmt_APA_numbers(loss$inducer_fail_prop)` % (`r loss$inducer_fail_trials` trials).
+
+
 ## Summary
 
 ```{r}
 #| include: FALSE
 # data summary
 d |> 
-  ungroup() |>
-  filter(trial_info=="Diagnostic trial") |>
+  filter( trial_info=="Diagnostic trial" ) |>
   summarize(
     .by = c(id, con),
     rt = mean(rt),
-    pe = 1 - mean(correct_response)) |> 
+    pe = 1 - mean(correct_response) ) 
   # mutate(rt = scale(rt), pe = scale(pe)) |>
     #' na.rm is not necessary, because problems related to missing trials 
     #' should be handled by the above criteria.
@@ -310,8 +316,6 @@ d |>
 
 ```{r RT tables}
 #| echo: false
-
-rt_test      <- t.test(  d3$rt_FALSE, d3$rt_TRUE, paired = TRUE, alternative = "greater" )
 
 # Freq:
 ## response times
@@ -371,7 +375,8 @@ d2 |>
 
 ```
 
-Table XX \n *Test statistics for the experimental conditions*
+**Table XX**
+\n*Test Statistic for Response Time and Error Rate*
 
 ```{r stat table}
 #| echo: false
@@ -410,7 +415,13 @@ exp1_table_simple
 if(save_outputs){ gtsave(exp1_table_simple, filename = "../outputs/tables/exp1_table_simple.docx") }
 ```
 
-*Note.* <br/> `r fmt_APA_p_table_fig(p_min)` <br/>
+*Note.* \n
+`r fmt_APA_p_table_fig(p_min)`
+
+#### Paragraph
+The paired-sample t-test for response time, revealed a significant difference (*M* = `r b$Mdiff[1]`, *t*(`r b$df[1]`) = `r b$t[1]`, `r fmt_APA_numbers(b$p[1], .psym=T)`, BF~10~ = `r b$b.est[1]`, Cohen's *d* = `r b$d[1]`) between the incongruent (*M* = `r b$m_incongruent[1]`, *SD* = `r b$sd_incongruent[1]`) and the congruent (*M* = `r b$m_congruent[1]`, *SD* = `r b$sd_congruent[1]`) condition. The respective test for the proportion of error revealed a significant difference (*M* = `r b$Mdiff[2]`, *t*(`r b$df[2]`) = `r b$t[2]`, `r fmt_APA_numbers(b$p[2], .psym=T)`, BF~10~ = `r b$b.est[2]`, Cohen's *d* = `r b$d[2]`) between the incongruent (*M* = `r b$m_incongruent[2]`, *SD* = `r b$sd_incongruent[2]`) and the congruent (*M* = `r b$m_congruent[2]`, *SD* = `r b$sd_congruent[2]`) condition (see Appendix B).
+
+
 
 ### Figures
 
@@ -430,13 +441,11 @@ if(save_outputs){ gtsave(exp1_table_simple, filename = "../outputs/tables/exp1_t
 p1 <- 
   d |>
   filter(!is.na(con)) |>
-  group_by(id, con) |>
-    # ????????????????  inducer_run
-  summarize(rt = mean(rt)) |>
+  summarize(.by = c(id, con), 
+            rt = mean(rt), 
+            pe = 1 - mean(correct_response)) |>
     # Summarize the proportion of correct per block
-  ungroup() |>  
   mutate(con2 = ifelse(con==T,1,0)) |>
-  #mutate(con = ifelse(congruent==TRUE,1,0)) |>
   ggplot(aes(x = con2, y = rt, group=id, col = factor(con2)))+
   stat_summary(aes(col=NULL), position=position_dodge(.1), geom = "point", fun = mean, alpha = .1)+
   stat_summary(aes(col=NULL), position=position_dodge(.1), geom = "line", fun = mean, alpha = .1)+
@@ -455,10 +464,10 @@ p1 <-
 p2 <-
   d |>
   filter(!is.na(con)) |>
-  group_by(id, con) |>
-  summarize(pe = 1 - mean(correct_response)) |>
-    # Summarize the proportion of correct per block
-  ungroup() |>  
+  summarize(
+    .by = c(id, con), 
+    rt = mean(rt), 
+    pe = 1 - mean(correct_response)) |>
   mutate(con2 = ifelse(con==T,1,0)) |>
   ggplot(aes(x = con2, y = pe, group=id, col = factor(con)))+
   stat_summary(aes(col=NULL), position=position_dodge(.1), geom = "point", fun = mean, alpha = .1)+
@@ -474,7 +483,8 @@ p2 <-
   theme(axis.text.x = element_text(size = 10), legend.position = "none")+
   labs(x = "", y = "Proportion of Error") 
 
-p1 + p2
+p1 
+p2
 
 if(save_outputs){ ggsave("../outputs/figs/exp1_rt-pe_line.jpeg", p1+p2, width=8, height=5) }
 ```
@@ -489,13 +499,11 @@ if(save_outputs){ ggsave("../outputs/figs/exp1_rt-pe_line.jpeg", p1+p2, width=8,
 #| fig-dpi: 300
 #| fig-width: 6
 
-p1 <-
-  d |>
+p1 <- d |>
   filter(!is.na(con)) |>
-  group_by(id, con) |>
-  summarize(rt = mean(rt)) |>
-    # Summarize the proportion of correct per block
-  ungroup() |>  
+  summarize(.by = c(id, con), 
+            rt = mean(rt), 
+            pe = 1 - mean(correct_response)) |>
   mutate(con2 = ifelse(con==T,1,0)) |>
   ggplot(aes(x = con2, y = rt,fill = factor(con)))+
   stat_summary(fun = mean, geom = "col")+
@@ -511,14 +519,11 @@ p1 <-
   annotate("segment", x=-0.1, xend=1.1, y=696, yend=696, size=1)+
   annotate(geom = "text", x = .5, y=700, label="**", size=5)
 
-p2 <- 
-  d |>
+p2 <- d |>
   filter(!is.na(con)) |>
-  group_by(id, con) |>
-    # ????????????????  inducer_run
-  summarize(pe = 1 - mean(correct_response)) |>
-    # Summarize the proportion of correct per block
-  ungroup() |>  
+  summarize(.by = c(id, con), 
+            rt = mean(rt), 
+            pe = 1 - mean(correct_response)) |>
   mutate(con2 = ifelse(con==T,1,0)) |>
   ggplot(aes(x = con2, y = pe, fill = factor(con2)))+
   stat_summary(fun=mean, geom="col")+
@@ -534,11 +539,12 @@ p2 <-
   annotate("segment", x=-0.1, xend=1.1, y=.13, yend=.13, size=1)+
   annotate(geom = "text", x = .5, y=.137, label="**", size=5)
     
-p1 
+p1
 p2
 if(save_outputs){ ggsave("../outputs/figs/exp1_rt-pe_bar.jpeg", p1+p2, width=8, height=5) }
 ```
 
 --------------------------------------------------------------
 
-~Document generated: `r Sys.time()`~
+~Document\ generated:\ `r Sys.time()`~
+
