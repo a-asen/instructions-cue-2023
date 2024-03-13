@@ -7,8 +7,6 @@ editor:
       wrap: 62
 ---
 
-Document generated: `r Sys.time()`.
-
 ```{r libraries }
 #| include: FALSE
 library(tidyverse)
@@ -83,6 +81,7 @@ be removed from the demographics due to non-connections
 between data points and demographics variables.
 
 # Data
+
 ## Data prep
 
 ```{r base data }
@@ -163,17 +162,15 @@ loss$exclude_par_trials <- d |>
   filter(diagnostic_run >= 0) |>
   nrow()
 
-# Exclude: 
+# REMOVE excluded: 
 d <- d |> 
   filter(!(id %in% loss$exclude_par))
 
-# RELEVANT DATA START HERE
 loss$data_trials <- 
   d |> 
   filter(diagnostic_run >= 0) |> 
   nrow()
 
-# Inducer practice
 loss$inducer_practice_trials <- 
   d |> 
   filter(diagnostic_run >= 0) |>
@@ -183,7 +180,7 @@ loss$inducer_practice_trials <-
 loss$inducer_practice_prop <- 
   loss$inducer_practice_trials / loss$data_trials * 100
 
-# Exclude: 
+# REMOVE practice round
 d <- d |> 
   filter(inducer_run > 0)
 ```
@@ -201,20 +198,19 @@ where excluded due to low accuracy (\> 30% error).
 
 # Removing trials deviating more than 2.5 SD from each participants mean. 
 # Also remove NA responses
-d <- d |> 
-  left_join( 
+d <- d |>
+  left_join(
     by = c("id","inducer_run","diagnostic_run"),
     d |>
       filter(trial_info == "Diagnostic trial") |>
       mutate(
-        .by = id, 
-        rt_crit_low   = mean(rt) - sd(rt) * 2.5,
-        rt_crit_high  = mean(rt) + sd(rt) * 2.5,
-        retain_trials = ifelse(
-          ( ( rt >= rt_crit_high) | (rt <= rt_crit_low) & (is.na(rt)) ),
-            0, 1) 
+        .by = id,
+        rt_crit_low   = mean(rt, na.rm=T) - sd(rt, na.rm=T) * 2.5,
+        rt_crit_high  = mean(rt, na.rm=T) + sd(rt, na.rm=T) * 2.5,
+        rt_crit = ifelse( ( (rt >= rt_crit_high) | (rt <= rt_crit_low) ), 1, NA ),
+        rt_na = ifelse(is.na(rt), 1, NA)
       ) |>
-      select(id,inducer_run, diagnostic_run, retain_trials) 
+      select(id,inducer_run, diagnostic_run, rt_crit, rt_na)
   )
 
 # IMPORTANT NOTE: 
@@ -234,18 +230,18 @@ d <- d |>
 
 
 # lost trials
-loss$rt_sd_trials <- d |> 
-  filter(diagnostic_run >= 0) |> 
-  filter(retain_trials == 0) |>
+loss$rt_sd_trials <- d |>
+  filter(diagnostic_run >= 0) |>
+  filter(rt_crit == 1 | rt_na==1) |>
   nrow()
 
 loss$rt_sd_prop <- 
   loss$rt_sd_trials / loss$data_trials * 100
 
-
 # Exclude
 d <- d |>
-  filter(retain_trials == 1 | is.na(retain_trials) ) 
+  filter( is.na(rt_crit) & is.na(rt_na) ) |>
+  select(-rt_crit, -rt_na)
 ```
 
 Furthermore, `r loss[["rt_sd_trials"]]` trials were lost due
@@ -256,27 +252,30 @@ percent of the data.
 ```{r only correct inducers}
 #| include: FALSE
 d <- d |>
-  mutate( valid_trials = case_when( trial_info=="Inducer trial" & correct_response==1 ~ 1,
-                                    trial_info=="Inducer trial" & correct_response==0 ~ 0,
-                                    trial_info=="Inducer trial" & is.na(correct_response) ~ 0,
-                                      # non-responses count as a wrong response
-                                    T ~ NA ) ) |>
+  mutate( valid_trials = case_when( 
+    trial_info=="Inducer trial" & correct_response==1 ~ 1,
+    trial_info=="Inducer trial" & correct_response==0 ~ 0,
+    trial_info=="Inducer trial" & is.na(correct_response) ~ 0,
+    # non-responses count as a wrong response
+    T ~ NA ) ) |>
   fill(valid_trials, .direction = "up")
 
 loss$inducer_fail_trials <- d |>
   filter(diagnostic_run >= 0) |>
-  filter(valid_trials == 0) |> 
+  filter(valid_trials == 0) |>
   nrow()
-  
-loss$inducer_fail_prop <- 
+
+loss$inducer_fail_prop <-
   loss$inducer_fail_trials / loss$data_trials * 100
+
 
 loss$total_lost_trials <- loss$inducer_practice_trials + loss$rt_sd_trials + loss$inducer_fail_trials
 loss$total_lost_prop <- loss$inducer_practice_prop + loss$rt_sd_prop + loss$inducer_fail_prop
 
-d <- d |> 
+d <-
+  d |>
   filter( valid_trials == 1 ) |>
-  ungroup() 
+  select(-valid_trials)
 ```
 
 Lastly, `r round(loss[["inducer_fail_trials"]], 2)` trials
@@ -284,15 +283,25 @@ were removed due to a wrong response on the inducer trial.
 Representing a loss of
 `r round(loss[["inducer_fail_prop"]], 2)` percent of the data.
 
-A total of `r loss$rt_sd_trials + loss$inducer_fail_trials + loss$inducer_practice_trials`
+A total of
+`r loss$rt_sd_trials + loss$inducer_fail_trials + loss$inducer_practice_trials`
 trials were lost. Representing a loss of
 `r round(loss$rt_sd_prop + loss$inducer_fail_prop + loss$inducer_practice_prop, 2)`
 percent of the data.
 
-### Paragraph: 
+### Paragraph:
 
-The exclusion criteria resulted in the removal of `r fmt_APA_numbers(loss$total_lost_prop)` % (`r loss$total_lost_trials` trials) of the data. The first round was considered practice and resulted in the loss of `r fmt_APA_numbers(loss$inducer_practice_prop)` % (`r loss$inducer_practice_trials` trials), while highly deviating response times and non-responses accounted for `r fmt_APA_numbers(loss$rt_sd_prop)` % (`r loss$rt_sd_trials` trials), and a wrong response on the inducer trial resulted in a loss of `r fmt_APA_numbers(loss$inducer_fail_prop)` % (`r loss$inducer_fail_trials` trials).
-
+The exclusion criteria resulted in the removal of
+`r fmt_APA_numbers(loss$total_lost_prop)` %
+(`r loss$total_lost_trials` trials) of the data. The first
+round was considered practice and resulted in the loss of
+`r fmt_APA_numbers(loss$inducer_practice_prop)` %
+(`r loss$inducer_practice_trials` trials), while highly
+deviating response times and non-responses accounted for
+`r fmt_APA_numbers(loss$rt_sd_prop)` % (`r loss$rt_sd_trials`
+trials), and a wrong response on the inducer trial resulted in
+a loss of `r fmt_APA_numbers(loss$inducer_fail_prop)` %
+(`r loss$inducer_fail_trials` trials).
 
 ## Summary
 
@@ -304,7 +313,7 @@ d |>
   summarize(
     .by = c(id, con),
     rt = mean(rt),
-    pe = 1 - mean(correct_response) ) 
+    pe = 1 - mean(correct_response) ) |>
   # mutate(rt = scale(rt), pe = scale(pe)) |>
     #' na.rm is not necessary, because problems related to missing trials 
     #' should be handled by the above criteria.
@@ -375,8 +384,8 @@ d2 |>
 
 ```
 
-**Table XX**
-\n*Test Statistic for Response Time and Error Rate*
+**Table XX** \n*Test Statistic for Response Time and Error
+Rate\*
 
 ```{r stat table}
 #| echo: false
@@ -415,13 +424,26 @@ exp1_table_simple
 if(save_outputs){ gtsave(exp1_table_simple, filename = "../outputs/tables/exp1_table_simple.docx") }
 ```
 
-*Note.* \n
+*Note.* </br>
 `r fmt_APA_p_table_fig(p_min)`
 
 #### Paragraph
-The paired-sample t-test for response time, revealed a significant difference (*M* = `r b$Mdiff[1]`, *t*(`r b$df[1]`) = `r b$t[1]`, `r fmt_APA_numbers(b$p[1], .psym=T)`, BF~10~ = `r b$b.est[1]`, Cohen's *d* = `r b$d[1]`) between the incongruent (*M* = `r b$m_incongruent[1]`, *SD* = `r b$sd_incongruent[1]`) and the congruent (*M* = `r b$m_congruent[1]`, *SD* = `r b$sd_congruent[1]`) condition. The respective test for the proportion of error revealed a significant difference (*M* = `r b$Mdiff[2]`, *t*(`r b$df[2]`) = `r b$t[2]`, `r fmt_APA_numbers(b$p[2], .psym=T)`, BF~10~ = `r b$b.est[2]`, Cohen's *d* = `r b$d[2]`) between the incongruent (*M* = `r b$m_incongruent[2]`, *SD* = `r b$sd_incongruent[2]`) and the congruent (*M* = `r b$m_congruent[2]`, *SD* = `r b$sd_congruent[2]`) condition (see Appendix B).
 
-
+The paired-sample t-test for response time, revealed a
+significant difference (*M* = `r b$Mdiff[b$name=="RT"]`, *t*(`r b$df[b$name=="RT"]`)
+= `r b$t[b$name=="RT"]`, *p* `r fmt_APA_numbers(b$p[b$name=="RT"], .psym=T)`, BF~10~ =
+`r b$bf[b$name=="RT"]`, Cohen's *d* = `r b$d[b$name=="RT"]`) between the
+incongruent (*M* = `r b$m_incongruent[b$name=="RT"]`, *SD* =
+`r b$sd_incongruent[b$name=="RT"]`) and the congruent (*M* =
+`r b$m_congruent[b$name=="RT"]`, *SD* = `r b$sd_congruent[b$name=="RT"]`) condition.
+The respective test for the proportion of error revealed a
+significant difference (*M* = `r b$Mdiff[b$name=="PE"]`, *t*(`r b$df[b$name=="PE"]`)
+= `r b$t[b$name=="PE"]`, *p* `r fmt_APA_numbers(b$p[b$name=="PE"], .psym=T)`, BF~10~ =
+`r b$bf[b$name=="PE"]`, Cohen's *d* = `r b$d[b$name=="PE"]`) between the
+incongruent (*M* = `r b$m_incongruent[b$name=="PE"]`, *SD* =
+`r b$sd_incongruent[b$name=="PE"]`) and the congruent (*M* =
+`r b$m_congruent[b$name=="PE"]`, *SD* = `r b$sd_congruent[b$name=="PE"]`) condition
+(see Appendix B).
 
 ### Figures
 
@@ -433,7 +455,7 @@ The paired-sample t-test for response time, revealed a significant difference (*
 #| message: false
 #| error: false
 #| fig-dpi: 300
-#| fig-width: 6
+#| fig-width: 3
 
 # This way of visualizing is not necessarily the best -- it can illustate each
 # change in data (congruent/incongruent), but summary score should not be used with it
@@ -497,7 +519,7 @@ if(save_outputs){ ggsave("../outputs/figs/exp1_rt-pe_line.jpeg", p1+p2, width=8,
 #| message: false
 #| error: false
 #| fig-dpi: 300
-#| fig-width: 6
+#| fig-width: 3
 
 p1 <- d |>
   filter(!is.na(con)) |>
@@ -546,5 +568,4 @@ if(save_outputs){ ggsave("../outputs/figs/exp1_rt-pe_bar.jpeg", p1+p2, width=8, 
 
 --------------------------------------------------------------
 
-~Document\ generated:\ `r Sys.time()`~
-
+~Document generated: `r Sys.time()`~

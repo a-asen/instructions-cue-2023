@@ -135,17 +135,15 @@ loss$exclude_par_trials <- d |>
   filter(diagnostic_run >= 0) |>
   nrow()
 
-# Exclude: 
+# REMOVE excluded: 
 d <- d |> 
   filter(!(id %in% loss$exclude_par))
 
-# RELEVANT DATA START HERE
 loss$data_trials <- 
   d |> 
   filter(diagnostic_run >= 0) |> 
   nrow()
 
-# Inducer practice
 loss$inducer_practice_trials <- 
   d |> 
   filter(diagnostic_run >= 0) |>
@@ -155,83 +153,86 @@ loss$inducer_practice_trials <-
 loss$inducer_practice_prop <- 
   loss$inducer_practice_trials / loss$data_trials * 100
 
-# Exclude: 
+# REMOVE practice round
 d <- d |> 
   filter(inducer_run > 0)
 ```
 
+The first inducer block was considered practice and excluded,
+representing `r loss[["inducer_practice_prop"]]` percent of
+the data.
+
+In total, `r length(loss[["exclude_par"]])`
+`r ifelse(length(loss[["data_trials"]]) > 1, "participants", "participant")`
+where excluded due to low accuracy (\> 30% error).
+
 ```{r due to high SD & NA responses }
 #| include: FALSE
-
-# Removing trials deviating more than 2.5 SD from each participants mean. 
-# Also remove NA responses
-d <- d |> 
-  left_join( 
+d <- d |>
+  left_join(
     by = c("id","inducer_run","diagnostic_run"),
     d |>
       filter(trial_info == "Diagnostic trial") |>
       mutate(
-        .by = id, 
-        rt_crit_low   = mean(rt) - sd(rt) * 2.5,
-        rt_crit_high  = mean(rt) + sd(rt) * 2.5,
-        retain_trials = ifelse(
-          ( ( rt >= rt_crit_high) | (rt <= rt_crit_low) & (is.na(rt)) ),
-            0, 1) 
+        .by = id,
+        rt_crit_low   = mean(rt, na.rm=T) - sd(rt, na.rm=T) * 2.5,
+        rt_crit_high  = mean(rt, na.rm=T) + sd(rt, na.rm=T) * 2.5,
+        rt_crit = ifelse( ( (rt >= rt_crit_high) | (rt <= rt_crit_low) ), 1, NA ),
+        rt_na = ifelse(is.na(rt), 1, NA)
       ) |>
-      select(id,inducer_run, diagnostic_run, retain_trials) 
+      select(id,inducer_run, diagnostic_run, rt_crit, rt_na)
   )
 
-# IMPORTANT NOTE: 
-  #' Removing null RT responses are, in all theory, not preregistered. 
-  #' While there is a solution to "non-responses" for error (count them as wrong), 
-  #' there is no stated solution to response time. Generally, this leads to problems 
-  #' because a trial can be considered wrong under error conditions, while the accompanied 
-  #' "error" for response time is not obvious. Should the RT be 2000ms (max trial length)? 
-  #' Or should it be closer to infinity? 
-  #' 
-  #' Assuming a max trial length of 2000ms would highly likely yield exclusion based on 
-  #' the max rt * 2.5 SD (but that is not a given). 
-  #' 
-  #' It is not obvious what to do in such a case, and the simplest solution will 
-  #' be to exclude (remove) these trials). Even though this may be assumed from
-  #' the preregistration, it is *not* preregistered.
-
-
 # lost trials
-loss$rt_sd_trials <- d |> 
-  filter(diagnostic_run >= 0) |> 
-  filter(retain_trials == 0) |>
+loss$rt_sd_trials <- d |>
+  filter(diagnostic_run >= 0) |>
+  filter(rt_crit == 1 | rt_na==1) |>
   nrow()
 
 loss$rt_sd_prop <- 
   loss$rt_sd_trials / loss$data_trials * 100
 
-
 # Exclude
 d <- d |>
-  filter(retain_trials == 1 | is.na(retain_trials) ) 
+  filter( is.na(rt_crit) & is.na(rt_na) ) |>
+  select(-rt_crit, -rt_na)
 ```
+
+Furthermore, `r loss[["rt_sd_trials"]]` trials were lost due
+to deviating (2.5 SD) response times and none response(s).
+Representing a loss of `r round(loss[["rt_sd_prop"]], 2)`
+percent of the data.
 
 ```{r only correct inducers}
 #| include: FALSE
 d <- d |>
-  mutate( valid_trials = case_when( trial_info=="Inducer trial" & correct_response==1 ~ 1,
-                                    trial_info=="Inducer trial" & correct_response==0 ~ 0,
-                                    trial_info=="Inducer trial" & is.na(correct_response) ~ 0,
-                                      # non-responses count as a wrong response
-                                    T ~ NA ) ) |>
+  mutate( valid_trials = case_when( 
+    trial_info=="Inducer trial" & correct_response==1 ~ 1,
+    trial_info=="Inducer trial" & correct_response==0 ~ 0,
+    trial_info=="Inducer trial" & is.na(correct_response) ~ 0,
+    # non-responses count as a wrong response
+    T ~ NA ) ) |>
   fill(valid_trials, .direction = "up")
 
 loss$inducer_fail_trials <- d |>
   filter(diagnostic_run >= 0) |>
-  filter(valid_trials == 0) |> 
+  filter(valid_trials == 0) |>
   nrow()
-  
-loss$inducer_fail_prop <- 
+
+loss$inducer_fail_prop <-
   loss$inducer_fail_trials / loss$data_trials * 100
 
-d <- d |> filter( valid_trials == 1 )
+
+loss$total_lost_trials <- loss$inducer_practice_trials + loss$rt_sd_trials + loss$inducer_fail_trials
+loss$total_lost_prop <- loss$inducer_practice_prop + loss$rt_sd_prop + loss$inducer_fail_prop
+
+d <-
+  d |>
+  filter( valid_trials == 1 ) |>
+  select(-valid_trials)
 ```
+
+
 # Integrated measures:
 
 ## LISAS
@@ -245,7 +246,8 @@ d <- d |> filter( valid_trials == 1 )
 # See Vandierendonck 2017 @ https://doi.org/10.3758/s13428-016-0721-5
 # Calculation according to: Liesefeld & Janczyk 2023 @ https://doi.org/10.3758/s13428-022-01843-2
 
-lisas_grand <- d |>
+lisas_grand <-
+  d |>
   filter(trial_info=="Diagnostic trial") |>
   group_by(id) |>
   summarize(
@@ -366,11 +368,9 @@ bis__lisas <-
 tab <- 
   bis__lisas |> 
   pivot_longer(c(rt,pe,lisas,BIS,BIS_lisas))  |>
-  pivot_wider(names_from=con, values_from=value ) |>
-  mutate(diff = Incongruent - Congruent) |>
-  rowwise() |>
-  group_by(name) |>
-  reframe(
+  pivot_wider(names_from=con, values_from=value) |>
+  summarise(
+    .by       = name,
     m_incon   = mean(Incongruent),
     sd_incon  = sd(Incongruent),
     m_con     = mean(Congruent),
@@ -378,7 +378,8 @@ tab <-
     mdiff     = mean(Incongruent-Congruent),
     t.val     = t.test(Incongruent, Congruent, paired=T, alternative = "greater")$statistic,
     df        = t.test(Incongruent, Congruent, paired=T, alternative = "greater")$parameter,
-    p.val     = t.test(Incongruent, Congruent, paired=T, alternative = "greater")$p.value |> fmt_APA_numbers(.p = T), 
+    p.val     = t.test(Incongruent, Congruent, paired=T, alternative = "greater")$p.value |>
+      fmt_APA_numbers(.p=T),
     b.est     = mean( ttestBF(Incongruent, Congruent, paired=T, posterior=T, iterations=5000)[,"mu"] ),
     b         = extractBF( ttestBF(Incongruent, Congruent, paired=T) )$bf,
     hdi       = paste0("[",
@@ -390,11 +391,19 @@ tab <-
   ) |>
   mutate( across( where(is.numeric), fmt_APA_numbers) ) 
   
+# BIS is not "greater", but "less"
+tab$p.val[tab$name=="BIS"] <-
+  bis__lisas |> 
+  select(id,con,BIS) |> 
+  pivot_wider(names_from=con, values_from=BIS) |>
+  summarise(
+    t.test(Incongruent, Congruent, paired=T, alternative = "less")$p.value
+  ) |> pull() |> fmt_APA_numbers(.p=T)
+
 mean(tab$df) -> tab_df
 tab |> 
   mutate(name = factor(name, levels=c("rt","pe","lisas","BIS_lisas","BIS") ), 
          e1="",e2="",e3="", e4="",
-         p.val = fmt_APA_numbers(p.val, .p=T),
          across(contains(c("con", "b")), ~ fmt_APA_numbers(num=.x, .chr=T) )
          ) |>
   arrange(name) |>
@@ -409,16 +418,18 @@ tab |>
     # why u not wrk? 
   cols_label(m_incon = md("*M*"), sd_incon = md("*SD*"), m_con = md("*M*"), sd_con = md("*SD*"),
              p.val = md("*p*"), b = md("BF~10~"), b.est = md("*M*~est~"), 
-             hdi = "HDI", d = md("*d*"), e1="",e2="",e3="", e4="", t.val = md( paste0("*t*(", tab_df,")") ) ) |>
+             hdi = "HDI", d = md("*d*"), e1="",e2="",e3="", e4="", 
+             t.val = md( paste0("*t*(", tab_df,")") ),
+             mdiff = md("*M*~diff~")) |>
   tab_spanner("Congruent", c(m_con, sd_con) ) |>
-  cols_hide( c(df, mdiff)) |>
+  cols_hide( c(df)) |>
   cols_align("center" )  -> exp1_table_complex
 exp1_table_complex
 
 if(save_outputs){ gtsave(exp1_table_complex, filename = "../outputs/tables/exp1_table_complex.docx") }
 ```
 
-The paired-sample t-test for the LISAS, revealed a significant difference (*M* = `r tab$mdiff[3]`, t(`r tab$df[3]`) = `r tab$t.val[3]`, `r fmt_APA_numbers(tab$p.val[3], .psym=T)`, BF~10~ = `r tab$b.est[3]`, Cohen's *d* = `r tab$d[3]`) between the incongruent (*M* = `r tab$m_incon[3]`, *SD* = `r tab$sd_incon[3]`) and the congruent (*M* = `r tab$m_con[3]`, *SD* = `r tab$sd_con[3]`) condition. The respective test for the proportion of error revealed a significant difference (*M* = `r tab$mdiff[1]`, t(`r tab$df[1]`) = `r tab$t.val[1]`, `r fmt_APA_numbers(tab$p.val[1], .psym=T)`, BF10 = `r tab$b.est[1]`, Cohen's *d* = `r tab$d[1]`) between the incongruent (*M* = `r tab$m_incon[1]`, *SD* = `r tab$sd_incon[1]`) and the congruent (*M* = `r tab$m_con[1]`, *SD* = `r tab$sd_con[1]`) condition (see Appendix B).
+The paired-sample *t*-test for the LISAS, revealed a significant difference (*M* = `r tab$mdiff[tab$name=="lisas"]`, *t*(`r tab$df[tab$name=="lisas"]`) = `r tab$t.val[tab$name=="lisas"]`, *p* `r fmt_APA_numbers(tab$p.val[tab$name=="lisas"], .psym=T)`, BF~10~ = `r tab$b[tab$name=="lisas"]`, Cohen's *d* = `r tab$d[tab$name=="lisas"]`) between the incongruent (*M* = `r tab$m_incon[tab$name=="lisas"]`, *SD* = `r tab$sd_incon[tab$name=="lisas"]`) and the congruent (*M* = `r tab$m_con[tab$name=="lisas"]`, *SD* = `r tab$sd_con[tab$name=="lisas"]`) condition. The respective test for the BIS revealed a significant difference (*M* = `r tab$mdiff[tab$name=="BIS"]`, *t*(`r tab$df[tab$name=="BIS"]`) = `r tab$t.val[tab$name=="BIS"]`, *p* `r fmt_APA_numbers(tab$p.val[tab$name=="BIS"], .psym=T)`, BF~10~ = `r tab$b[tab$name=="BIS"]`, Cohen's *d* = `r tab$d[tab$name=="BIS"]`) between the incongruent (*M* = `r tab$m_incon[tab$name=="BIS"]`, *SD* = `r tab$sd_incon[tab$name=="BIS"]`) and the congruent (*M* = `r tab$m_con[tab$name=="BIS"]`, *SD* = `r tab$sd_con[tab$name=="BIS"]`) condition (see Appendix B).
 
 # Feedback
 
