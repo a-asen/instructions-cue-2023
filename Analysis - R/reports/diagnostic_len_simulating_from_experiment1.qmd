@@ -172,6 +172,64 @@ res |>
 exp1_outcome_int_score
 ```
 
+# Simulate from slicing parameter calculation:
+
+```{r}
+#| echo: false
+sim_pe_rt_parameters 
+
+
+sim_exp2_from_exp1_params <- function(size, difference){
+  tibble(
+    id = seq(1,size,1),
+    pre_cue = rnorm(
+      size,
+      sim_pe_rt_parameters |> filter(pairs==100, name=="pe") |> pull(m_d) * difference,
+      sim_pe_rt_parameters |> filter(pairs==100, name=="pe") |> pull(sd_d)
+    ),
+    post_cue = rnorm(
+      size,
+      sim_pe_rt_parameters |> filter(pairs==26, name=="pe") |> pull(m_d),
+      sim_pe_rt_parameters |> filter(pairs==26, name=="pe") |> pull(sd_d)
+    )
+  )
+}
+
+
+clusterExport(cl, "sim_exp2_from_exp1_params")
+exp2_cue_diff_sim <- 
+pblapply(1:500, \(rep){
+  map_df(27:50, \(samp){
+    map_df(seq(.1,.5,.025), \(diff){
+      sim_exp2_from_exp1_params(samp, diff) |>
+        mutate(diff = pre_cue-post_cue) |> 
+        pull(diff) |>
+        t.test(x = _, mu=0) |> 
+        tidy() |> 
+        mutate(
+          .before=1, 
+          size = samp,
+          diff = diff,
+          itr  = rep, 
+        )
+    })
+  })
+}) |> map_df(~.x)
+
+test |> 
+  ggplot(aes(itr, p.value, col=size))+
+  geom_line()
+
+test |> 
+  summarise(
+    .by = size, 
+    pow  = mean(p.value < .05),
+    across(where(is.double), mean),
+  )
+```
+
+
+
 # Simulate experiment 1
 
 ```{r}
