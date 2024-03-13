@@ -41,7 +41,6 @@ if(make_cluster){
     library(lsr)
   })
 } else {cl <- NULL}
-
 ```
 
 # Data
@@ -50,7 +49,10 @@ if(make_cluster){
 #| include: false
 load("../data/processed/exp1_data.rdata")
 
-mult_test <- read_parquet("../data/simulations/sample_based_on_exp1_parames_by_congruency.parquet")
+if(load_simulation_data){
+  
+  mult_test <- read_parquet("../data/simulations/sample_based_on_exp1_parames_by_congruency.parquet")
+}
 ```
 
 ```{r preprocessing}
@@ -175,6 +177,60 @@ exp1_outcome_int_score
 # Simulate from slicing parameter calculation:
 
 ```{r}
+#| include: false
+sim_pe_rt_parameters <- 
+  sum_rnd_slice_diag_exclu |> # slicing params
+  filter(pairs %in% c(26, 36, 100))
+sim_pe_rt_parameters
+```
+
+```{r}
+# pre        |  post 
+# con-incon  |  con-incon 
+
+exp1_outcome_raw
+
+N=34
+obs=10
+clusterExport(cl, c("N","obs"))
+pblapply(1:300,\(rep){
+  map_df(27:47,\(size){
+    tibble(
+      id    = rep(1:size, each=obs),
+      rep   = rep.int(1:obs, size),
+      con   = rnorm(size*obs, .091, .954),
+      incon = rnorm(size*obs, -.091, 1.054),
+    ) |> 
+      summarise(
+        .by = id,
+        across(where(is.double), mean),
+      ) -> test
+    t.test(test$con, test$incon) |> tidy() |> 
+      mutate(.before=1, itr=rep, size=size)
+    })
+    
+}, cl=cl) |> 
+  map_df(~.x) -> 
+  test
+test |> 
+  summarise(
+    .by = size,
+    p = mean(p.value<.05))
+
+test |>
+  summarise(
+    .by = size, 
+    across(where(is.double), mean)
+  ) |>
+  ggplot(aes(size, p.value)) +
+  geom_line()
+
+t.test(test$con,test$incon, paired=T)
+```
+
+
+
+```{r}
 #| echo: false
 sim_pe_rt_parameters 
 
@@ -288,8 +344,8 @@ gen_data_raw <- function(N, obs){
   #' @param OBS Number of observation per N
 
   tibble(
-    id  = rep(1:N, each = obs),
-    pairs = rep.int(1:obs, N),
+    id      = rep(1:N, each = obs),
+    pairs   = rep.int(1:obs, N),
     rt_con  = rnorm(N * obs, 
                     exp1_outcome_raw$rt[exp1_outcome_raw$con==T],
                     exp1_outcome_raw$rt_sd[exp1_outcome_raw$con==T]),
