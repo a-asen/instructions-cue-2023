@@ -86,24 +86,22 @@ fmt_APA_numbers <- function(num, .p = FALSE, .psym = FALSE, .low_val = FALSE, .c
       return(o_num)
       # if is not numeric after transformation, return original
     }
-    # p
-    if(.p | .psym){
+
+    if(.psym){
       if(num < .001){
-        if(.psym){
-          p <- "p < .001"
-        } else {
-          p <- "< .001"
-        }
+        return("< .001")
       } else {
-        p <- round(num, 3)
-        if(.psym){
-          p <- as.character(p) |> str_replace("0.", "p = ")
-        } else {
-          p <- as.character(p) |> str_replace("0.", ".")
-        }
+        return( round(num, 3) |> as.character() |> str_replace("0.", "= ") )
       }
-      return( p )
     }
+    if(.p){
+      if(num < .001){
+        return("< .001")
+      } else {
+        return( round(num, 3) |> as.character() |> str_replace("0.", ".") )
+      }
+    }
+
     # NORMAL VALS
     if(num >= 100 | num <= -100){
       num <- round(num, 0)
@@ -111,6 +109,7 @@ fmt_APA_numbers <- function(num, .p = FALSE, .psym = FALSE, .low_val = FALSE, .c
     if(num >= 10 | num <= -10){
       num <- round(num, 1)
     }
+
     # IF LOW VALUES
     if(num >= 1 | num <= -1 | num < 1 & !.low_val | num > -1 & !.low_val){
       num <- round(num, 2)
