@@ -83,7 +83,7 @@ const cue_duration = 1250               // How long is the pre-cue present for?
 
 
 ////    Practice parameters     ////
-const prac_diagnostic_rounds = 16                    // Number of diagnostic practice rounds
+const prac_diagnostic_rounds = 2                    // Number of diagnostic practice rounds
     // Set to 0 if no practice rounds should occur.
 const prac_inducer_rounds = 6
     // NB: Max 64 rounds of new stimuli (prac_inducer_rounds + number_of_inducer > 64)
@@ -546,14 +546,12 @@ function inducer_FNC(run_stimuli, exp_block, trial_info, force_resp_side = null,
      * @param {integer} force_resp_side     List of forced response sides (e.g., [0,1,0,0,1,1])
      * @param {boolean} deadline            Will the run have a deadline? 
      */
-    // run_stimuli == Randomly selected stimuli for the current block 
-    // exp_block == Current block number
 
     var rnd_inducer_stimulus;
     var force_equal;
     
     // GET inducer stimulus
-    if(!force_resp_side == null){
+    if(force_resp_side != null){
         rnd_inducer_stimulus = run_stimuli[force_resp_side]
         force_equal = true
     } else {
@@ -910,16 +908,22 @@ const about_the_experiment_and_consent = {
         We are investigating concentration and memory. 
         <br><br>
 
-        In this (experimental) study, we will ask you to complete two categorization tasks in parallel.<br>
-        One categorization task will change throughout the task, and the other will remain the same. <br>
-        Your task is to respond to the current relevant task that is informed based on the situation. <br>
-        The task is difficult (especially at the start), but feedback will be provided. <br>
-        The task takes about 15 minutes. <br>
-        If you are up for a challenge, check it out - and do your best! :)
+        In this (experimental) study, we will ask you to complete two categorization tasks in parallel.
+        <br>
+        One of these tasks will vary as the study progresses, while the other will remain constant.
+        <br>
+        Your role is to respond appropriately to the task that is currently relevant, as determined by the given situation.
+        <br><br>
+
+        We acknowledge that the task may present some challenges initially, <br>
+        but please be assured that feedback will be provided to aid your progress. <br>
+        The entire task will take approximately 15 minutes to complete. <br>
+        If you're ready for a challenge and willing to test your limits, we encourage you to participate. <br>
+        Give it your best effort!
         <br><br>
 
         The study is conducted by Steffen Aasen (Master student) and \n
-        Torsten Martiny-Huenger (Supervisor) at UiT – The Arctic University of Norway.
+        Torsten Martiny-Huenger (Supervisor) from the UiT – The Arctic University of Norway.
         <br><br>
 
         If you have questions about the study, you may contact Torsten Martiny-Huenger at (torsten.martiny-huenger@uit.no). </p>
@@ -943,13 +947,14 @@ const about_the_experiment_and_consent = {
         <h3> Consent </h3>
         
         Participation in the study is voluntary. <br> 
-        All responses to this experiment are collected and stored anonymously. \n
+        All responses to this experiment are collected and stored anonymously. <br>
         That means they cannot be traced back to you. <br>
         The anonymous storage means we cannot provide participants with their responses upon request. <br>
-        You can quit the experiment without giving a reason by closing the browser tab. No data will be stored in that case.
+        You can quit the experiment without giving a reason by closing the browser tab. <br>
+        No data will be stored in that case.
         <br><br> 
         The data will be used for scientific purposes. <br> 
-        If you agree to these terms and conditions and want to participate click NEXT. <br>
+        If you agree to these terms and conditions and want to participate, click NEXT. <br>
         </div>`,
 
         ]
@@ -974,7 +979,7 @@ if( !skip_instructions ){
         The experiment will proceed quickly, without any breaks, <br>
         please ensure that you are in a quiet environment where you are unlikely to be distracted/disrupted. <br>
         <br><br>
-        This experiment requires full screen. If you are ready, enable full screen to proceed.
+        This experiment requires full screen, click the button below to enable full screen.
         <br><br>
         </div>`,
         button_label: "Enable full screen",
@@ -1005,28 +1010,41 @@ let diagnostic_task_instruction_description = {
             // FIRST, what keys will be used in this experiment? 
             `<div style="font-size:${instruction_font_size}">
             <h3> The task </h3><br>
-            The task will present 3-letter non-words that require either a left or right response. <br>
-            A left response corresponds to the <b>F</b> key, and a right response corresponds to the <b>J</b> key.
+            In this task, you will be shown 3-letter non-words. <br>
+            Each non-word requires a response: either left or right.
             <br><br>
-            The task consists of two instructions: <br>
-            One instruction remains the same throughout the task, and is connected to non-words presented in <b>black colour</b>. <br>
-            One instruction changes throughout the task, and is connected to non-words presented in <b> \n
-            <span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour_name.toLowerCase() + " colour"}</span></b>.
+            A left response should be made by pressing the F key.
+            <br>
+            A right response should be made by pressing the J key.
             <br><br>
-            You will receive a maximum of 20 seconds to read the instructions. <br>
+            The task includes two types of instructions:
+            <br>    
+            One instruction remains constant throughout the task and applies to non-words presented in black.
+            <br>
+            The other instruction changes throughout the task and applies to non-words presented in 
+            <b><span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour_name.toLowerCase()}</span></b>.
             
+            <br><br>
             </div> `,
 
             // About the first task
             `<div style="font-size:${instruction_font_size}">
 
-            On the next screen, the instruction that remains the same throughout the task, will be presented. <br>
-            (Connected to non-words in <b> black colour</b>.)  
-            <br><br>
-            A couple of practice rounds will be presented. <br>
-            <br><br>
-            The practice starts by clicking NEXT.
+            <h3> Consistent Instruction Screen </h3>
 
+            The instruction that remains the same throughout the task (connected to non-words in black) <br>
+            will be presented on the next screen.
+            <br><br>
+
+            These instructions, along with the relationship to the 3-letter non-words, <br>
+            will be displayed for up to 20 seconds.
+            <br><br>
+
+            A few practice trials will follow.
+            <br><br>
+
+            Begin the practice by clicking NEXT.
+            <br>
             </div>`,
         ]
     },
@@ -1118,7 +1136,7 @@ if(!skip_practice){
     // To force an equal number of right/left responses, we set the last parameter to "true". 
     // The function will create an array of equal right/left responses and randomize it. 
     // Selecting the respective response (italic/upright) case based on the predetermined array, looping through it to the length of the "prac_diagnostic_rounds".
-    diagnostic_FNC(prac_diagnostic_rounds, run_stimuli, "prac", 100, "diagnostic practice", true, false)
+    diagnostic_FNC(prac_diagnostic_rounds, run_stimuli, "Diagnostic practice", 100, "Diagnostic practice", true, false)
         // Force the round to be equal to not bias the practice
     
     // Inducer description
@@ -1129,15 +1147,20 @@ if(!skip_practice){
                 // FIRST, what keys will be used in this experiment? 
                 `<div style="font-size:${instruction_font_size}">
                 
-                On the next screen, the instruction that changes throughout the task, will be presented. <br>
-                (Connected to non-words in <b> \n
-                <span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour_name.toLowerCase() + " colour"}</span></b>.)
+                <h3> Variable Instruction Screen </h3>
+                <br>
+                On the next screen, you'll see the instruction that changes throughout the task (connected to non-words in <span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour_name.toLowerCase()}</span></b>).
                 <br><br>
-                These instructions will have the same format, <br> but will describe two new 3-letter non-words.
+
+                Although the format of these instructions remains the same,<br>
+                they will introduce two new 3-letter non-words each time.
                 <br><br>
-                A couple of practice trials will be presented.
+
+                A few practice trials will be provided.
                 <br><br>
-                The practice round starts by clicking "Start".
+
+                The practice starts by clicking "Start".
+                <br>
                 </div>`,
             ]
         },
@@ -1159,13 +1182,15 @@ if(!skip_practice){
     // To do this we create an array of the length of the practice, split it in two, and give them a 0 or 1 value. 
     // We then randomize the array, and parse through the array along the for loop. The value is then force into the inducer trial, 
     // selecting the stimulus corresponding to the value (first = 0, last = 1).
-    var prac_indu = Array(  Array(Math.floor(prac_inducer_rounds/2)).fill(1) ,  Array( Math.ceil(prac_inducer_rounds/2) ).fill(0)  ).flat()
+    var prac_indu = Array(  Array( Math.floor(prac_inducer_rounds/2) ).fill(1),  
+                            Array( Math.ceil( prac_inducer_rounds/2) ).fill(0)  ).flat()
         // Generate equal left/right inducer response trials
     var rnd_prac_indu = jsPsych.randomization.shuffle(prac_indu) // Randomize array
     if(debug){ console.log("Rnd practice inducer:", rnd_prac_indu) }
 
     for(let i = 0; i < prac_inducer_rounds; i++){
         let force_stimuli_inducer = rnd_prac_indu[i]
+        console.log(force_stimuli_inducer)
     
         // Run stimuli
         let run_stimuli = [rnd_stimuli[0], rnd_stimuli[1]]
@@ -1178,42 +1203,48 @@ if(!skip_practice){
     
     // Cue instructions
     let cue_instructions = {
-        type: jsPsychHtmlKeyboardResponse,
-        stimulus: function(){   
-            return `<div style="font-size:${instruction_font_size}">
+        type: jsPsychInstructions,
+        pages: () => { 
+            return [ `<div style="font-size:${instruction_font_size}">
             
-            One last practice round will be presented.
-    
-            <br><br>
-            Every new round will present two new 3-letter non-words. <br>
-            These relate to the non-words presented in 
-            <b><span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour_name.toLowerCase() + " colour"}</span></b>. 
-            
-            <br><br>
-            Before the 
-            <b><span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour_name.toLowerCase() + " coloured"}</span></b> 
-            non-word appears, some <b>black coloured</b> non-words will be presented. <br>
-    
-            <br><br>
-            In addition, a <b><span style="color:${rnd_cue_col}"> ${rnd_cue_col_n} coloured ${cue_stimulus_name.toLowerCase() }</span></b> will appear before the 
-            <b><span style="color: ${rnd_inducer_colour}"> ${rnd_inducer_colour_name.toLowerCase()+ " coloured"}</span></b> non-word.  
+            <h3> Additional Practice Round </h3>
             <br>
-            The <b><span style="color:${rnd_cue_col}"> ${rnd_cue_col_n} ${cue_stimulus_name.toLowerCase() }</span></b> indicate that the
-            <b><span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour_name.toLowerCase()+ " coloured"}</span></b> 
-            non-word will appear within a couple of screens.
+            Another practice round will be conducted, following the same structure as all subsequent rounds.
+            <br><br>
+
+            Firstly, an instruction screen will assign two new <b><span style="color:${rnd_inducer_colour}"> 3-letter non-words</span></b> 
+            to a left and right response. 
+            <br><br>
+
+            Thereafter, several trials will be presented in <b>black colour</b>, which may be either <i>italicized</i> or upright.
+            <br><br>
+
+            Lastly, a single trial featuring a non-word in <b><span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour_name.toLowerCase()} colour</span></b>
+            will be shown. 
+            <br><br><br>
+
+            However, before the <b><span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour_name.toLowerCase() + " coloured non-word"}</span></b> 
+            appears, a <b><span style="color:${rnd_cue_col}"> ${rnd_cue_col_n} ${cue_stimulus_name.toLowerCase() }</span></b> 
+            will be presented.
+            <br> 
+            This <b><span style="color:${rnd_cue_col}"> ${rnd_cue_col_n} ${cue_stimulus_name.toLowerCase() }</span></b> 
+            signifies that the <b><span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour_name.toLowerCase() + " coloured non-word"}</span></b>
+            will appear <b>within the next 0 to 4 trials</b>.
+            <br><br><br>
+
+            You do not have to response to the <b><span style="color:${rnd_cue_col}"> ${rnd_cue_col_n} ${cue_stimulus_name.toLowerCase() }</span></b>,
+            it will automatically disappear after about 1 second.
             <br>
-            The <b><span style="color:${rnd_cue_col}"> ${rnd_cue_col_n} ${cue_stimulus_name.toLowerCase() }</span></b> cannot be responded to. 
-    
-            </div>`
+            </div>`]
         }, 
-        prompt: "<br>Press SPACE to start the last practice",
-        choices: " ", 
-        data: {
-            stimulus: `Cue practice`,
-            trial_info: "Cue practice",
-        },
-        on_finish: (data) => { 
-            if( debug ){ console.log(data) }
+        allow_keys: false, 
+        show_clickable_nav: true,
+        button_label_previous: "",
+        button_label_next: "Start practice",
+        post_trial_gap: 1500,
+        data: { stimulus: "Instructions", trial_info: "Final experiment explanation" },
+        on_finish: (data) => {
+            if(debug){ console.log(data) }
         }
     }
     timeline.push( cue_instructions )
@@ -1225,29 +1256,36 @@ if(!skip_practice){
     inducer_instruction_FNC(run_stimuli, "Practice", "Cue practice")
 
     // equal resp after cue
-    let prac_cue_run = Array( Array( Math.floor( prac_post_cue_num/2 ) ).fill(0), Array( Math.ceil( prac_post_cue_num/2 ) ).fill(1) ).flat()
-    let rnd_prac_cue_run = jsPsych.randomization.shuffle( prac_cue_run )
-    if(debug){ console.log( "prac cue run:", rnd_prac_cue_run) }
-    diagnostic_FNC(prac_cue_rounds, run_stimuli, "Practice", prac_post_cue_num, "Cue practice", false, false, rnd_prac_cue_run)
-    inducer_FNC(run_stimuli, "Practice", "Inducer practice", false)
+    let prac_pre_cue_run = Array(   Array( Math.floor( (prac_cue_rounds-prac_post_cue_num)/2 ) ).fill(0), 
+                                    Array( Math.ceil(  (prac_cue_rounds-prac_post_cue_num)/2 ) ).fill(1) ).flat()
+    let prac_post_cue_run = Array(  Array( Math.floor( (prac_post_cue_num)/2 ) ).fill(0), 
+                                    Array( Math.ceil(  (prac_post_cue_num)/2 ) ).fill(1) ).flat()
+    let rnd_prac_pre_cue_run = jsPsych.randomization.shuffle( prac_pre_cue_run )
+    let rnd_prac_post_cue_run = jsPsych.randomization.shuffle( prac_post_cue_run )
+    if(debug){ console.log("Cue practice, pre-cue run:", rnd_prac_pre_cue_run, ".. Post-cue run:", rnd_prac_post_cue_run) }
+    diagnostic_FNC(prac_cue_rounds, run_stimuli, "Practice", prac_post_cue_num, "Cue practice", false, false, rnd_prac_pre_cue_run, rnd_prac_post_cue_run)
+    inducer_FNC(run_stimuli, "Practice", "Inducer practice", null, false)
     
     
     //// Proper task start instructions
     let proper_task_start = {
-        type: jsPsychHtmlKeyboardResponse,
-        stimulus: function(){   
-            return `<div style="font-size:${instruction_font_size}">
+        type: jsPsychInstructions,
+        stimulus: () => {   
+            return [`<div style="font-size:${instruction_font_size}">
             You have now completed the practice.
             
             <br><br>
-            From now on, each presentation will have a deadline of 2 seconds. <br>
-            Respond to each non-word as <b>fast and accurately</b> as possible. <br>
+            From now on, each presentation of a 3-letter will have a deadline of maximum 2 seconds. <br>
+            Respond to each presentation as <b>fast and accurately</b> as possible. <br>
             The task will be difficult, but feedback will be provided. 
-            
-            </div>`
+            <br>
+            </div>`]
         }, 
-        prompt: "<br>Press SPACE to start the task",
-        choices: " ", 
+        allow_keys: false,
+        show_clickable_nav: true,
+        button_label_previous: "", 
+        button_label_next: "Start experiment",
+        post_trial_gap: 1500,
         data: {
             stimulus: `End practice`,
             trial_info: "End of practice",
