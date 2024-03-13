@@ -279,7 +279,7 @@ if(run_simulations){
   # Summarise
   rnd_slice_diag_exclu |>
     summarise(
-      .by = c(pairs,n),
+      .by = c(pairs, name),
       power = mean(p.value<.05), 
       across(where(is.double), mean)
     ) -> sum_rnd_slice_diag_exclu
@@ -297,7 +297,7 @@ if(run_simulations){
 #| warning: false
 
 sum_rnd_slice_diag_exclu |>
-  ggplot(aes(pairs, power, col = n)) + 
+  ggplot(aes(pairs, power, col=name)) + 
   geom_line()+
   geom_hline(yintercept=.8)+
   scale_y_continuous(breaks=seq(0,1,.1))+
@@ -314,15 +314,38 @@ expected available trials `r n_diag_pairs*loss_trials` with
 the set post-cue diagnostic length or `r n_diag_pairs`
 
 
-### Changes in mean differences by increasing the number of pairs
+### Changes in the difference in mean and SD by increasing the number of pairs
 
 How the mean differences for PE and RT change with increase pairs of the diagnostic trial. 
 ```{r}
 #| echo: false
+#| warning: false
+#| message: false
 rnd_slice_diag_exclu |> 
   ggplot(aes(pairs, m_d, col=name))+
-  stat_summary(geom="line")
+  stat_summary(geom="line")+
+  geom_vline(xintercept=n_diag_pairs, linetype="dashed")+
+  geom_vline(xintercept=n_diag_pairs*loss_trials, linetype="dashed", col="red")
 ```
+
+```{r}
+#| echo: false
+#| warning: false
+#| message: false
+sum_rnd_slice_diag_exclu |> 
+  ggplot(aes(pairs, sd_d, col=name))+
+  geom_line() +
+  geom_vline(xintercept=n_diag_pairs, linetype="dashed")+
+  geom_vline(xintercept=n_diag_pairs*loss_trials, linetype="dashed", col="red")
+```
+
+```{r}
+#| include: false
+sim_pe_rt_parameters <- 
+  sum_rnd_slice_diag_exclu |> 
+  filter(pairs %in% c(26, 36, 100))
+```
+
 
 ## Randomly slicing congruency & and increase sample size
 
@@ -436,13 +459,14 @@ size will not remedy the problem for RT.
 One way to remedy this problem is by investigating the utility
 of the integrated scores.
 
-## Randomly slicing w/integrated score
+## Randomly slicing with integrated score
 
 ```{r}
 #| echo: false
 if(run_simulations){
-  pblapply(27:56, \(samp_s){
-    map_df(10:80, \(pairs){
+  clusterExport(cl, c("d_ex"))
+  pblapply(22:82, \(samp_s){
+    map_df(10:120, \(pairs){
       map_df(1:500, \(itr){
         # We create random "ids" by randomly sampling "samp_s" times,
         # And create a fake id "rnd_id_" 
@@ -456,66 +480,80 @@ if(run_simulations){
         }) -> test
 
         # Grand:
-        grand <- 
-          test |>
-          summarize(
-            g_rt = mean(rt),
-            g_rt_sd = sd(rt),
-            g_pc = mean(correct_response),
-            g_pe = 1 - g_pc,
-            g_pc_sd =  sd(correct_response) )
+      grand <- 
+        test |>
+        summarize(
+          g_rt = mean(rt),
+          g_rt_sd = sd(rt),
+          g_pc = mean(correct_response),
+          g_pe = 1 - g_pc,
+          g_pc_sd =  sd(correct_response) )
+      
+      # LISAS:
+      lisas <- 
+        test |>
+        summarize(
+          .by = id,
+          l_rt = mean(rt),
+          l_rt_sd = sd(rt),
+          l_pe = 1 - mean(correct_response), 
+          l_pe_sd =  sd(correct_response) )
         
-        # LISAS:
-        lisas <- 
-          test |>
-          summarize(
-            .by = id,
-            l_rt = mean(rt),
-            l_rt_sd = sd(rt),
-            l_pe = 1 - mean(correct_response), 
-            l_pe_sd =  sd(correct_response) )
-          
-        # Calculation
-        res <-
-          test |>
-          summarise(
-            .by = c(id, con), 
-            rt_sd = sd(rt),
-            rt = mean(rt),
-            pe_sd = sd(correct_response),
-            pe = 1 - mean(correct_response),
-            pc = mean(correct_response),
-          ) |> 
-          left_join(lisas, by="id") |> 
-          cbind(grand) |>
-          as_tibble() |>
-          mutate(
-            lisas  = ifelse(is.infinite(l_rt_sd/l_pe_sd), rt, rt + (l_rt_sd/l_pe_sd) * pe), 
-            BIS    = ( (pc - g_pc) / g_pc_sd ) - ( (rt - g_rt) / g_rt_sd ) )
-          
-        res |>
-          t.test(lisas ~ con, data=_, paired = T) |> 
-          tidy() |> 
-          mutate(.before=1, n = "LISAS") |>
-          rbind(
-            res |> 
-              t.test(BIS ~ con, data=_, paired=T) |> 
-              tidy() |> 
-              mutate(.before=1, n="BIS")
-          ) |> 
-          mutate(
-            .before=1, 
-            samp  = samp_s,
-            pairs = pairs,
-            itr   = itr,
-          )
-      })
+      # Calculation
+      res <-
+        test |>
+        summarise(
+          .by = c(id, con), 
+          rt_sd = sd(rt),
+          rt = mean(rt),
+          pe_sd = sd(correct_response),
+          pe = 1 - mean(correct_response),
+          pc = mean(correct_response),
+        ) |> 
+        left_join(lisas, by="id") |> 
+        cbind(grand) |>
+        as_tibble() |>
+        mutate(
+          lisas  = ifelse(is.infinite(l_rt_sd/l_pe_sd), rt, rt + (l_rt_sd/l_pe_sd) * pe), 
+          BIS    = ( (pc - g_pc) / g_pc_sd ) - ( (rt - g_rt) / g_rt_sd ) )
+      
+      res |>
+        t.test(lisas ~ con, data=_, paired = T) |> 
+        tidy() |> 
+        mutate(.before=1, n = "LISAS") |>
+        rbind(
+          res |> 
+            t.test(BIS ~ con, data=_, paired=T) |> 
+            tidy() |> 
+            mutate(.before=1, n="BIS")
+        ) |> 
+        mutate(
+          .before=1, 
+          samp  = samp_s,
+          pairs = pairs,
+          itr   = itr,
+        ) |>
+        left_join(
+          by = join_by("n"=="name"),
+          res |> 
+            select(id,con,lisas,BIS) |> 
+            mutate(lisas = scale(lisas)) |>
+            rename(LISAS = lisas) |>
+            pivot_longer(c(LISAS, BIS)) |>
+            pivot_wider(names_from=con, values_from=value) |>
+            summarise(
+              .by = name,
+              m_diff    = mean(`FALSE`-`TRUE`),
+              sd_diff   = sd(`FALSE`-`TRUE`),
+            )
+        ) 
     })
-  }, cl = cl) |> 
-    map_df(~.x) -> 
-    rnd_int_scores_extended_slice_diag_exclu
-  
-  rnd_int_scores_extended_slice_diag_exclu |>
+  })
+}, cl = cl) |> 
+  map_df(~.x) -> 
+  rnd_int_scores_extended_slice_diag_exclu
+
+rnd_int_scores_extended_slice_diag_exclu |>
     summarise(
       .by = c(samp,pairs,n),
       power = mean(p.value<.05), 
