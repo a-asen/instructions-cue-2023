@@ -83,7 +83,7 @@ const cue_duration = 1250               // How long is the pre-cue present for?
 
 
 ////    Practice parameters     ////
-const prac_diagnostic_rounds = 2                    // Number of diagnostic practice rounds
+const prac_diagnostic_rounds = 16                    // Number of diagnostic practice rounds
     // Set to 0 if no practice rounds should occur.
 const prac_inducer_rounds = 6
     // NB: Max 64 rounds of new stimuli (prac_inducer_rounds + number_of_inducer > 64)
@@ -632,7 +632,7 @@ function force_stim_equal(array){
             if(max_list[ita_or_not][left_or_right].length > 0 ){
                 if(ita_or_not == 1){ total_1-- } else if (ita_or_not==0) { total_0-- }
                 if(debug){  
-                    console.log("total1:",  total_1, "total0:", total_0)
+                    // console.log("total1:",  total_1, "total0:", total_0)
                 }
                 list.push( max_list[ita_or_not][left_or_right][0] ) // Add stimulus response side 
                 max_list[ita_or_not][left_or_right].splice(0,1) // remove from pre-determined-list
@@ -1190,7 +1190,6 @@ if(!skip_practice){
 
     for(let i = 0; i < prac_inducer_rounds; i++){
         let force_stimuli_inducer = rnd_prac_indu[i]
-        console.log(force_stimuli_inducer)
     
         // Run stimuli
         let run_stimuli = [rnd_stimuli[0], rnd_stimuli[1]]
@@ -1270,7 +1269,7 @@ if(!skip_practice){
     //// Proper task start instructions
     let proper_task_start = {
         type: jsPsychInstructions,
-        stimulus: () => {   
+        pages: () => {   
             return [`<div style="font-size:${instruction_font_size}">
             You have now completed the practice.
             
