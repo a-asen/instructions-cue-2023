@@ -137,10 +137,13 @@ exp1_outcome
 # Slicing from experiment 1:
 Parameters:
 
-```{r echo: F}
+```{r}
+n_diag_pairs <- 36 # number of diagnostic pairs
 loss_trials  <- exp1_remaining_trials/240
-n_diag_pairs <- 36 #pairs
+loss_trials 
 ```
+
+We determine to use around 36 pairs (72 trials) for the post-cue run, corresponding to an average of 3 trials per post-cue run. These runs are displayed as the black dashed line, and the expected remaining trials (after loss) are indicated with a dashed red line. 
 
 ## Slice from the START
 
@@ -595,4 +598,4 @@ participants.
 
 --------------------------------------------------------------
 
-~Generated generated `r Sys.time()`~
+~Document\ generated:\ `r Sys.time()`~
