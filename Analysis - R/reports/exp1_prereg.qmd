@@ -321,6 +321,106 @@ d |>
   ungroup() -> d2
 ```
 
+```{r residual qq plot and qqline }
+#| echo: false
+d |> 
+  filter( trial_info=="Diagnostic trial" ) |>
+  summarize(
+    .by = c(id, con),
+    rt = mean(rt),
+    pe = 1 - mean(correct_response) ) |> 
+  pivot_longer(c(rt, pe))  |>
+  reframe(
+    .by = name, 
+    resid = resid( lmer(value ~ con + (1|id)) )
+  ) |>
+  ggplot(aes(sample = resid))+
+  facet_wrap(~name, scale="free") +
+  geom_qq() +
+  geom_qq_line() 
+```
+
+```{r histogram and density of mean difference in rt and pe}
+#| echo: false
+d2 |> 
+  reframe(
+    rt = rt_FALSE-rt_TRUE,
+    pe = pe_FALSE-pe_TRUE
+  ) |>
+  pivot_longer(c(rt,pe)) |>
+  ggplot(aes(value)) + 
+  facet_wrap(~name, scales="free") +
+  geom_histogram(aes(y=after_stat(density))) +
+  geom_density(col="red", linewidth=1.2) 
+```
+
+```{r }
+#| echo: false
+# Some deviations from normality
+d2 |>
+  reframe(
+    rt=rt_FALSE-rt_TRUE,
+    pe=pe_FALSE-pe_TRUE,
+  ) |> pivot_longer(c(rt,pe)) |>
+  ggplot(aes(name, value))+
+  facet_wrap(~name, scales="free")+
+  geom_boxplot()
+```
+
+```{r wilcoxon signed rank test}
+#| echo: false
+wilcox.test(d2$rt_FALSE, d2$rt_TRUE, paired=T) |>
+  tidy() |>
+  bind_rows(
+    wilcox.test(d2$pe_FALSE, d2$pe_TRUE, paired=T) |>
+      tidy()
+  )
+
+# Non-parametric test is still significant
+```
+
+```{r paired sample t-test after excluding outliers}
+#| echo: false
+# Exclude outliers
+d2 |>
+  mutate(
+    rt=rt_FALSE-rt_TRUE,
+    pe=pe_FALSE-pe_TRUE,
+    rt_l=quantile(rt, .25),
+    rt_h=quantile(rt, .75),
+    rt_q = IQR(rt),
+    pe_l=quantile(pe, .25),
+    pe_h=quantile(pe, .75),
+    pe_q = IQR(pe),
+  ) |> 
+  filter(rt > (rt_l - 1.5*rt_q), rt < (rt_h + 1.5*rt_q),
+         pe > (pe_l - 1.5*pe_q), pe < (pe_h + 1.5*pe_q)) -> d3
+
+d3 |>
+  reframe(
+    rt = rt_FALSE - rt_TRUE,
+    pe = pe_FALSE - pe_TRUE
+  ) |> pivot_longer(c(rt,pe)) |>
+  ggplot(aes(value))+
+  facet_wrap(~name, scales="free")+
+  geom_histogram(aes(y = after_stat(density)))+
+  geom_density(col="red", linewidth=1.2)
+```
+
+```{r}
+# Paired sample t-test
+t.test(d3$rt_FALSE, d3$rt_TRUE, paired=T, alternative="greater") |>
+  tidy() |>
+  mutate(name = "rt", .before=1) |>
+  bind_rows( 
+    t.test(d3$pe_FALSE, d3$pe_TRUE, paired=T, alternative="greater") |>
+      tidy() |>
+      mutate(name = "pe", .before=1)
+  )
+# Even after excluding outliers, we still find a significant congruency effect
+```
+
+
 ### Table
 
 ```{r RT tables}
@@ -333,7 +433,6 @@ rt_test_b    <- ttestBF( d2$rt_FALSE, d2$rt_TRUE, paired = TRUE, iterations = 10
 rt_test_b2   <- ttestBF( d2$rt_FALSE, d2$rt_TRUE, paired = TRUE, iterations = 10000, posterior = T )
 rt_test_hdi  <- hdi(rt_test_b2)
   # weird if this is how you have to do it
-
 d2 |>
   summarise(
     name            = "RT",
