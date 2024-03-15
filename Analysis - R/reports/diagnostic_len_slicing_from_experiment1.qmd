@@ -483,8 +483,7 @@ if(run_simulations){
         }) -> test
 
         # Grand:
-      grand <- 
-        test |>
+      grand  <-  test |>
         summarize(
           g_rt = mean(rt),
           g_rt_sd = sd(rt),
@@ -493,18 +492,15 @@ if(run_simulations){
           g_pc_sd =  sd(correct_response) )
       
       # LISAS:
-      lisas <- 
-        test |>
+      lisas  <-  test |>
         summarize(
           .by = id,
-          l_rt = mean(rt),
           l_rt_sd = sd(rt),
-          l_pe = 1 - mean(correct_response), 
-          l_pe_sd =  sd(correct_response) )
+          l_pe_s  = sqrt( mean(correct_response) * (1 - mean(correct_response)) )
+        )
         
       # Calculation
-      res <-
-        test |>
+      res  <-  test |>
         summarise(
           .by = c(id, con), 
           rt_sd = sd(rt),
@@ -517,7 +513,7 @@ if(run_simulations){
         cbind(grand) |>
         as_tibble() |>
         mutate(
-          lisas  = ifelse(is.infinite(l_rt_sd/l_pe_sd), rt, rt + (l_rt_sd/l_pe_sd) * pe), 
+          lisas  = ifelse(is.infinite(l_rt_sd/l_pe_s), rt, rt + (l_rt_sd/l_pe_s) * pe), 
           BIS    = ( (pc - g_pc) / g_pc_sd ) - ( (rt - g_rt) / g_rt_sd ) )
       
       res |>
