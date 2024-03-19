@@ -2,14 +2,13 @@
 ////////////////////////////////////////////////////////////////////////
 
 // CHANGE THESE BEFORE EXPERIMENT!
-const debug = true                  // Show debug information?
+const debug = false                  // Show debug information?
 const skip_instructions = false     // Skip intro? 
 const skip_practice = false         // Skip practice? 
 const save_local_data = false        // Save local file? 
 
-const study_name = "exp2_pilot" // add to filename 
-// const redirect_link = ## NT &&//"https://app.prolific.com/submissions/complete?cc=" 
-        // https://app.prolific.com/submissions/complete?cc=C4S441ES (CUE TASK)
+const study_name = "exp2" // add to filename 
+const redirect_link = "https://app.prolific.com/submissions/complete?cc=C4S441ES" // (CUE TASK)
 
 
 ////////////////////////////////////////////////////////////////////////
@@ -53,11 +52,11 @@ const inducer_colours      = ["red", "yellow", "blue"]      // Inducer colour ra
 const inducer_colour_name  = ["red", "yellow", "blue"]
     // This is also what is DISPLAYED (i.e., text) to participants. Should therefore be a readable name. 
 
-const number_of_inducers = 10       // Number of inducers 
+const number_of_inducers = 24       // Number of inducers 
 
 
 ////    Diagnostic parameters   ////
-const max_diagnostic_trials = 100     // Overall max run length
+const max_diagnostic_trials = 240     // Overall max run length
 
 // pre-cue: 
 const diagnostic_min_length = 4         // Min run length
@@ -917,7 +916,7 @@ const about_the_experiment_and_consent = {
 
         We acknowledge that the task may present some challenges initially, <br>
         but please be assured that feedback will be provided to aid your progress. <br>
-        The entire task will take approximately 15 minutes to complete. <br>
+        The entire task will take approximately 20 minutes to complete. <br>
         If you're ready for a challenge and willing to test your limits, we encourage you to participate. <br>
         Give it your best effort!
         <br><br>
