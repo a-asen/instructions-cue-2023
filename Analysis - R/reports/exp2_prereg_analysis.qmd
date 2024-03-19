@@ -34,7 +34,7 @@ read_csv("../data/raw/experiment2/exp2_demo.csv") -> demo
 # Behaviour data
 # list.files("../data/raw/experiment2/pilots/", full.names = T)  -> fnames
 list.files("../data/raw/experiment2/task/", full.names = T)  -> fnames
-map_df(fnames[5:6], \(x){
+map_df(fnames[1], \(x){
   read_csv(x)
 }) -> exp2_d
 ```
@@ -236,7 +236,6 @@ trials), and a wrong response on the inducer trial resulted in
 a loss of `r fmt_APA_numbers(loss$inducer_fail_prop)` %
 (`r loss$inducer_fail_trials` trials).
 
-## Analysis
 
 ```{r calculate BIS and LISAS }
 #| echo: false
@@ -278,14 +277,15 @@ d_ex_test <- d_ex |>
   bind_cols(grand) |>
   mutate(
     lisas  = ifelse(is.infinite(l_rt_sd/l_pe_s), rt, rt + (l_rt_sd/l_pe_s) * pe), 
-    bis    = ( (pc - g_pc) / g_pc_sd ) - ( (rt - g_rt) / g_rt_sd ) 
+    bis    = ( (pc - g_pc) / g_pc_sd ) - ( (rt - g_rt) / g_rt_sd ),
+    inv_bis = bis*-1,
   ) |> 
-  select(id, post_cue, congruent, rt, pe, lisas, bis)
+  select(id, post_cue, congruent, rt, rt_sd, pe, pe_sd, lisas, bis, inv_bis)
 ```
 
-## Visualize
+## Assumption check
 
-```{r check assumptions }
+```{r normality check }
 #| echo: false
 
 # Check the assumption of normality: 
@@ -301,39 +301,52 @@ d_ex_test |>
   geom_qq_line() 
 ```
 
-
-
-
-```{r statistical test}
+```{r outliers}
 #| echo: false
-aov_car(rt ~ post_cue*congruent + Error(id/(post_cue*congruent)), d_ex_test)
+d_ex_test |> 
+  mutate(Cue = fct_relevel(ifelse(post_cue==T, "Post-cue", "Pre-cue"),"Post-cue", after=1),
+         Congruency = fct_relevel(ifelse(congruent==T, "Congruent", "Incongruent"), "Congruenct", after=1)) |>
+  pivot_longer(c(rt,pe,lisas,inv_bis)) |>
+  ggplot(aes(Cue, value, col = Congruency)) + 
+  facet_wrap(~ name, scales="free")+
+  geom_boxplot()
+```
 
+```{r get the extreme outliers}
+d_ex_test |> 
+  group_by(post_cue,congruent) |>
+  rstatix::identify_outliers(rt)
+```
+
+## Statistical test
+
+```{r statistical test and spherisity}
+#| echo: false
+
+# aov_car(rt ~ post_cue*congruent + Error(id/(post_cue*congruent)), test) -> testing
+# summary(testing)
+
+# rstatix so this should work
+rstatix::anova_test(test, dv=rt, wid = id, within=c(post_cue, congruent), detailed=T) -> testing
+rstatix::get_anova_table(testing) 
+
+# ez (this as well)
+# ez::ezANOVA(test,
+#             rt,
+#             id,
+#             within=c(post_cue, congruent),
+#             detailed = T) -> testing
+
+
+# Bayesian rmANOAV
 anovaBF(rt ~ post_cue*congruent + id, d_ex_test, whichRandom = "id")
 
-brms::brm(rt ~ post_cue*congruent + (1|id), data = testing2) -> brm_test
-
-
-d2 |> 
-  reframe(
-    rt = rt_FALSE-rt_TRUE,
-    pe = (pe_FALSE-pe_TRUE)
-  ) |> 
-  pivot_longer(c(rt,pe)) |>
-  summarise(
-    .by  = name, 
-    stat = shapiro.test(value)$statistic,
-    p    = shapiro.test(value)$p.value
-  )
-
-pairwise.wilcox.test(dat_test$rt, dat_test$con, paired=T) |> tidy()
-pairwise.wilcox.test(dat_test$pe, dat_test$con, paired=T) |> tidy()
-
-
+# brms::brm(rt ~ post_cue*congruent + (1|id), data = testing2) -> brm_test
 
 ```
 
 
-
+## Tables and figures
 
 ```{r visualize}
 #| echo: false
@@ -358,7 +371,7 @@ d_ex_test |>
 
 
 
-```{r}
+```{r finished table}
 d |>
   filter(trial_info=="Diagnostic trial") |>
   pivot_longer(c(rt,correct_response)) |>
@@ -398,130 +411,5 @@ exp2_statistic_table
 *Note.* <br/>
 `r fmt_APA_p_table_fig(exp2_statistic_table$p[2])` <br/>
 <!--- This function could be improved by finding the lowest value in a p vector ---> 
-
-
-
-
-# ? 
-
-## Figures
-### Linerange
-```{r}
-#| echo: false
-#| warning: false
-#| message: false
-#| error: false
-#| fig-dpi: 300
-#| fig-width: 6
-
-p1 <- 
-  d |>
-  filter(!is.na(con)) |>
-  group_by(id, con) |>
-    # ????????????????  inducer_run
-  summarize(rt = mean(rt)) |>
-    # Summarize the proportion of correct per block
-  ungroup() |>  
-  mutate(con2 = ifelse(con==T,1,0)) |>
-  #mutate(con = ifelse(congruent==TRUE,1,0)) |>
-  ggplot(aes(x = con2, y = rt, group=id, col = factor(con2)))+
-  stat_summary(aes(col=NULL), position=position_dodge(.1), geom = "point", fun = mean, alpha = .1)+
-  stat_summary(aes(col=NULL), position=position_dodge(.1), geom = "line", fun = mean, alpha = .1)+
-  stat_summary(aes(group=NULL), fun.data = mean_se, geom = "errorbar", width=.2, size = 1.5, alpha = .8)+
-  stat_summary(aes(group=NULL, col=NULL), fun.data = mean_se, geom = "point", size = 1.5)+
-  scale_x_continuous(breaks = c(0,1), labels = c("Incongruent", "Congruent"), name="",
-                     expand = c(.2,.2), minor_breaks = NULL)+
-  scale_y_continuous(breaks = seq(0,2000,50), minor_breaks = NULL)+
-  coord_cartesian(ylim = c(450, 960))+
-                        # Adjust
-  theme_minimal()+
-  theme(axis.text.x = element_text(size = 10), legend.position = "none")+
-  labs(title = "Response time", x = "", y = "Response time (ms)")
-
-p2 <-
-  d |>
-  filter(!is.na(con)) |>
-  group_by(id, con) |>
-  summarize(pct = mean(correct_response)) |>
-    # Summarize the proportion of correct per block
-  ungroup() |>  
-  mutate(con2 = ifelse(con==T,1,0)) |>
-  ggplot(aes(x = con2, y = pct, group=id, col = factor(con)))+
-  stat_summary(aes(col=NULL), position=position_dodge(.1), geom = "point", fun = mean, alpha = .1)+
-  stat_summary(aes(col=NULL), position=position_dodge(.1), geom = "line", fun = mean, alpha = .1)+
-  stat_summary(aes(group=NULL), fun.data = mean_se, geom = "errorbar", width=.2, size = 1.5, alpha = .8)+
-  stat_summary(aes(group=NULL, col=NULL), fun.data = mean_se, geom = "point", size = 1.5)+
-  scale_x_continuous(breaks = c(0,1), labels = c("Incongruent", "Congruent"), name="",
-                     expand = c(.2,.2), minor_breaks = NULL)+
-  scale_y_continuous(breaks = seq(0,1,.05), minor_breaks = NULL)+
-  coord_cartesian(ylim = c(.65, 1.01))+
-                      # Adjust
-  theme_minimal()+
-  theme(axis.text.x = element_text(size = 10), legend.position = "none")+
-  labs(title = "Proportion of correct trials", x = "", y = "Proportion")
-
-p1+p2
-if(save_outputs){ ggsave("../outputs/figs/exp2_rt-pe_line.jpeg", p1+p2, width=8, height=5) }
-```
-
-### Bar plot
-```{r}
-#| echo: false
-#| warning: false
-#| message: false
-#| error: false
-#| fig-dpi: 300
-#| fig-width: 6
-
-p1 <-
-  d |>
-  filter(!is.na(con)) |>
-  group_by(id, con) |>
-  summarize(rt = mean(rt)) |>
-    # Summarize the proportion of correct per block
-  ungroup() |>  
-  mutate(con2 = ifelse(con==T,1,0)) |>
-  ggplot(aes(x = con2, y = rt,fill = factor(con)))+
-  stat_summary(fun = mean, geom = "col")+
-  stat_summary(fun.data = mean_se, geom = "errorbar", width = .4, size = 1, alpha = 1)+
-  scale_x_continuous(breaks = c(0,1), labels = c("Incongruent", "Congruent"), name="",
-                     expand = c(.2,.2), minor_breaks = NULL)+
-  scale_y_continuous(breaks = seq(0,2000,25), minor_breaks = NULL)+
-  coord_cartesian(ylim = c(600, 750))+
-                        # Adjust? 
-  theme_minimal()+
-  theme(axis.text.x = element_text(size = 10), legend.position = "none")+
-  labs(x = "", y = "Response Time (ms)")+
-  annotate("segment", x=-0.1, xend=1.1, y=696, yend=696, size=1)+
-  annotate(geom = "text", x = .5, y=700, label="**", size=5)
-
-p2 <- 
-  d |>
-  filter(!is.na(con)) |>
-  group_by(id, con) |>
-    # ????????????????  inducer_run
-  summarize(pe = 1 - mean(correct_response)) |>
-    # Summarize the proportion of correct per block
-  ungroup() |>  
-  mutate(con2 = ifelse(con==T,1,0)) |>
-  ggplot(aes(x = con2, y = pe, fill = factor(con2)))+
-  stat_summary(fun=mean, geom="col")+
-  stat_summary(aes(group=NULL), fun.data = mean_se, geom = "errorbar", width=.4, size = 1)+
-  scale_x_continuous(breaks = c(0,1), labels = c("Incongruent", "Congruent"), name="",
-                     expand = c(.2,.2), minor_breaks = NULL)+
-  scale_y_continuous(breaks = seq(0,1,.05), minor_breaks = NULL)+
-  coord_cartesian(ylim = c(0, .3))+
-                        # Adjust? 
-  theme_minimal()+
-  theme(axis.text.x = element_text(size = 10), legend.position = "none")+
-  labs(x = "", y = "Proportion of Error")+
-  annotate("segment", x=-0.1, xend=1.1, y=.13, yend=.13, size=1)+
-  annotate(geom = "text", x = .5, y=.137, label="**", size=5)
-    
-p1 + p2
-
-if(save_outputs){ ggsave("../outputs/figs/exp2_rt-pe_bar.jpeg", p1+p2, width=8, height=5) }
-```
-
 
 
