@@ -304,6 +304,7 @@ deviating response times and non-responses accounted for
 trials), and a wrong response on the inducer trial resulted in
 a loss of `r fmt_APA_numbers(loss$inducer_fail_prop)` %
 (`r loss$inducer_fail_trials` trials).
+
 ```{r}
 d |> 
   filter(!(is.na(con))) |>
@@ -318,19 +319,23 @@ dat |>
 
 fn_test <-\(data, indices){
   d <- data[indices,]
-  t.test(d[["rt_FALSE"]], d[["rt_TRUE"]], paired=T) |> tidy()
+  # t.test(d[["rt_FALSE"]], d[["rt_TRUE"]], paired=T) |> tidy()
+  t.test(d[["rt_FALSE"]], d[["rt_TRUE"]], paired=T) |> unlist()
 }
 
 r <- boot::boot(dat, fn_test, 50)
 
+boot::boot.array()
 r 
 plot(r)
 dat 
 ```
 
-## Summary
+# Results
 
-### Assumption check
+## Assumption check
+
+### Normality
 
 ```{r}
 #| include: FALSE
@@ -386,6 +391,8 @@ d2 |>
   theme(legend.position = "none")
 ```
 
+### Outliers
+
 ```{r outliers - boxplot}
 #| echo: false
 #| fig-width: 6
@@ -407,98 +414,10 @@ d2 |>
         axis.title.x = NULL)
 ```
 
-#### Non-parametric test
+## Analysis 
 
-```{r wilcoxon signed rank test}
-#| echo: false
-# Non-parametric test is still significant
-wilcox.test(d2$rt_FALSE, d2$rt_TRUE, paired=T, alternative="greater") |>
-  tidy() |>
-  mutate(name = "rt") |>
-  bind_rows(
-    wilcox.test(d2$pe_FALSE, d2$pe_TRUE, paired=T, alternative="greater") |>
-      tidy() |> 
-      mutate(name ="pe")
-  ) -> wilcox_test
-```
+### t-test (no removed)
 
-We include two non-parametric test of the difference between the means due to the outliers found in our sample. We did a paired sample Wilcoxon signed ranked test for response time and error rate. For the former, we found a significant difference of the median (response time, *V* = `r wilcox_test$statistic[wilcox_test$name=="rt"]`, *p* = `r fmt_APA_numbers(wilcox_test$p.value[wilcox_test$name=="rt"], .p=T)`), and for the latter (error rate, *V* = `r wilcox_test$statistic[wilcox_test$name=="pe"]`, *p* = `r fmt_APA_numbers(wilcox_test$p.value[wilcox_test$name=="pe"], .psym = T)`). 
-
-#### Paired sample t-test with removed outliers
-
-```{r finding outliers and extreme outliers}
-#| echo: false
-# Exclude outliers
-outlier_values <- d2 |>
-  reframe(
-    id=id,
-    rt=rt_FALSE-rt_TRUE,
-    pe=pe_FALSE-pe_TRUE,
-  ) |> pivot_longer(c(rt,pe)) |>
-  group_by(name) |>
-  rstatix::identify_outliers(value)
-
-is_outlier <- outlier_values |> filter(is.outlier==T) |> pull(id)
-is_extreme <- outlier_values |> filter(is.extreme==T) |> pull(id)
-```
-
-```{r testing extreme}
-#| echo: false
-d2 |> 
-  filter(!(id %in% is_extreme)) -> d3
-
-t.test(d3$rt_FALSE, d3$rt_TRUE, paired=T, alternative="greater") |>
-  tidy() |>
-  mutate(name = "rt", .before=1) |>
-  bind_rows( 
-    t.test(d3$pe_FALSE, d3$pe_TRUE, paired=T, alternative="greater") |>
-      tidy() |>
-      mutate(name = "pe", .before=1)
-  ) -> rm_extreme_t
-```
-
-We included four additional paired sample *t*-tests to investigate whether removing the outliers would change the results from the main analysis. 
-
-Removing the extreme outliers from the paired sample *t*-test, still resulted in a significant difference between the means for response time (*t*(`r rm_extreme_t$parameter[rm_extreme_t$name=="rt"]`) = `r fmt_APA_numbers( rm_extreme_t$statistic[rm_extreme_t$name=="rt"])`, *p* = `r fmt_APA_numbers( rm_extreme_t$p.value[rm_extreme_t$name=="rt"], .p=T)`), and error rate (*t*(`r rm_extreme_t$parameter[rm_extreme_t$name=="pe"]`) = `r fmt_APA_numbers( rm_extreme_t$statistic[rm_extreme_t$name=="pe"])`, *p* = `r fmt_APA_numbers( rm_extreme_t$p.value[rm_extreme_t$name=="pe"], .p=T)`). 
-
-```{r paired sample t-test after excluding outliers}
-#| echo: false
-# Outliers removed
-d2 |> 
-  filter(!(id %in% is_outlier)) |>
-  reframe(
-    rt = rt_FALSE - rt_TRUE,
-    pe = pe_FALSE - pe_TRUE
-  ) |> 
-  rename(`Response time` = rt, `Error rate` = pe) |>
-  pivot_longer(c(`Response time`, `Error rate`)) |>
-  ggplot(aes(value, col = name, fill = name))+
-  facet_wrap(~name, scales="free")+
-  geom_histogram(aes(y = after_stat(density)))+
-  geom_density(aes(fill = NULL, col = NULL ), linewidth=1.2)+
-  labs(x = "Difference between means", y ="Density")+
-  theme(legend.position = "none")
-```
-
-```{r testing outliers}
-#| echo: false
-# Paired sample t-test
-d2 |> 
-  filter(!(id %in% is_outlier)) -> d4
-
-t.test(d4$rt_FALSE, d4$rt_TRUE, paired=T, alternative="greater") |>
-  tidy() |>
-  mutate(name = "rt", .before=1) |>
-  bind_rows( 
-    t.test(d4$pe_FALSE, d4$pe_TRUE, paired=T, alternative="greater") |>
-      tidy() |>
-      mutate(name = "pe", .before=1)
-  ) -> rm_outlier_t
-```
-
-Removing all of the outliers from the paired sample *t*-test, still resulted in a significant difference between the means for response time (*t*(`r rm_outlier_t$parameter[rm_outlier_t$name=="rt"]`) = `r fmt_APA_numbers( rm_outlier_t$statistic[rm_outlier_t$name=="rt"])`, *p* = `r fmt_APA_numbers( rm_outlier_t$p.value[rm_outlier_t$name=="rt"], .p=T)`), and error rate (*t*(`r rm_outlier_t$parameter[rm_outlier_t$name=="pe"]`) = `r fmt_APA_numbers( rm_outlier_t$statistic[rm_outlier_t$name=="pe"])`, *p* = `r fmt_APA_numbers( rm_outlier_t$p.value[rm_outlier_t$name=="pe"], .p=T)`). 
-
-### Preregistered t-test
 #### Table
 
 ```{r RT tables}
@@ -604,7 +523,7 @@ if(save_outputs){ gtsave(exp1_table_simple, filename = "../outputs/tables/exp1_t
 *Note.* </br>
 `r fmt_APA_p_table_fig(p_min)`
 
-##### Paragraph
+#### Paragraph
 
 The paired-sample t-test for response time, revealed a
 significant difference (*M* = `r b$Mdiff[b$name=="RT"]`, *t*(`r b$df[b$name=="RT"]`)
@@ -622,9 +541,9 @@ incongruent (*M* = `r b$m_incongruent[b$name=="PE"]`, *SD* =
 `r b$m_congruent[b$name=="PE"]`, *SD* = `r b$sd_congruent[b$name=="PE"]`) condition
 (see Appendix B).
 
-#### Figures
+### Figures
 
-##### Linerange
+#### Linerange
 
 ```{r}
 #| echo: false
@@ -687,7 +606,7 @@ p2
 if(save_outputs){ ggsave("../outputs/figs/exp1_rt-pe_line.jpeg", p1+p2, width=8, height=5) }
 ```
 
-##### Bar plot
+#### Bar plot
 
 ```{r}
 #| echo: false
@@ -745,3 +664,102 @@ if(save_outputs){ ggsave("../outputs/figs/exp1_rt-pe_bar.jpeg", p1+p2, width=8, 
 --------------------------------------------------------------
 
 ~Document generated: `r Sys.time()`~
+
+
+## Robustness check: 
+
+### Non-parametric test
+
+```{r wilcoxon signed rank test}
+#| echo: false
+# Non-parametric test is still significant
+wilcox.test(d2$rt_FALSE, d2$rt_TRUE, paired=T, alternative="greater") |>
+  tidy() |>
+  mutate(name = "rt") |>
+  bind_rows(
+    wilcox.test(d2$pe_FALSE, d2$pe_TRUE, paired=T, alternative="greater") |>
+      tidy() |> 
+      mutate(name ="pe")
+  ) -> wilcox_test
+```
+
+We include two non-parametric test of the difference between the means due to the outliers found in our sample. We did a paired sample Wilcoxon signed ranked test for response time and error rate. For the former, we found a significant difference of the median (response time, *V* = `r wilcox_test$statistic[wilcox_test$name=="rt"]`, *p* = `r fmt_APA_numbers(wilcox_test$p.value[wilcox_test$name=="rt"], .p=T)`), and for the latter (error rate, *V* = `r wilcox_test$statistic[wilcox_test$name=="pe"]`, *p* = `r fmt_APA_numbers(wilcox_test$p.value[wilcox_test$name=="pe"], .psym = T)`). 
+
+### t-test with removed extreme outliers
+
+```{r finding outliers and extreme outliers}
+#| echo: false
+# Exclude outliers
+outlier_values <- d2 |>
+  reframe(
+    id=id,
+    rt=rt_FALSE-rt_TRUE,
+    pe=pe_FALSE-pe_TRUE,
+  ) |> pivot_longer(c(rt,pe)) |>
+  group_by(name) |>
+  rstatix::identify_outliers(value)
+
+is_outlier <- outlier_values |> filter(is.outlier==T) |> pull(id)
+is_extreme <- outlier_values |> filter(is.extreme==T) |> pull(id)
+```
+
+```{r testing extreme}
+#| echo: false
+d2 |> 
+  filter(!(id %in% is_extreme)) -> d3
+
+t.test(d3$rt_FALSE, d3$rt_TRUE, paired=T, alternative="greater") |>
+  tidy() |>
+  mutate(name = "rt", .before=1) |>
+  bind_rows( 
+    t.test(d3$pe_FALSE, d3$pe_TRUE, paired=T, alternative="greater") |>
+      tidy() |>
+      mutate(name = "pe", .before=1)
+  ) -> rm_extreme_t
+```
+
+We included four additional paired sample *t*-tests to investigate whether removing the outliers would change the results from the main analysis. 
+
+Removing the extreme outliers from the paired sample *t*-test, still resulted in a significant difference between the means for response time (*t*(`r rm_extreme_t$parameter[rm_extreme_t$name=="rt"]`) = `r fmt_APA_numbers( rm_extreme_t$statistic[rm_extreme_t$name=="rt"])`, *p* = `r fmt_APA_numbers( rm_extreme_t$p.value[rm_extreme_t$name=="rt"], .p=T)`), and error rate (*t*(`r rm_extreme_t$parameter[rm_extreme_t$name=="pe"]`) = `r fmt_APA_numbers( rm_extreme_t$statistic[rm_extreme_t$name=="pe"])`, *p* = `r fmt_APA_numbers( rm_extreme_t$p.value[rm_extreme_t$name=="pe"], .p=T)`). 
+
+### t-test with removed outliers
+
+```{r paired sample t-test after excluding outliers}
+#| echo: false
+# Outliers removed
+d2 |> 
+  filter(!(id %in% is_outlier)) |>
+  reframe(
+    rt = rt_FALSE - rt_TRUE,
+    pe = pe_FALSE - pe_TRUE
+  ) |> 
+  rename(`Response time` = rt, `Error rate` = pe) |>
+  pivot_longer(c(`Response time`, `Error rate`)) |>
+  ggplot(aes(value, col = name, fill = name))+
+  facet_wrap(~name, scales="free")+
+  geom_histogram(aes(y = after_stat(density)))+
+  geom_density(aes(fill = NULL, col = NULL ), linewidth=1.2)+
+  labs(x = "Difference between means", y ="Density")+
+  theme(legend.position = "none")
+```
+
+```{r testing outliers}
+#| echo: false
+# Paired sample t-test
+d2 |> 
+  filter(!(id %in% is_outlier)) -> d4
+
+t.test(d4$rt_FALSE, d4$rt_TRUE, paired=T, alternative="greater") |>
+  tidy() |>
+  mutate(name = "rt", .before=1) |>
+  bind_rows( 
+    t.test(d4$pe_FALSE, d4$pe_TRUE, paired=T, alternative="greater") |>
+      tidy() |>
+      mutate(name = "pe", .before=1)
+  ) -> rm_outlier_t
+```
+
+Removing all of the outliers from the paired sample *t*-test, still resulted in a significant difference between the means for response time (*t*(`r rm_outlier_t$parameter[rm_outlier_t$name=="rt"]`) = `r fmt_APA_numbers( rm_outlier_t$statistic[rm_outlier_t$name=="rt"])`, *p* = `r fmt_APA_numbers( rm_outlier_t$p.value[rm_outlier_t$name=="rt"], .p=T)`), and error rate (*t*(`r rm_outlier_t$parameter[rm_outlier_t$name=="pe"]`) = `r fmt_APA_numbers( rm_outlier_t$statistic[rm_outlier_t$name=="pe"])`, *p* = `r fmt_APA_numbers( rm_outlier_t$p.value[rm_outlier_t$name=="pe"], .p=T)`). 
+
+
+
