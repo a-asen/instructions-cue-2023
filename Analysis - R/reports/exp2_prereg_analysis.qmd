@@ -58,7 +58,7 @@ dem$age
 
 We recruited `r length(demo$Age)+4`, participants from the United Kingdom via Prolific. Due to a coding mistake, four participants did not generate any data. This left us with a mean age of `r dem$age` (SD = `r dem$age_sd`; `r dem$females` females) from the United Kingdom via Prolific. Note that two participants were excluded from the data analysis, but cannot be removed from the demographics due to non-connections between data points and demographics variables. 
 
-# Analysis
+# Data preparation
 
 ```{r prep base data}
 #| echo: false
@@ -222,7 +222,7 @@ trials were lost. Representing a loss of
 `r round(loss$rt_sd_prop + loss$inducer_fail_prop + loss$inducer_practice_prop, 2)`
 percent of the data.
 
-### Paragraph:
+### Paragraph
 
 The exclusion criteria resulted in the removal of
 `r fmt_APA_numbers(loss$total_lost_prop)` %
@@ -236,6 +236,7 @@ trials), and a wrong response on the inducer trial resulted in
 a loss of `r fmt_APA_numbers(loss$inducer_fail_prop)` %
 (`r loss$inducer_fail_trials` trials).
 
+# Analysis 
 
 ```{r calculate BIS and LISAS }
 #| echo: false
@@ -285,6 +286,7 @@ d_ex_test <- d_ex |>
 
 ## Assumption check
 
+### Normality
 ```{r normality check }
 #| echo: false
 
@@ -301,6 +303,8 @@ d_ex_test |>
   geom_qq_line() 
 ```
 
+### Outliers
+
 ```{r outliers}
 #| echo: false
 d_ex_test |> 
@@ -312,13 +316,27 @@ d_ex_test |>
   geom_boxplot()
 ```
 
-```{r get the extreme outliers}
-d_ex_test |> 
-  group_by(post_cue,congruent) |>
-  rstatix::identify_outliers(rt)
+```{r finding outliers and extreme outliers}
+#| echo: false
+# Exclude outliers
+outlier_values <- d2 |>
+  reframe(
+    id=id,
+    rt=rt_FALSE-rt_TRUE,
+    pe=pe_FALSE-pe_TRUE,
+  ) |> pivot_longer(c(rt,pe)) |>
+  group_by(name) |>
+  rstatix::identify_outliers(value)
+
+is_outlier <- outlier_values |> filter(is.outlier==T) |> pull(id)
+is_extreme <- outlier_values |> filter(is.extreme==T) |> pull(id)
 ```
 
+<!--- some more --> 
+
 ## Statistical test
+
+### rmRMANOVA
 
 ```{r statistical test and spherisity}
 #| echo: false
@@ -345,8 +363,9 @@ anovaBF(rt ~ post_cue*congruent + id, d_ex_test, whichRandom = "id")
 
 ```
 
+<!--- residual plot? -->
 
-## Tables and figures
+#### Tables and figures
 
 ```{r visualize}
 #| echo: false
@@ -366,13 +385,11 @@ d_ex_test |>
   geom_line(aes(group=interaction(id,Congruency)), alpha = .2, position = position_dodge(.1)) +
   stat_summary(fun.data = mean_se) +
   labs(y = "")
-
 ```
 
-
-
 ```{r finished table}
-d |>
+#| echo: false
+exp2_statistic_table <- d |>
   filter(trial_info=="Diagnostic trial") |>
   pivot_longer(c(rt,correct_response)) |>
   summarise(
@@ -404,7 +421,8 @@ d |>
   unique() |> 
   mutate(
     across(where(is.double), \(x) fmt_APA_numbers(x, .chr=T))
-  ) -> exp2_statistic_table
+  )
+
 exp2_statistic_table
 ```
 
@@ -412,4 +430,6 @@ exp2_statistic_table
 `r fmt_APA_p_table_fig(exp2_statistic_table$p[2])` <br/>
 <!--- This function could be improved by finding the lowest value in a p vector ---> 
 
+## Robustness checks
 
+### 
