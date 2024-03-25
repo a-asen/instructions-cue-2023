@@ -1227,7 +1227,7 @@ if(!skip_practice){
             <br> 
             This <b><span style="color:${rnd_cue_col}"> ${rnd_cue_col_n} ${cue_stimulus_name.toLowerCase() }</span></b> 
             signifies that the <b><span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour_name.toLowerCase() + " coloured non-word"}</span></b>
-            will appear <b>within the next 0 to 4 trials</b>.
+            will appear <b>within a couple of trials</b> (screens)</b>.
             <br><br><br>
 
             You do not have to response to the <b><span style="color:${rnd_cue_col}"> ${rnd_cue_col_n} ${cue_stimulus_name.toLowerCase() }</span></b>,
