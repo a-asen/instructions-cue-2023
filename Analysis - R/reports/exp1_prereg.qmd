@@ -17,6 +17,7 @@ library(bayestestR)
 library(lsr)
 library(lme4)
 library(broom)
+library(boot)
 source("../lib/helper_functions.R")
 
 save_outputs <- FALSE
@@ -304,32 +305,6 @@ deviating response times and non-responses accounted for
 trials), and a wrong response on the inducer trial resulted in
 a loss of `r fmt_APA_numbers(loss$inducer_fail_prop)` %
 (`r loss$inducer_fail_trials` trials).
-
-```{r}
-d |> 
-  filter(!(is.na(con))) |>
-  summarise(.by=c(id,con), 
-               rt = mean(rt), 
-               pe = 1 - mean(correct_response)) |>
-  pivot_wider(names_from = con, values_from=c(rt,pe)) -> dat
-
-dat |> 
-  t.test(rt~con, dat = _, paired=T)
-
-
-fn_test <-\(data, indices){
-  d <- data[indices,]
-  # t.test(d[["rt_FALSE"]], d[["rt_TRUE"]], paired=T) |> tidy()
-  t.test(d[["rt_FALSE"]], d[["rt_TRUE"]], paired=T) |> unlist()
-}
-
-r <- boot::boot(dat, fn_test, 50)
-
-boot::boot.array()
-r 
-plot(r)
-dat 
-```
 
 # Results
 
@@ -667,6 +642,31 @@ if(save_outputs){ ggsave("../outputs/figs/exp1_rt-pe_bar.jpeg", p1+p2, width=8, 
 
 
 ## Robustness check: 
+### Bootstrapping
+
+```{r bootstrapping response time}
+#| echo: false
+fn_test <-\(data, indices, pre, post, out){
+  d <- data[indices,]
+  # t.test(d[["rt_FALSE"]], d[["rt_TRUE"]], paired=T) |> tidy()
+  t.test(d[[pre]], d[[post]], paired=T) -> dat
+  dat[[out]]
+}
+
+rt_est <- boot(d2, fn_test, R = 5000, pre="rt_FALSE", post="rt_TRUE", out = "estimate")
+rt_t   <- boot(d2, fn_test, R = 5000, pre="rt_FALSE", post="rt_TRUE", out = "statistic")
+plot(rt_est)
+boot.ci(rt_est)
+```
+
+```{r}
+#| echo: false
+
+pe_est <- boot(d2, fn_test, R = 5000, pre="pe_FALSE", post="pe_TRUE", out = "estimate")
+pe_t   <- boot(d2, fn_test, R = 5000, pre="pe_FALSE", post="pe_TRUE", out = "statistic")
+plot(pe_est)
+boot.ci(pe_est)
+```
 
 ### Non-parametric test
 
@@ -702,6 +702,26 @@ outlier_values <- d2 |>
 is_outlier <- outlier_values |> filter(is.outlier==T) |> pull(id)
 is_extreme <- outlier_values |> filter(is.extreme==T) |> pull(id)
 ```
+
+```{r paired sample t-test after excluding extrene outliers}
+#| echo: false
+# Outliers removed
+d2 |> 
+  filter(!(id %in% is_extreme)) |>
+  reframe(
+    rt = rt_FALSE - rt_TRUE,
+    pe = pe_FALSE - pe_TRUE
+  ) |> 
+  rename(`Response time` = rt, `Error rate` = pe) |>
+  pivot_longer(c(`Response time`, `Error rate`)) |>
+  ggplot(aes(value, col = name, fill = name))+
+  facet_wrap(~name, scales="free")+
+  geom_histogram(aes(y = after_stat(density)))+
+  geom_density(aes(fill = NULL, col = NULL ), linewidth=1.2)+
+  labs(x = "Difference between means", y ="Density", title= "a")+
+  theme(legend.position = "none")
+```
+
 
 ```{r testing extreme}
 #| echo: false
@@ -739,7 +759,7 @@ d2 |>
   facet_wrap(~name, scales="free")+
   geom_histogram(aes(y = after_stat(density)))+
   geom_density(aes(fill = NULL, col = NULL ), linewidth=1.2)+
-  labs(x = "Difference between means", y ="Density")+
+  labs(x = "Difference between means", y ="Density", title="b")+
   theme(legend.position = "none")
 ```
 
@@ -760,6 +780,5 @@ t.test(d4$rt_FALSE, d4$rt_TRUE, paired=T, alternative="greater") |>
 ```
 
 Removing all of the outliers from the paired sample *t*-test, still resulted in a significant difference between the means for response time (*t*(`r rm_outlier_t$parameter[rm_outlier_t$name=="rt"]`) = `r fmt_APA_numbers( rm_outlier_t$statistic[rm_outlier_t$name=="rt"])`, *p* = `r fmt_APA_numbers( rm_outlier_t$p.value[rm_outlier_t$name=="rt"], .p=T)`), and error rate (*t*(`r rm_outlier_t$parameter[rm_outlier_t$name=="pe"]`) = `r fmt_APA_numbers( rm_outlier_t$statistic[rm_outlier_t$name=="pe"])`, *p* = `r fmt_APA_numbers( rm_outlier_t$p.value[rm_outlier_t$name=="pe"], .p=T)`). 
-
 
 
