@@ -1018,7 +1018,7 @@ let diagnostic_task_instruction_description = {
             <br><br>
             The task includes two types of instructions:
             <br>    
-            One instruction remains constant throughout the task and applies to non-words presented in black.
+            One instruction remains constant throughout the task and applies to non-words presented in <b>black</b>.
             <br>
             The other instruction changes throughout the task and applies to non-words presented in 
             <b><span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour_name.toLowerCase()}</span></b>.
@@ -1029,9 +1029,9 @@ let diagnostic_task_instruction_description = {
             // About the first task
             `<div style="font-size:${instruction_font_size}">
 
-            <h3> Consistent Instruction Screen </h3>
+            <h3> Consistent Instructions </h3>
 
-            The instruction that remains the same throughout the task (connected to non-words in black) <br>
+            The instruction that remains the same throughout the task (connected to non-words in <b>black</b>) <br>
             will be presented on the next screen.
             <br><br>
 
@@ -1146,13 +1146,14 @@ if(!skip_practice){
                 // FIRST, what keys will be used in this experiment? 
                 `<div style="font-size:${instruction_font_size}">
                 
-                <h3> Variable Instruction Screen </h3>
+                <h3> Variable Instructions </h3>
                 <br>
-                On the next screen, you'll see the instruction that changes throughout the task (connected to non-words in <span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour_name.toLowerCase()}</span></b>).
+                On the next screen, you will see examples of the instructions that changes throughout the task (connected to non-words in <b><span style="color:${rnd_inducer_colour}"> ${rnd_inducer_colour_name.toLowerCase()}</span></b>).
                 <br><br>
 
-                Although the format of these instructions remains the same,<br>
-                they will introduce two new 3-letter non-words each time.
+                As with the prior instructions, these instructions will be displayed for up to 20 seconds.<br>
+                The format of these instructions will remains the same,<br>
+                but they will introduce two new 3-letter non-words each time.
                 <br><br>
 
                 A few practice trials will be provided.
