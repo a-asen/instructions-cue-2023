@@ -26,15 +26,48 @@ library(BayesFactor)  # bayes
 source("../lib/helper_functions.R")
 ```
 
+```{r}
+#| include: false
+bayes_plot <- function( data_list, rm_vars = NULL, par_match = TRUE){
+  #' @param rm_vars   Vector string. Remove variables from coefficient plot 
+  #' @param par_match Partial matching of rm_vars
+  
+  if(par_match){
+    map(rm_vars, \(var){
+       variables(data_list)[str_detect(variables(data_list), var)]
+    }) |> unlist() -> remove_variables
+  } else {
+    remove_variables <- rm_vars
+  }
+  
+  int <- variables(data_list)[str_detect(variables(data_list), "Intercept")]
+  remove_list <- c(c("disc","lp__", "lprior"), remove_variables, int)
+  gpars <- setdiff(variables(data_list), remove_list)
+  brms::rhat(data_list) -> b
+  
+  if(max(b, na.rm=T) > 1.01){
+    print(paste("max:", max(b, na.rm=T), " <- High, check model"))
+  } else {
+    print(paste("max:", max(b, na.rm=T)))
+  }
+  print(paste("mean:", mean(b, na.rm=T)))
+  print(paste("median:", median(b, na.rm=T)))
+  
+  bayesplot::mcmc_intervals(as.matrix(data_list), pars=gpars, prob_outer = 0.95) + 
+    geom_vline(xintercept = 0, linetype = "dashed", )+
+    labs(title = colnames(data_list$data)[1])
+}
+```
+
 ```{r load data}
 #| include: false 
 # demographics:
-read_csv("../data/raw/experiment2/exp2_demo.csv") -> demo
+# read_csv("../data/raw/experiment2/exp2_demo.csv") -> demo
 
 # Behaviour data
 # list.files("../data/raw/experiment2/pilots/", full.names = T)  -> fnames
 list.files("../data/raw/experiment2/task/", full.names = T)  -> fnames
-map_df(fnames[1], \(x){
+map_df(fnames, \(x){
   read_csv(x)
 }) -> exp2_d
 ```
@@ -59,18 +92,17 @@ dem$age
 We recruited `r length(demo$Age)+4`, participants from the United Kingdom via Prolific. Due to a coding mistake, four participants did not generate any data. This left us with a mean age of `r dem$age` (SD = `r dem$age_sd`; `r dem$females` females) from the United Kingdom via Prolific. Note that two participants were excluded from the data analysis, but cannot be removed from the demographics due to non-connections between data points and demographics variables. 
 
 # Data preparation
-
 ```{r prep base data}
 #| echo: false
 d <- d_ex <- 
   exp2_d |> 
   select(id, trial_info, inducer_run, diagnostic_run, post_cue, congruent, rt, correct_response) |>
   filter( trial_info == "Diagnostic trial" | trial_info == "Inducer trial" ) |>
-  mutate(rt = as.integer(ifelse(rt=="null", NA,rt)))
+  mutate(rt = as.integer(ifelse(rt=="null", NA,rt)),
+         inducer_run = as.integer(inducer_run))
 ```
 
-
-## Exclusion
+## Exclusion    
 ```{r exclusion start - accuracy}
 #| include: FALSE
 loss <- list()
@@ -80,7 +112,7 @@ loss$raw_data_trials <-
   nrow()
 
 ### participants excluding - accuracy      ====
-d_ex |>
+d |>
   filter( trial_info == "Diagnostic trial" | trial_info == "Inducer trial" ) |>
   group_by( id ) |>
   mutate( correct_response = ifelse( trial_info=="Inducer trial" & is.na(rt), 0, correct_response) ) |>
@@ -126,15 +158,13 @@ In total, `r length(loss[["exclude_par"]])`
 `r ifelse(length(loss[["data_trials"]]) > 1, "participants", "participant")`
 where excluded due to low accuracy (> 30% error). 
 
-```{r due to high SD & NA responses }
-#| include: FALSE
-
+```{r due to high SD & NA responses, include=TRUE}
 # Removing trials deviating more than 2.5 SD from each participants mean. 
 # Also remove NA responses
-d <- d |>
+d_ex <- d_ex |>
   left_join(
     by = c("id","inducer_run","diagnostic_run"),
-    d |>
+    d_ex |>
       filter(trial_info == "Diagnostic trial") |>
       mutate(
         .by = id,
@@ -146,24 +176,8 @@ d <- d |>
       select(id,inducer_run, diagnostic_run, rt_crit, rt_na)
   )
 
-# IMPORTANT NOTE: 
-  #' Removing null RT responses are, in all theory, not preregistered. 
-  #' While there is a solution to "non-responses" for error (count them as wrong), 
-  #' there is no stated solution to response time. Generally, this leads to problems 
-  #' because a trial can be considered wrong under error conditions, while the accompanied 
-  #' "error" for response time is not obvious. Should the RT be 2000ms (max trial length)? 
-  #' Or should it be closer to infinity? 
-  #' 
-  #' Assuming a max trial length of 2000ms would highly likely yield exclusion based on 
-  #' the max rt * 2.5 SD (but that is not a given). 
-  #' 
-  #' It is not obvious what to do in such a case, and the simplest solution will 
-  #' be to exclude (remove) these trials). Even though this may be assumed from
-  #' the preregistration, it is *not* preregistered.
-
-
 # lost trials
-loss$rt_sd_trials <- d |>
+loss$rt_sd_trials <- d_ex |>
   filter(diagnostic_run >= 0) |>
   filter(rt_crit == 1 | rt_na==1) |>
   nrow()
@@ -172,7 +186,7 @@ loss$rt_sd_prop <-
   loss$rt_sd_trials / loss$data_trials * 100
 
 # Exclude
-d <- d |>
+d_ex <- d_ex |>
   filter( is.na(rt_crit) & is.na(rt_na) ) |>
   select(-rt_crit, -rt_na)
 ```
@@ -182,8 +196,7 @@ to deviating (2.5 SD) response times and none response(s).
 Representing a loss of `r round(loss[["rt_sd_prop"]], 2)`
 percent of the data.
 
-```{r only correct inducers}
-#| include: FALSE
+```{r only correct inducers, include=TRUE}
 d_ex <- d_ex |>
   mutate( valid_trials = case_when( 
     trial_info=="Inducer trial" & correct_response==1 ~ 1,
@@ -236,11 +249,10 @@ trials), and a wrong response on the inducer trial resulted in
 a loss of `r fmt_APA_numbers(loss$inducer_fail_prop)` %
 (`r loss$inducer_fail_trials` trials).
 
-# Analysis 
 
-```{r calculate BIS and LISAS }
-#| echo: false
+# Analysis                 
 
+```{r calculate BIS and LISAS, echo=TRUE}
 # Liesefeld, H. R., & Janczyk, M. (2023). Same same but different: Subtle but consequential differences between two measures to linearly integrate speed and accuracy (LISAS vs. BIS). Behavior Research Methods, 55(3), 1175–1192. https://doi.org/10.3758/s13428-022-01843-2
 
 # Grand:
@@ -284,138 +296,159 @@ d_ex_test <- d_ex |>
   select(id, post_cue, congruent, rt, rt_sd, pe, pe_sd, lisas, bis, inv_bis)
 ```
 
-## Assumption check
+```{r}
+# Why do we have 35? 
+d_ex |> 
+  filter(inducer_run==max(inducer_run)) |> 
+  summarise(id = unique(id) ) 
 
-### Normality
-```{r normality check }
-#| echo: false
-
-# Check the assumption of normality: 
-d_ex_test |> 
-  pivot_longer(c(rt,pe,lisas,bis)) |>
-  summarise(
-    .by = name, 
-    residuals = resid( lmer( value ~ post_cue*congruent + (1|id) ) )
-  ) |>
-  ggplot(aes(sample = residuals)) +
-  facet_wrap(~ name) +
-  geom_qq() +
-  geom_qq_line() 
+d |> 
+  filter(inducer_run==max(inducer_run)) |> 
+  summarise(id = unique(id) ) 
+  
+table(d_ex$inducer_run)
+d_ex |> 
+  group_by(id, inducer_run) |>
+  summarise(n()) 
 ```
-
-### Outliers
-
-```{r outliers}
-#| echo: false
-d_ex_test |> 
-  mutate(Cue = fct_relevel(ifelse(post_cue==T, "Post-cue", "Pre-cue"),"Post-cue", after=1),
-         Congruency = fct_relevel(ifelse(congruent==T, "Congruent", "Incongruent"), "Congruenct", after=1)) |>
-  pivot_longer(c(rt,pe,lisas,inv_bis)) |>
-  ggplot(aes(Cue, value, col = Congruency)) + 
-  facet_wrap(~ name, scales="free")+
-  geom_boxplot()
-```
-
-```{r finding outliers and extreme outliers}
-#| echo: false
-# Exclude outliers
-outlier_values <- d2 |>
-  reframe(
-    id=id,
-    rt=rt_FALSE-rt_TRUE,
-    pe=pe_FALSE-pe_TRUE,
-  ) |> pivot_longer(c(rt,pe)) |>
-  group_by(name) |>
-  rstatix::identify_outliers(value)
-
-is_outlier <- outlier_values |> filter(is.outlier==T) |> pull(id)
-is_extreme <- outlier_values |> filter(is.extreme==T) |> pull(id)
-```
-
-<!--- some more --> 
-
 ## Statistical test
 
 ### rmRMANOVA
+```{r frequent rmanova and table, echo=TRUE}
+aov_ez <- ez::ezANOVA(d_ex_test, pe, id,
+            within = c(post_cue, congruent),
+            detailed = T)
+aov_ez$ANOVA |> 
+  mutate(across(c(3:6,9), ~fmt_APA_numbers(.x, .chr = T)),
+         p = fmt_APA_numbers(p, .p=T)) |> 
+  gt()
+```
 
-```{r statistical test and spherisity}
-#| echo: false
-
-# aov_car(rt ~ post_cue*congruent + Error(id/(post_cue*congruent)), test) -> testing
-# summary(testing)
-
-# rstatix so this should work
-rstatix::anova_test(test, dv=rt, wid = id, within=c(post_cue, congruent), detailed=T) -> testing
-rstatix::get_anova_table(testing) 
-
-# ez (this as well)
-# ez::ezANOVA(test,
-#             rt,
-#             id,
-#             within=c(post_cue, congruent),
-#             detailed = T) -> testing
-
-
+```{r bayesian rmanova, echo=FALSE}
 # Bayesian rmANOAV
-anovaBF(rt ~ post_cue*congruent + id, d_ex_test, whichRandom = "id")
+bay_res <- anovaBF(pe ~ post_cue * congruent + id, 
+                   whichRandom = "id", 
+                   d_ex_test |> mutate(id=factor(id),
+                                       post_cue=factor(post_cue),
+                                       congruent=factor(congruent))) 
+# Doesnt give posterior
+extractBF(bay_res)
+bayestestR::hdi(bay_res)
+bayestestR::bayesfactor(bay_res)
 
-# brms::brm(rt ~ post_cue*congruent + (1|id), data = testing2) -> brm_test
+library(brms)
+library(cmdstanr)
+library(bayesplot)
+library(bayestestR)
+
+bay_res2 <- brm(rt ~ congruent + post_cue + congruent:post_cue + (1|id), 
+                d_ex_test, save_pars = save_pars(all=T),
+                iter = 6000, chains = 6, backend = "cmdstanr", cores = 6, init=0)
+bayes_plot(bay_res2, c("z_", "sigma"))
+
+bayestestR::bayesfactor(bay_res2)
+bayestestR::hdi(bay_res2)
+
+bayesplot::mcmc_intervals(as.matrix(bay_res2))
 
 ```
 
-<!--- residual plot? -->
+**SPHERISITY?**
 
-#### Tables and figures
-
-```{r visualize}
-#| echo: false
-
-d_ex_test |> 
+## Figures 
+```{r data vis calculation, include=FALSE}
+data_vis <- 
+  d_ex_test |> 
   mutate(
-    Cue = fct_relevel( ifelse(post_cue==F, "Pre", "Post"), "Pre"),
+    Cue = ifelse(post_cue==T, 1,0),
     Congruency = fct_relevel( ifelse(congruent==F, "Incongruent", "Congruent"), "Incongruent"),
-    bis_inv = -1 * bis
+    bis_inv = -1 * bis,
+    con = ifelse(congruent==T, 1,0),
   ) |>
   rename(`Response time` = rt, `Error rate` = pe, LISAS = lisas, BIS = bis_inv) |>
   pivot_longer(c(`Response time`,`Error rate`, LISAS, BIS)) |>
-  ggplot(aes(Cue, value, col = Congruency)) +
-  facet_wrap(~name, scale="free")+
-  # background
-  geom_point(alpha = .2, position = position_dodge(.1)) +
-  geom_line(aes(group=interaction(id,Congruency)), alpha = .2, position = position_dodge(.1)) +
-  stat_summary(fun.data = mean_se) +
-  labs(y = "")
+  mutate(name = fct_relevel(name, "Response time", "Error rate", "LISAS", "BIS"))
 ```
+
+```{r visualize, echo=TRUE}
+data_vis |>
+  ggplot(aes(Cue, value, col = Congruency)) +
+  facet_wrap(~name, scales="free") + 
+  stat_summary(fun.data = mean_se, position=position_dodge(.1)) +
+  stat_summary(fun.data = mean_se, geom="line", 
+               position=position_dodge(.1), ) +
+  scale_x_continuous(breaks=c(0,1),labels = c("Pre-cue", "Post-cue"))+
+  # coord_cartesian(xlim=c(-.25,1.25), ylim=c(0,.1))+
+  labs(x=NULL, y="Error rate")
+data_vis |>
+  filter(name =="Error rate") |>
+  ggplot(aes(Cue, value, col = Congruency)) +
+  stat_summary(fun.data = mean_se, position=position_dodge(.1)) +
+  stat_summary(fun.data = mean_se, geom="line", 
+               position=position_dodge(.1), ) +
+  scale_x_continuous(breaks=c(0,1),labels = c("Pre-cue", "Post-cue"))+
+  coord_cartesian(xlim=c(-.25,1.25), ylim=c(0,.1))+
+  labs(x=NULL, y="Error rate")
+
+data_vis |>
+  filter(name =="BIS") |>
+  ggplot(aes(Cue, value, col = Congruency)) +
+  stat_summary(fun.data = mean_se, position=position_dodge(.1)) +
+  stat_summary(fun.data = mean_se, geom="line", 
+               position=position_dodge(.1), ) +
+  scale_x_continuous(breaks=c(0,1),labels = c("Pre-cue", "Post-cue"))+
+  # coord_cartesian(xlim=c(-.25,1.25), ylim=c(0,.1))+
+  labs(x=NULL, y="Error rate")
+
+
+
+```
+
+```{r bar plot, echo=FALSE}
+data_vis |>   
+  filter(name == "Response time") |>
+  ggplot(aes(Cue, value, fill = Congruency)) +
+  stat_summary(fun.data = mean_se, position=position_dodge(.75), geom="col", width=.75)+
+  stat_summary(fun.data = mean_se, position=position_dodge(.75), geom="errorbar", width=.5) +
+  scale_x_continuous(breaks=c(0,1),labels = c("Pre-cue", "Post-cue"))+
+  coord_cartesian(xlim=c(-.25,1.25), ylim=c(550, 750))+
+  labs(x = NULL, y="Response time")
+```
+
+
+## Table
 
 ```{r finished table}
 #| echo: false
-exp2_statistic_table <- d |>
+
+exp2_statistic_table <- 
+  d_ex |>
   filter(trial_info=="Diagnostic trial") |>
   pivot_longer(c(rt,correct_response)) |>
   summarise(
-    .by = c(id, con, name),
+    .by = c(id, congruent, name),
     mean = mean(value), 
     sd   = sd(value)
   ) |> 
   mutate(mean = ifelse(name=="correct_response", 1-mean, mean)) |>
   reframe(
     .by = name, 
-    diff = mean( mean[con==FALSE] - mean[con==TRUE]),
-    t = t.test(mean[con==FALSE], mean[con==TRUE], paired=T, alternative="greater")$statistic,
-    df = t.test(mean[con==FALSE], mean[con==TRUE], paired=T, alternative="greater")$parameter,
+    diff = mean( mean[congruent==FALSE] - mean[congruent==TRUE]),
+    t = t.test(mean[congruent==FALSE], mean[congruent==TRUE], paired=T, alternative="greater")$statistic,
+    df = t.test(mean[congruent==FALSE], mean[congruent==TRUE], paired=T, alternative="greater")$parameter,
     p = fmt_APA_numbers( 
-      t.test(mean[con==FALSE], mean[con==TRUE], paired=T, alternative="greater")$p.value,
+      t.test(mean[congruent==FALSE], mean[congruent==TRUE], paired=T, alternative="greater")$p.value,
       .p=T ),
-    d = cohensD( mean[con==FALSE], mean[con==TRUE], method = "paired" ),
-    bayes = ttestBF(mean[con==FALSE], mean[con==TRUE], paired=T, iterations=10000, posterior=T)[,"mu"],
+    d = cohensD( mean[congruent==FALSE], mean[congruent==TRUE], method = "paired" ),
+    bayes = ttestBF(mean[congruent==FALSE], mean[congruent==TRUE], paired=T, iterations=10000, posterior=T)[,"mu"],
     b.est = mean( bayes ),
-    bf    = extractBF( ttestBF(mean[con==FALSE], mean[con==TRUE], paired=T, iterations=10000) )$bf,
+    bf    = extractBF( ttestBF(mean[congruent==FALSE], mean[congruent==TRUE], paired=T, iterations=10000) )$bf,
     hdi   = paste0("[", fmt_APA_numbers( hdi(bayes)$CI_low ), ", ", 
                    fmt_APA_numbers( hdi(bayes)$CI_high ),"]"),
-    m_incon  = mean(mean[con==FALSE]),
-    m_con    = mean(mean[con==TRUE]),
-    sd_incon = sd(mean[con==FALSE]),
-    sd_con   = sd(mean[con==TRUE]),
+    m_incon  = mean(mean[congruent==FALSE]),
+    m_con    = mean(mean[congruent==TRUE]),
+    sd_incon = sd(mean[congruent==FALSE]),
+    sd_con   = sd(mean[congruent==TRUE]),
   ) |>
   select(name, m_incon,sd_incon, m_con, sd_con,everything(), -bayes) |>
   unique() |> 
@@ -430,6 +463,143 @@ exp2_statistic_table
 `r fmt_APA_p_table_fig(exp2_statistic_table$p[2])` <br/>
 <!--- This function could be improved by finding the lowest value in a p vector ---> 
 
+## ELSE 
+
+### Feedback
+
+```{r}
+map_df(unique(exp2_d$id),\(x){
+  exp2_d[exp2_d$trial_info=="End of experiment feedback" & 
+           !is.na(exp2_d$trial_info) & 
+           exp2_d$id==x,] -> d
+  jsonlite::fromJSON(d[["response"]]) |>
+    as_tibble() |>
+    mutate(id = x)
+}) -> exp2_feedback
+
+exp2_feedback |>
+  mutate(loss = id %in% loss$exclude_par) |> 
+  view()
+```
+
+### Interactive
+```{r}
+map_df(unique(exp2_d$id),\(x){
+  exp2_d[exp2_d$trial_info=="End of experiment feedback" & 
+           !is.na(exp2_d$trial_info) & 
+           exp2_d$id==x,] -> d
+  jsonlite::fromJSON(d[["interactive"]]) |> as_tibble() |>
+    mutate( id = x)
+}) -> exp2_interactive
+exp2_interactive |> 
+  arrange(trial) 
+```
+
+
+
+
 ## Robustness checks
 
-### 
+### Normality
+```{r calculate residual distribution, echo=T}
+residual_norm <- 
+  d_ex_test |> 
+  pivot_longer(c(rt,pe,lisas,bis)) |>
+  summarise(
+    .by = name, 
+    id = id,
+    residuals = resid( lmer( value ~ post_cue + congruent + post_cue:congruent + (1|id) ) )
+  ) 
+```
+
+```{r residual qqplot, echo=TRUE}
+residual_norm |>
+  ggplot(aes(sample = residuals)) +
+  facet_wrap(~ name, scales="free") +
+  geom_qq() +
+  geom_qq_line()
+```
+
+```{r residual histogram, echo=TRUE}
+residual_norm |>
+  ggplot(aes(residuals)) +
+  facet_wrap(~ name, scales="free") +
+  geom_histogram()
+```
+
+```{r identiy outlier, echo=TRUE}
+data_outliers <- 
+  residual_norm |>
+  group_by(name) |>
+  identify_outliers(residuals)
+```
+
+```{r}
+data_outliers$id[data_outliers$is.extreme==T]
+data_outliers$id[data_outliers$is.outlier==T] |> unique()
+```
+
+### Outliers
+```{r outliers}
+#| echo: false
+d_ex_test |> 
+  mutate(Cue = fct_relevel(ifelse(post_cue==T, "Post-cue", "Pre-cue"),"Post-cue", after=1),
+         Congruency = fct_relevel(ifelse(congruent==T, "Congruent", "Incongruent"), "Congruent", after=1)) |>
+  pivot_longer(c(rt,pe,lisas,inv_bis)) |>
+  ggplot(aes(Cue, value, col = Congruency)) + 
+  facet_wrap(~ name, scales="free")+
+  geom_boxplot()
+```
+
+```{r raw distribution, echo=T}
+d_ex_test |> 
+  mutate(Cue = ifelse(post_cue==T, "Post", "Pre"),
+         Congruency = fct_relevel(ifelse(congruent==T, "Congruent", "Incongruent"), "Congruent", after=1)) |>
+  pivot_longer(c(rt,pe,lisas,inv_bis)) |>
+  ggplot(aes(value, col = Congruency)) + 
+  facet_wrap(name ~ Cue, scales="free", ncol=2) +
+  geom_density()
+  geom_boxplot()
+```
+
+```{r difference distribution, echo=TRUE}
+d_ex_test |> 
+  mutate(cue = ifelse(post_cue==T, "post","pre"),
+         congruent = ifelse(congruent==T, "Congruent", "Incongruent")) |>
+  select(-rt_sd,-pe_sd, -inv_bis,-post_cue) |>
+  pivot_longer(c(rt,pe,bis,lisas)) |> 
+  pivot_wider(
+    names_from=c(cue, congruent), 
+    values_from=c(value) 
+  ) |>
+  mutate(
+    pre_diff   = pre_Incongruent - pre_Congruent,
+    post_diff  = post_Incongruent - post_Congruent,
+  ) -> d_ex_test_diff
+
+d_ex_test_diff |>
+  pivot_longer(c(pre_diff,post_diff),names_to="name2") |>
+  ggplot(aes(y=value, col=name2))+
+  facet_wrap(~name, scales="free")+
+  geom_boxplot()+
+  labs(col="Cue")
+```
+
+```{r finding outliers and extreme outliers, echo=TRUE}
+# Exclude outliers
+outlier_values <-
+  d_ex_test_diff |> 
+  pivot_longer(c(pre_diff, post_diff), names_to="name2") |>
+  group_by(name)  |>
+  rstatix::identify_outliers(value)
+
+is_outlier <- outlier_values |> filter(is.outlier==T) |> pull(id) |> unique()
+is_extreme <- outlier_values |> filter(is.extreme==T) |> pull(id) |> unique()
+```
+
+
+
+
+
+
+
