@@ -15,8 +15,8 @@ library(gt)
 library(BayesFactor)
 library(bayestestR)
 library(lsr)
-library(lme4)
-library(broom)
+library(lme4)  # residuals
+library(broom) # clean objectoutputs
 library(boot)
 source("../lib/helper_functions.R")
 
@@ -34,7 +34,7 @@ citation("BayesFactor")
 citation("bayestestR")
 citation("gt")
 citation("lsr")
-
+citation("boot")
 ```
 
 ```{r load data }
@@ -347,6 +347,23 @@ d |>
   geom_qq_line() 
 ```
 
+```{r}
+#| echo: false
+
+d |> 
+  filter( trial_info=="Diagnostic trial" ) |>
+  summarize(
+    .by = c(id, con),
+    rt = mean(rt),
+    pe = 1 - mean(correct_response) ) |> 
+  pivot_longer(c(rt, pe)) |> 
+  ggplot(aes(value, fill = con)) + 
+  facet_wrap(name~con, scales="free")+
+  geom_histogram(aes(y = after_stat(density)))+
+  geom_density(aes(fill=NULL))
+```
+
+
 ```{r histogram and density of mean difference in rt and pe}
 #| echo: false
 #| fig-width: 6
@@ -591,7 +608,8 @@ if(save_outputs){ ggsave("../outputs/figs/exp1_rt-pe_line.jpeg", p1+p2, width=8,
 #| fig-dpi: 300
 #| fig-width: 3
 
-p1 <- d |>
+p1 <- ""
+d |>
   filter(!is.na(con)) |>
   summarize(.by = c(id, con), 
             rt = mean(rt), 
@@ -603,6 +621,7 @@ p1 <- d |>
   scale_x_continuous(breaks = c(0,1), labels = c("Incongruent", "Congruent"), name="",
                      expand = c(.2,.2), minor_breaks = NULL)+
   scale_y_continuous(breaks = seq(0,2000,25), minor_breaks = NULL)+
+  geom_text(aes(x=-.5, y=740), label="a", size=8)+
   coord_cartesian(ylim = c(600, 750))+
                         # Adjust? 
   theme_minimal()+
@@ -611,7 +630,8 @@ p1 <- d |>
   annotate("segment", x=-0.1, xend=1.1, y=696, yend=696, size=1)+
   annotate(geom = "text", x = .5, y=700, label="**", size=5)
 
-p2 <- d |>
+p2 <-""
+d |>
   filter(!is.na(con)) |>
   summarize(.by = c(id, con), 
             rt = mean(rt), 
@@ -627,6 +647,7 @@ p2 <- d |>
                         # Adjust? 
   theme_minimal()+
   theme(axis.text.x = element_text(size = 10), legend.position = "none")+
+  geom_text(aes(x=-.5, y=.275), label="b", size=8)+
   labs(x = "", y = "Proportion of Error")+
   annotate("segment", x=-0.1, xend=1.1, y=.13, yend=.13, size=1)+
   annotate(geom = "text", x = .5, y=.137, label="**", size=5)
