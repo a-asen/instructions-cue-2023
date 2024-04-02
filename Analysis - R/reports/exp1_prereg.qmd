@@ -411,6 +411,45 @@ d2 |>
 ### t-test (no removed)
 
 #### Table
+```{r , include=FALSE}
+# Better table.
+exp2_statistic_table <- 
+  d_ex |>
+  filter(trial_info=="Diagnostic trial") |>
+  pivot_longer(c(rt,correct_response)) |>
+  summarise(
+    .by = c(id, congruent, name),
+    mean = mean(value), 
+    sd   = sd(value)
+  ) |> 
+  mutate(mean = ifelse(name=="correct_response", 1-mean, mean)) |>
+  reframe(
+    .by = name, 
+    diff = mean( mean[congruent==FALSE] - mean[congruent==TRUE]),
+    t = t.test(mean[congruent==FALSE], mean[congruent==TRUE], paired=T, alternative="greater")$statistic,
+    df = t.test(mean[congruent==FALSE], mean[congruent==TRUE], paired=T, alternative="greater")$parameter,
+    p = fmt_APA_numbers( 
+      t.test(mean[congruent==FALSE], mean[congruent==TRUE], paired=T, alternative="greater")$p.value,
+      .p=T ),
+    d = cohensD( mean[congruent==FALSE], mean[congruent==TRUE], method = "paired" ),
+    bayes = ttestBF(mean[congruent==FALSE], mean[congruent==TRUE], paired=T, iterations=10000, posterior=T)[,"mu"],
+    b.est = mean( bayes ),
+    bf    = extractBF( ttestBF(mean[congruent==FALSE], mean[congruent==TRUE], paired=T, iterations=10000) )$bf,
+    hdi   = paste0("[", fmt_APA_numbers( hdi(bayes)$CI_low ), ", ", 
+                   fmt_APA_numbers( hdi(bayes)$CI_high ),"]"),
+    m_incon  = mean(mean[congruent==FALSE]),
+    m_con    = mean(mean[congruent==TRUE]),
+    sd_incon = sd(mean[congruent==FALSE]),
+    sd_con   = sd(mean[congruent==TRUE]),
+  ) |>
+  select(name, m_incon,sd_incon, m_con, sd_con,everything(), -bayes) |>
+  unique() |> 
+  mutate(
+    across(where(is.double), \(x) fmt_APA_numbers(x, .chr=T))
+  )
+
+exp2_statistic_table
+```
 
 ```{r RT tables}
 #| echo: false
