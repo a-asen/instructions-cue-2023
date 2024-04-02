@@ -59,10 +59,9 @@ bayes_plot <- function( data_list, rm_vars = NULL, par_match = TRUE){
 }
 ```
 
-```{r load data}
-#| include: false 
+```{r load data, include=FALSE}
 # demographics:
-# read_csv("../data/raw/experiment2/exp2_demo.csv") -> demo
+read_csv("../data/raw/experiment2/exp2_demo.csv") -> demo
 
 # Behaviour data
 # list.files("../data/raw/experiment2/pilots/", full.names = T)  -> fnames
@@ -73,8 +72,8 @@ map_df(fnames, \(x){
 ```
 
 # Demographics
-```{r}
-#| include: false
+
+```{r , include=FALSE}
 demo |> 
   mutate(s = ifelse(Sex=="Male", 1,0)) |> 
   summarize(
@@ -86,12 +85,29 @@ demo |>
     sex = mean(s),
     sex_s = sd(s)
   ) |> round(2) -> dem
-dem$age
+
+# demo |> mutate(n = 1:length(demo$Age)) -> ddemo
+# 
+# map(1:length(ddemo$Age), \(x){
+#   l2 <- ddemo[-x,]
+#   map(1:length(l2$Age), \(y){
+#     l3 <- ddemo[-y,]
+#     
+#   }) |> list_rbind()
+# }) |> list_rbind()
 ```
 
-We recruited `r length(demo$Age)+4`, participants from the United Kingdom via Prolific. Due to a coding mistake, four participants did not generate any data. This left us with a mean age of `r dem$age` (SD = `r dem$age_sd`; `r dem$females` females) from the United Kingdom via Prolific. Note that two participants were excluded from the data analysis, but cannot be removed from the demographics due to non-connections between data points and demographics variables. 
+We recruited `r length(demo$Age)+4`, participants from the
+United Kingdom via Prolific. Due to a coding mistake, four
+participants did not generate any data. This left us with a
+mean age of `r dem$age` (SD = `r dem$age_sd`; `r dem$females`
+females) from the United Kingdom via Prolific. Note that two
+participants were excluded from the data analysis, but cannot
+be removed from the demographics due to non-connections
+between data points and demographics variables.
 
 # Data preparation
+
 ```{r prep base data}
 #| echo: false
 d <- d_ex <- 
@@ -102,7 +118,8 @@ d <- d_ex <-
          inducer_run = as.integer(inducer_run))
 ```
 
-## Exclusion    
+## Exclusion
+
 ```{r exclusion start - accuracy}
 #| include: FALSE
 loss <- list()
@@ -152,11 +169,13 @@ d_ex <- d_ex |>
   filter(inducer_run > 0)
 ```
 
-The first inducer block was considered practice and excluded, representing `r loss[["inducer_practice_prop"]]` percent of the data. 
+The first inducer block was considered practice and excluded,
+representing `r loss[["inducer_practice_prop"]]` percent of
+the data.
 
 In total, `r length(loss[["exclude_par"]])`
 `r ifelse(length(loss[["data_trials"]]) > 1, "participants", "participant")`
-where excluded due to low accuracy (> 30% error). 
+where excluded due to low accuracy (\> 30% error).
 
 ```{r due to high SD & NA responses, include=TRUE}
 # Removing trials deviating more than 2.5 SD from each participants mean. 
@@ -249,8 +268,7 @@ trials), and a wrong response on the inducer trial resulted in
 a loss of `r fmt_APA_numbers(loss$inducer_fail_prop)` %
 (`r loss$inducer_fail_trials` trials).
 
-
-# Analysis                 
+# Analysis
 
 ```{r calculate BIS and LISAS, echo=TRUE}
 # Liesefeld, H. R., & Janczyk, M. (2023). Same same but different: Subtle but consequential differences between two measures to linearly integrate speed and accuracy (LISAS vs. BIS). Behavior Research Methods, 55(3), 1175–1192. https://doi.org/10.3758/s13428-022-01843-2
@@ -296,7 +314,7 @@ d_ex_test <- d_ex |>
   select(id, post_cue, congruent, rt, rt_sd, pe, pe_sd, lisas, bis, inv_bis)
 ```
 
-```{r}
+```{r why we have one more than expected, echo=FALSE}
 # Why do we have 35? 
 d_ex |> 
   filter(inducer_run==max(inducer_run)) |> 
@@ -311,18 +329,160 @@ d_ex |>
   group_by(id, inducer_run) |>
   summarise(n()) 
 ```
+
 ## Statistical test
 
-### rmRMANOVA
+### Freq
+Statistical test of all 35 participants:
+
+#### Table
+
 ```{r frequent rmanova and table, echo=TRUE}
-aov_ez <- ez::ezANOVA(d_ex_test, pe, id,
-            within = c(post_cue, congruent),
-            detailed = T)
-aov_ez$ANOVA |> 
-  mutate(across(c(3:6,9), ~fmt_APA_numbers(.x, .chr = T)),
-         p = fmt_APA_numbers(p, .p=T)) |> 
+pe_aov <- aov_car(pe ~ Error(id/(congruent*post_cue)), d_ex_test, detailed=T, 
+                     anova_table = list(es="pes"))
+rt_aov <- aov_car(rt ~ Error(id/(congruent*post_cue)), d_ex_test, detailed=T, 
+                     anova_table = list(es="pes"))
+lisas_aov <- aov_car(lisas ~ Error(id/(congruent*post_cue)), d_ex_test, detailed=T, 
+                     anova_table = list(es="pes"))
+bis_aov <- aov_car(bis ~ Error(id/(congruent*post_cue)), d_ex_test, detailed=T, 
+                     anova_table = list(es="pes"))
+
+trns_mod <- function(data){
+  d <- data$anova_table
+  
+  Fname <- paste0(
+    "F (", unique(d$`num Df`), ",",
+     unique(d$`den Df`),")" )
+  
+  d |> 
+    mutate(names = c("Congrunecy","Cue", "Congruency_X_Cue")) |> 
+    rename(!!Fname := `F`, p = `Pr(>F)`) |>
+    select(names, all_of(Fname), p, pes) |> 
+    mutate(`F (1,34)` = fmt_APA_numbers(`F (1,34)`, .chr=T),
+           p = fmt_APA_numbers(p, .p=T),
+           pes = fmt_APA_numbers(pes, .low_val=T))
+}
+
+tibble(names = "Error", `F (1,34)`=NA, p=NA, pes=NA) |>
+  bind_rows(
+    trns_mod(pe_aov) ) |>
+  bind_rows(
+    tibble(names = "Response time") ) |> 
+  bind_rows(
+    trns_mod(rt_aov) ) |>
+  bind_rows(
+    tibble(names = "LISAS") ) |> 
+  bind_rows(
+    trns_mod(lisas_aov) ) |>
+  bind_rows(
+    tibble(names = "BIS") ) |> 
+  bind_rows(
+    trns_mod(bis_aov) ) |>
   gt()
 ```
+
+#### Paragarph
+
+The rmANOVA for error revealed a significant effect of
+Congruency (*F*\~`r pe_aov$anova_table[["num Df"]][1]`,
+`r pe_aov$anova_table[["den Df"]][1]`\~ =
+`r fmt_APA_numbers(pe_aov$anova_table$F[1])`, *p*
+`r fmt_APA_numbers(pe_aov$anova_table[["Pr(>F)"]][1], .psym=T)`,
+$\eta_p^2$ =
+`r fmt_APA_numbers(pe_aov$anova_table[["pes"]][1], .low_val=T)`),
+suggesting lower errors for congruent trials. As for the cue,
+the analysis did not reveal a significant effect of the Cue
+(*F*\~`r pe_aov$anova_table[["num Df"]][2]`,
+`r pe_aov$anova_table[["den Df"]][2]`\~ =
+`r fmt_APA_numbers(pe_aov$anova_table$F[2])`, *p*
+`r fmt_APA_numbers(pe_aov$anova_table[["Pr(>F)"]][2], .psym=T)`,
+$\eta_p^2$ =
+`r fmt_APA_numbers(pe_aov$anova_table[["pes"]][2], .low_val=T)`),
+nor an interaction effect
+(*F*\~`r pe_aov$anova_table[["num Df"]][3]`,
+`r pe_aov$anova_table[["den Df"]][3]`\~ =
+`r pe_aov$anova_table$F[3]`, *p*
+`r fmt_APA_numbers(pe_aov$anova_table[["Pr(>F)"]][3], .psym=T)`,
+$\eta_p^2$ =
+`r fmt_APA_numbers(pe_aov$anova_table[["pes"]][3], .low_val=T)`).
+
+The rmANOVA for the LISAS revealed a significant effect of
+Congruency (*F*\~`r lisas_aov$anova_table[["num Df"]][1]`,
+`r lisas_aov$anova_table[["den Df"]][1]`\~ =
+`r fmt_APA_numbers(lisas_aov$anova_table$F[1])`, *p*
+`r fmt_APA_numbers(lisas_aov$anova_table[["Pr(>F)"]][1], .psym=T)`,
+$\eta_p^2$ =
+`r fmt_APA_numbers(lisas_aov$anova_table[["pes"]][1], .low_val=T)`),
+suggesting lower errors for congruent trials. As for the cue,
+the analysis did not reveal a significant effect of the Cue
+(*F*\~`r lisas_aov$anova_table[["num Df"]][2]`,
+`r lisas_aov$anova_table[["den Df"]][2]`\~ =
+`r fmt_APA_numbers(lisas_aov$anova_table$F[2])`, *p*
+`r fmt_APA_numbers(lisas_aov$anova_table[["Pr(>F)"]][2], .psym=T)`,
+$\eta_p^2$ =
+`r fmt_APA_numbers(lisas_aov$anova_table[["pes"]][2], .low_val=T)`),
+nor an interaction effect
+(*F*\~`r lisas_aov$anova_table[["num Df"]][3]`,
+`r lisas_aov$anova_table[["den Df"]][3]`\~ =
+`r lisas_aov$anova_table$F[3]`, *p*
+`r fmt_APA_numbers(lisas_aov$anova_table[["Pr(>F)"]][3], .psym=T)`,
+$\eta_p^2$ =
+`r fmt_APA_numbers(lisas_aov$anova_table[["pes"]][3], .low_val=T)`).
+
+The rmANOVA for the LISAS revealed a significant effect of
+Congruency (*F*\~`r bis_aov$anova_table[["num Df"]][1]`,
+`r bis_aov$anova_table[["den Df"]][1]`\~ =
+`r fmt_APA_numbers(bis_aov$anova_table$F[1])`, *p*
+`r fmt_APA_numbers(bis_aov$anova_table[["Pr(>F)"]][1], .psym=T)`,
+$\eta_p^2$ =
+`r fmt_APA_numbers(bis_aov$anova_table[["pes"]][1], .low_val=T)`),
+suggesting lower errors for congruent trials. As for the cue,
+the analysis did not reveal a significant effect of the Cue
+(*F*\~`r bis_aov$anova_table[["num Df"]][2]`,
+`r bis_aov$anova_table[["den Df"]][2]`\~ =
+`r fmt_APA_numbers(bis_aov$anova_table$F[2])`, *p*
+`r fmt_APA_numbers(bis_aov$anova_table[["Pr(>F)"]][2], .psym=T)`,
+$\eta_p^2$ =
+`r fmt_APA_numbers(bis_aov$anova_table[["pes"]][2], .low_val=T)`),
+nor an interaction effect
+(*F*\~`r bis_aov$anova_table[["num Df"]][3]`,
+`r bis_aov$anova_table[["den Df"]][3]`\~ =
+`r bis_aov$anova_table$F[3]`, *p*
+`r fmt_APA_numbers(bis_aov$anova_table[["Pr(>F)"]][3], .psym=T)`,
+$\eta_p^2$ =
+`r fmt_APA_numbers(bis_aov$anova_table[["pes"]][3], .low_val=T)`).
+
+#### 34 partic tests
+
+Since we preregistered a sample of 34, but do not know which
+participant to remove, we include tests of all data with n-1.
+We then report the minimum and maximum F and p value for the
+conditions and interaction.
+
+```{r anova with one participant removed, echo=FALSE, warning=FALSE}
+d_ex_test |> 
+  pull(id) |> unique() -> id_list
+map_df(1:35, \(x){
+  ez::ezANOVA(
+    d_ex_test |> filter(!(id == id_list[x])), pe, id,
+    within = c(post_cue, congruent), detailed = T)[["ANOVA"]] |>
+    mutate(
+      .before=1,
+      rm_id = id_list[x]
+    )
+}) -> test_one_less
+test_one_less |> 
+  filter(Effect != "(Intercept)") |>
+  summarise(
+    .by = Effect,
+    minF = min(`F`),
+    maxF = max(`F`),
+    maxP = max(p),
+    minP = min(p),
+  )
+```
+
+### Bayes
 
 ```{r bayesian rmanova, echo=FALSE}
 # Bayesian rmANOAV
@@ -331,17 +491,21 @@ bay_res <- anovaBF(pe ~ post_cue * congruent + id,
                    d_ex_test |> mutate(id=factor(id),
                                        post_cue=factor(post_cue),
                                        congruent=factor(congruent))) 
+posterior(bay_res, 2, iterations = 10000) -> test
+test
+colnames(test)
+
+hdi(test)
 # Doesnt give posterior
 extractBF(bay_res)
 bayestestR::hdi(bay_res)
-bayestestR::bayesfactor(bay_res)
 
 library(brms)
 library(cmdstanr)
 library(bayesplot)
 library(bayestestR)
 
-bay_res2 <- brm(rt ~ congruent + post_cue + congruent:post_cue + (1|id), 
+bay_res2 <- brm(pe ~ congruent + post_cue + congruent:post_cue + (1|id), 
                 d_ex_test, save_pars = save_pars(all=T),
                 iter = 6000, chains = 6, backend = "cmdstanr", cores = 6, init=0)
 bayes_plot(bay_res2, c("z_", "sigma"))
@@ -355,7 +519,8 @@ bayesplot::mcmc_intervals(as.matrix(bay_res2))
 
 **SPHERISITY?**
 
-## Figures 
+## Figures
+
 ```{r data vis calculation, include=FALSE}
 data_vis <- 
   d_ex_test |> 
@@ -370,7 +535,7 @@ data_vis <-
   mutate(name = fct_relevel(name, "Response time", "Error rate", "LISAS", "BIS"))
 ```
 
-```{r visualize, echo=TRUE}
+```{r visualize across all, echo=TRUE}
 data_vis |>
   ggplot(aes(Cue, value, col = Congruency)) +
   facet_wrap(~name, scales="free") + 
@@ -378,8 +543,11 @@ data_vis |>
   stat_summary(fun.data = mean_se, geom="line", 
                position=position_dodge(.1), ) +
   scale_x_continuous(breaks=c(0,1),labels = c("Pre-cue", "Post-cue"))+
-  # coord_cartesian(xlim=c(-.25,1.25), ylim=c(0,.1))+
+  coord_cartesian(xlim=c(-.25,1.25))+
   labs(x=NULL, y="Error rate")
+```
+
+```{r indiv vis, echo=TRUE}
 data_vis |>
   filter(name =="Error rate") |>
   ggplot(aes(Cue, value, col = Congruency)) +
@@ -398,7 +566,7 @@ data_vis |>
                position=position_dodge(.1), ) +
   scale_x_continuous(breaks=c(0,1),labels = c("Pre-cue", "Post-cue"))+
   # coord_cartesian(xlim=c(-.25,1.25), ylim=c(0,.1))+
-  labs(x=NULL, y="Error rate")
+  labs(x=NULL, y="BIS")
 
 
 
@@ -415,55 +583,20 @@ data_vis |>
   labs(x = NULL, y="Response time")
 ```
 
-
 ## Table
 
 ```{r finished table}
 #| echo: false
 
-exp2_statistic_table <- 
-  d_ex |>
-  filter(trial_info=="Diagnostic trial") |>
-  pivot_longer(c(rt,correct_response)) |>
-  summarise(
-    .by = c(id, congruent, name),
-    mean = mean(value), 
-    sd   = sd(value)
-  ) |> 
-  mutate(mean = ifelse(name=="correct_response", 1-mean, mean)) |>
-  reframe(
-    .by = name, 
-    diff = mean( mean[congruent==FALSE] - mean[congruent==TRUE]),
-    t = t.test(mean[congruent==FALSE], mean[congruent==TRUE], paired=T, alternative="greater")$statistic,
-    df = t.test(mean[congruent==FALSE], mean[congruent==TRUE], paired=T, alternative="greater")$parameter,
-    p = fmt_APA_numbers( 
-      t.test(mean[congruent==FALSE], mean[congruent==TRUE], paired=T, alternative="greater")$p.value,
-      .p=T ),
-    d = cohensD( mean[congruent==FALSE], mean[congruent==TRUE], method = "paired" ),
-    bayes = ttestBF(mean[congruent==FALSE], mean[congruent==TRUE], paired=T, iterations=10000, posterior=T)[,"mu"],
-    b.est = mean( bayes ),
-    bf    = extractBF( ttestBF(mean[congruent==FALSE], mean[congruent==TRUE], paired=T, iterations=10000) )$bf,
-    hdi   = paste0("[", fmt_APA_numbers( hdi(bayes)$CI_low ), ", ", 
-                   fmt_APA_numbers( hdi(bayes)$CI_high ),"]"),
-    m_incon  = mean(mean[congruent==FALSE]),
-    m_con    = mean(mean[congruent==TRUE]),
-    sd_incon = sd(mean[congruent==FALSE]),
-    sd_con   = sd(mean[congruent==TRUE]),
-  ) |>
-  select(name, m_incon,sd_incon, m_con, sd_con,everything(), -bayes) |>
-  unique() |> 
-  mutate(
-    across(where(is.double), \(x) fmt_APA_numbers(x, .chr=T))
-  )
 
 exp2_statistic_table
 ```
 
 *Note.* <br/>
 `r fmt_APA_p_table_fig(exp2_statistic_table$p[2])` <br/>
-<!--- This function could be improved by finding the lowest value in a p vector ---> 
+<!--- This function could be improved by finding the lowest value in a p vector --->
 
-## ELSE 
+## ELSE
 
 ### Feedback
 
@@ -483,6 +616,7 @@ exp2_feedback |>
 ```
 
 ### Interactive
+
 ```{r}
 map_df(unique(exp2_d$id),\(x){
   exp2_d[exp2_d$trial_info=="End of experiment feedback" & 
@@ -495,12 +629,10 @@ exp2_interactive |>
   arrange(trial) 
 ```
 
-
-
-
 ## Robustness checks
 
 ### Normality
+
 ```{r calculate residual distribution, echo=T}
 residual_norm <- 
   d_ex_test |> 
@@ -540,11 +672,12 @@ data_outliers$id[data_outliers$is.outlier==T] |> unique()
 ```
 
 ### Outliers
-```{r outliers}
-#| echo: false
+
+```{r raw outliers, echo=FALSE}
 d_ex_test |> 
   mutate(Cue = fct_relevel(ifelse(post_cue==T, "Post-cue", "Pre-cue"),"Post-cue", after=1),
-         Congruency = fct_relevel(ifelse(congruent==T, "Congruent", "Incongruent"), "Congruent", after=1)) |>
+         Congruency = fct_relevel(ifelse(
+           congruent==T, "Congruent", "Incongruent"), "Congruent", after=1)) |>
   pivot_longer(c(rt,pe,lisas,inv_bis)) |>
   ggplot(aes(Cue, value, col = Congruency)) + 
   facet_wrap(~ name, scales="free")+
@@ -597,9 +730,18 @@ is_outlier <- outlier_values |> filter(is.outlier==T) |> pull(id) |> unique()
 is_extreme <- outlier_values |> filter(is.extreme==T) |> pull(id) |> unique()
 ```
 
+```{r test data without outliers, echo=FALSE}
 
+aov_ez_rm_out <- ez::ezANOVA(
+  d_ex_test |> filter(!(id %in% is_outlier)), 
+  pe, id, within = c(post_cue, congruent), detailed = T)
 
+aov_ez_rm_out$ANOVA |> 
+  mutate(across(c(3:6,9), ~fmt_APA_numbers(.x, .chr = T)),
+         p = fmt_APA_numbers(p, .p=T)) |> 
+  gt()
+```
 
+```{r}
 
-
-
+```
