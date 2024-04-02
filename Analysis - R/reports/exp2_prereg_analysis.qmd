@@ -7,27 +7,26 @@ editor:
       wrap: 62
 ---
 
-```{r libraries and load data}
-#| include: FALSE
-#| warning: FALSE
-library(tidyverse) # 
+```{r libraries and load data, include=FALSE, warning=FALSE}
+library(tidyverse)    # 
 library(broom)        # tidying
 library(afex)         # ANOVA
 library(lme4)         # Mixed 
-library(BayesFactor)  # bayes
+library(gt)
+library(BayesFactor)  # Bayesian model
+library(rstatix)      # Outliers (other?)
 
+library(brms)   # bayesian regressionn
 # ??? 
 # library(bayestestR)
 # library(patchwork)
-# library(gt)
 # library(ggpp)
 # library(lsr)
 
 source("../lib/helper_functions.R")
 ```
 
-```{r}
-#| include: false
+```{r , include=FALSE}
 bayes_plot <- function( data_list, rm_vars = NULL, par_match = TRUE){
   #' @param rm_vars   Vector string. Remove variables from coefficient plot 
   #' @param par_match Partial matching of rm_vars
@@ -59,7 +58,7 @@ bayes_plot <- function( data_list, rm_vars = NULL, par_match = TRUE){
 }
 ```
 
-```{r load data, include=FALSE}
+```{r load data, include=FALSE, message=FALSE}
 # demographics:
 read_csv("../data/raw/experiment2/exp2_demo.csv") -> demo
 
@@ -108,8 +107,7 @@ between data points and demographics variables.
 
 # Data preparation
 
-```{r prep base data}
-#| echo: false
+```{r prep base data, echo=FALSE}
 d <- d_ex <- 
   exp2_d |> 
   select(id, trial_info, inducer_run, diagnostic_run, post_cue, congruent, rt, correct_response) |>
@@ -120,8 +118,7 @@ d <- d_ex <-
 
 ## Exclusion
 
-```{r exclusion start - accuracy}
-#| include: FALSE
+```{r exclusion start - accuracy, include=FALSE}
 loss <- list()
 loss$raw_data_trials <- 
   d_ex |> 
@@ -332,21 +329,90 @@ d_ex |>
 
 ## Statistical test
 
-### Freq
+### Normality
+
+```{r calculate residual distribution, echo=T}
+residual_norm <- 
+  d_ex_test |> 
+  pivot_longer(c(rt,pe,lisas,bis)) |>
+  reframe(
+    .by = name, 
+    id = id,
+    residuals = resid( lmer( value ~ post_cue + congruent + post_cue:congruent + (1|id) ) )
+  ) 
+```
+
+```{r residual qqplot, echo=TRUE}
+residual_norm |>
+  ggplot(aes(sample = residuals)) +
+  facet_wrap(~ name, scales="free") +
+  geom_qq() +
+  geom_qq_line()
+```
+
+```{r residual histogram, echo=TRUE}
+residual_norm |>
+  ggplot(aes(residuals)) +
+  facet_wrap(~ name, scales="free") +
+  geom_histogram()
+```
+
+Generally, the residual errors seems to be normally distributed around 0. There are a couple of outliers, but they are also uniform (i.e., as much on both sides), albeit for the Errors with a slight skew. 
+
+```{r raw distribution, include=FALSE}
+d_ex_test |> 
+  mutate(Cue = ifelse(post_cue==T, "Post", "Pre"),
+         Congruency = fct_relevel(ifelse(congruent==T, "Congruent", "Incongruent"), "Congruent", after=1)) |>
+  pivot_longer(c(rt,pe,lisas,inv_bis)) |>
+  ggplot(aes(value, col = Congruency)) + 
+  facet_wrap(name ~ Cue, scales="free", ncol=2) +
+  geom_density()
+```
+
+### Outliers
+```{r difference distribution, echo=TRUE}
+d_ex_test |> 
+  mutate(cue = ifelse(post_cue==T, "post","pre"),
+         congruent = ifelse(congruent==T, "Congruent", "Incongruent")) |>
+  select(-rt_sd,-pe_sd, -inv_bis,-post_cue) |>
+  pivot_longer(c(rt,pe,bis,lisas)) |> 
+  pivot_wider(
+    names_from=c(cue, congruent), 
+    values_from=c(value) 
+  ) |>
+  mutate(
+    pre_diff   = pre_Incongruent - pre_Congruent,
+    post_diff  = post_Incongruent - post_Congruent,
+  ) -> d_ex_test_diff
+
+d_ex_test_diff |>
+  pivot_longer(c(pre_diff,post_diff),names_to="name2") |>
+  ggplot(aes(y=value, col=name2))+
+  facet_wrap(~name, scales="free")+
+  geom_boxplot()+
+  labs(col="Cue")
+```
+
+```{r finding outliers and extreme outliers, echo=TRUE}
+# Exclude outliers
+outlier_values <-
+  d_ex_test_diff |> 
+  pivot_longer(c(pre_diff, post_diff), names_to="name2") |>
+  group_by(name)  |>
+  identify_outliers(value)
+
+id_is_outlier <- outlier_values |> filter(is.outlier==T) |> pull(id) |> unique()
+id_is_extreme <- outlier_values |> filter(is.extreme==T) |> pull(id) |> unique()
+```
+
+Some outliers, check without. 
+
+### Frequentist analyses
 Statistical test of all 35 participants:
 
 #### Table
 
-```{r frequent rmanova and table, echo=TRUE}
-pe_aov <- aov_car(pe ~ Error(id/(congruent*post_cue)), d_ex_test, detailed=T, 
-                     anova_table = list(es="pes"))
-rt_aov <- aov_car(rt ~ Error(id/(congruent*post_cue)), d_ex_test, detailed=T, 
-                     anova_table = list(es="pes"))
-lisas_aov <- aov_car(lisas ~ Error(id/(congruent*post_cue)), d_ex_test, detailed=T, 
-                     anova_table = list(es="pes"))
-bis_aov <- aov_car(bis ~ Error(id/(congruent*post_cue)), d_ex_test, detailed=T, 
-                     anova_table = list(es="pes"))
-
+```{r transform data object output, include=FALSE}
 trns_mod <- function(data){
   d <- data$anova_table
   
@@ -358,27 +424,48 @@ trns_mod <- function(data){
     mutate(names = c("Congrunecy","Cue", "Congruency_X_Cue")) |> 
     rename(!!Fname := `F`, p = `Pr(>F)`) |>
     select(names, all_of(Fname), p, pes) |> 
-    mutate(`F (1,34)` = fmt_APA_numbers(`F (1,34)`, .chr=T),
+    mutate(across(2, ~fmt_APA_numbers(.x, .chr=T)),
            p = fmt_APA_numbers(p, .p=T),
            pes = fmt_APA_numbers(pes, .low_val=T))
 }
+```
 
-tibble(names = "Error", `F (1,34)`=NA, p=NA, pes=NA) |>
+```{r frequent rmanova and table, echo=TRUE}
+pe_aov <- aov_car(pe ~ Error(id/(congruent*post_cue)), d_ex_test, detailed=T, 
+                     anova_table = list(es="pes"))
+rt_aov <- aov_car(rt ~ Error(id/(congruent*post_cue)), d_ex_test, detailed=T, 
+                     anova_table = list(es="pes"))
+lisas_aov <- aov_car(lisas ~ Error(id/(congruent*post_cue)), d_ex_test, detailed=T, 
+                     anova_table = list(es="pes"))
+bis_aov <- aov_car(bis ~ Error(id/(congruent*post_cue)), d_ex_test, detailed=T, 
+                     anova_table = list(es="pes"))
+
+trns_mod(pe_aov) |> 
+  mutate(group="Error rate") |>
   bind_rows(
-    trns_mod(pe_aov) ) |>
+    trns_mod(rt_aov) |> 
+      mutate(group="Response time") ) |>
   bind_rows(
-    tibble(names = "Response time") ) |> 
+    trns_mod(lisas_aov) |>
+      mutate(group="LISAS") ) |>
   bind_rows(
-    trns_mod(rt_aov) ) |>
-  bind_rows(
-    tibble(names = "LISAS") ) |> 
-  bind_rows(
-    trns_mod(lisas_aov) ) |>
-  bind_rows(
-    tibble(names = "BIS") ) |> 
-  bind_rows(
-    trns_mod(bis_aov) ) |>
-  gt()
+    trns_mod(bis_aov) |>
+      mutate(group="BIS") ) |>
+  pivot_wider(names_from = group, values_from = c(`F (1,34)`, p, pes)) |>
+  select(names, ends_with("Error rate"), ends_with("Response time"), ends_with("LISAS"), ends_with("BIS")) |>
+  gt() |>
+  tab_spanner("Error rate", 
+              c(`F (1,34)_Error rate`, `p_Error rate`, `pes_Error rate`)) |>
+  tab_spanner("Response time", 
+              c(`F (1,34)_Response time`, `p_Response time`, `pes_Response time`)) |>
+  tab_spanner("LISAS", 
+              c(`F (1,34)_LISAS`, `p_LISAS`, `pes_LISAS`)) |>
+  tab_spanner("BIS", 
+              c(`F (1,34)_BIS`, `p_BIS`, `pes_BIS`)) |>
+  cols_label(`F (1,34)_BIS` = md("*F*(1,34)"), `F (1,34)_LISAS` = md("*F*(1,34)"), `F (1,34)_Response time` = md("*F*(1,34)"),
+             `F (1,34)_Error rate` = md("*F*(1,34)"), p_LISAS = md("*p*"), p_BIS = md("*p*"), `p_Error rate`= md("*p*"), 
+             `p_Response time` = md("*p*"), `pes_Error rate` =  )
+
 ```
 
 #### Paragarph
@@ -482,23 +569,151 @@ test_one_less |>
   )
 ```
 
-### Bayes
+#### Robustness check
+
+```{r remove outliers and test, echo=FALSE}
+# is_extreme # there is no extreme outliers! 
+is_outlier
+
+# rt_aov <- aov_car(rt ~ Error(id/(congruent*post_cue)), d_ex_test, detailed=T, 
+#                      anova_table = list(es="pes"))
+
+o_pe_aov <- aov_car(pe ~ Error(id/(congruent*post_cue)), 
+                  d_ex_test |> 
+                    filter(!(id %in% id_is_outlier)), detailed=T, 
+                  anova_table = list(es="pes"))
+
+o_lisas_aov <- aov_car(lisas ~ Error(id/(congruent*post_cue)), 
+                     d_ex_test |> 
+                       filter(!(id %in% id_is_outlier)), detailed=T, 
+                     anova_table = list(es="pes"))
+
+o_bis_aov <- aov_car(bis ~ Error(id/(congruent*post_cue)), 
+                   d_ex_test |> 
+                    filter(!(id %in% id_is_outlier)), detailed=T, 
+                   anova_table = list(es="pes"))
+
+trns_mod(o_pe_aov) |> 
+  mutate(group = "Error") |> 
+  bind_rows(
+    trns_mod(o_lisas_aov) |>
+      mutate(group="LISAS")
+  ) |>
+  bind_rows(
+    trns_mod(o_bis_aov) |>
+      mutate(group="BIS")
+  ) |> 
+  pivot_wider(names_from=group, values_from = c(`F (1,25)`, p, pes)  )
+
+
+tibble(names = "Error", `F (1,25)`=NA, p=NA, pes=NA) |>
+  bind_rows(
+    trns_mod(o_pe_aov) ) |> 
+  # bind_rows(
+  #   tibble(names = "Response time") ) |> 
+  # bind_rows(
+  #   trns_mod(rt_aov) ) |>
+  bind_rows(
+    tibble(names = "LISAS") ) |> 
+  bind_rows(
+    trns_mod(o_lisas_aov) ) |>
+  bind_rows(
+    tibble(names = "BIS") ) |> 
+  bind_rows(
+    trns_mod(o_bis_aov) ) |>
+  gt()
+```
+
+
+
+
+### Bayesian Analyses 
 
 ```{r bayesian rmanova, echo=FALSE}
 # Bayesian rmANOAV
-bay_res <- anovaBF(pe ~ post_cue * congruent + id, 
+pe_bay <- anovaBF(pe ~ post_cue * congruent + id, 
+                  whichRandom = "id", 
+                  d_ex_test |> mutate(id=factor(id),
+                                      post_cue=factor(post_cue),
+                                      congruent=factor(congruent))) 
+pe_bay # only model with congruency 
+
+lisas_bay <- anovaBF(lisas ~ post_cue * congruent + id,
+                     whichRandom = "id", 
+                     d_ex_test |> mutate(id=factor(id),
+                                         post_cue=factor(post_cue),
+                                         congruent=factor(congruent))) 
+lisas_bay # Congruency + Cue  ---  secondary congruency+cue+interaction
+
+bis_bay <- anovaBF(bis ~ post_cue * congruent + id, 
                    whichRandom = "id", 
                    d_ex_test |> mutate(id=factor(id),
                                        post_cue=factor(post_cue),
                                        congruent=factor(congruent))) 
+bis_bay # Congruency + Cue  ---  secondary  congruency+cue+interaction
+```
+
+For errors, the model containing only congruency is favoured (BF~10~ = `r fmt_APA_numbers(pe_bay@bayesFactor$bf[2])`) compared to a model with only the Cue (BF~10~ = `r fmt_APA_numbers(pe_bay@bayesFactor$bf[1])`), Congruency and Cue (BF~10~ = `r fmt_APA_numbers(pe_bay@bayesFactor$bf[3])`), and Congruency, Cue and their interaction (BF~10~ = `r fmt_APA_numbers(pe_bay@bayesFactor$bf[4])`). 
+
+For the LISAS, the model containing both the Congruency and Cue is favoured (BF~10~ = `r fmt_APA_numbers(lisas_bay@bayesFactor$bf[2])`), but in close succession of the model with the Congruency, Cue and their interaction (BF~10~ = `r fmt_APA_numbers(lisas_bay@bayesFactor$bf[4])`), followed by the model with only Congruency (BF~10~ = `r fmt_APA_numbers(lisas_bay@bayesFactor$bf[2])`), and only the Cue (BF~10~ = `r fmt_APA_numbers(lisas_bay@bayesFactor$bf[1])`). 
+
+A similar picture is found for the BIS model comparison: The model containing both Congruency and Cue is more favoured (BF~10~ = `r fmt_APA_numbers(bis_bay@bayesFactor$bf[3])`), but followed by the model including the interaciton term (BF~10~ = `r fmt_APA_numbers(bis_bay@bayesFactor$bf[4])`), only Congruency (BF~10~ = `r fmt_APA_numbers(bis_bay@bayesFactor$bf[2])`), and lastly, only the Cue (BF~10~ = `r fmt_APA_numbers(bis_bay@bayesFactor$bf[1])`). 
+
+```{r n-1 repeated bayesian tests, echo=FALSE}
+rep_test <- function(dep){
+  map(1:35, \(x){
+    anovaBF(as.formula(glue::glue("{dep} ~ post_cue * congruent + id")), 
+            whichRandom = "id", 
+            d_ex_test |>
+              mutate(id=factor(id),
+                    post_cue=factor(post_cue),
+                    congruent=factor(congruent)) |>
+              filter(!(id == id_list[x])) ) -> bres
+    
+    tibble(
+      names = rownames(extractBF(bres)),
+      bf = extractBF(bres)$bf,
+      rm_id = id_list[x]
+    )
+  }) |> list_rbind() -> test_one_less
+  
+  test_one_less |> 
+    summarise(
+      .by = names,
+      minBF = min(bf),
+      maxBF = max(bf),
+    )
+}
+
+rep <- list()
+rep$pe_34 <- rep_test("pe")
+rep$lisas_34 <- rep_test("lisas")
+rep$bis_34 <- rep_test("bis")
+
+rep$pe_34 |> 
+  mutate(group = "Error") |> 
+  bind_rows(
+    rep$lisas_34 |> 
+      mutate(group="LISAS")
+  ) |> 
+  bind_rows(
+    rep$bis_34 |>
+      mutate(group="BIS")
+  ) |>
+  mutate(across(where(is.double), ~fmt_APA_numbers(.x, .chr=T)),
+         names = str_remove(names,"\\+ id$")) |>
+  pivot_wider(names_from=group, values_from=c(minBF, maxBF)) |>
+  gt()
+```
+
+The pattern of results found for the 35 participants is reflected in all 34 sampled tests (n-1), per the preregistered sample size. 
+
+
+
+```{r bayesian rmanova, echo=FALSE}
 posterior(bay_res, 2, iterations = 10000) -> test
 test
 colnames(test)
-
-hdi(test)
-# Doesnt give posterior
-extractBF(bay_res)
-bayestestR::hdi(bay_res)
 
 library(brms)
 library(cmdstanr)
@@ -508,12 +723,20 @@ library(bayestestR)
 bay_res2 <- brm(pe ~ congruent + post_cue + congruent:post_cue + (1|id), 
                 d_ex_test, save_pars = save_pars(all=T),
                 iter = 6000, chains = 6, backend = "cmdstanr", cores = 6, init=0)
-bayes_plot(bay_res2, c("z_", "sigma"))
 
-bayestestR::bayesfactor(bay_res2)
-bayestestR::hdi(bay_res2)
+variables(bay_res2) -> vars
+vars[str_detect(vars, "b_")] -> vars
+mcmc_acf(as.array(bay_res2), pars=vars)   # autocorrelation
+mcmc_trace(as.array(bay_res2), pars=vars) # mcmc draws
+bayes_plot(bay_res2, c("z_", "sigma"))    # coefficient plot
 
-bayesplot::mcmc_intervals(as.matrix(bay_res2))
+summary(bay_res2)
+
+fixef(bay_res2) |> 
+  as_tibble() |> 
+  mutate(.before=1, names = rownames(fixef(bay_res2)), 
+         across(where(is.double), ~fmt_APA_numbers(.x, .low_val=T)), 
+         Est.Error=NULL)
 
 ```
 
@@ -629,119 +852,3 @@ exp2_interactive |>
   arrange(trial) 
 ```
 
-## Robustness checks
-
-### Normality
-
-```{r calculate residual distribution, echo=T}
-residual_norm <- 
-  d_ex_test |> 
-  pivot_longer(c(rt,pe,lisas,bis)) |>
-  summarise(
-    .by = name, 
-    id = id,
-    residuals = resid( lmer( value ~ post_cue + congruent + post_cue:congruent + (1|id) ) )
-  ) 
-```
-
-```{r residual qqplot, echo=TRUE}
-residual_norm |>
-  ggplot(aes(sample = residuals)) +
-  facet_wrap(~ name, scales="free") +
-  geom_qq() +
-  geom_qq_line()
-```
-
-```{r residual histogram, echo=TRUE}
-residual_norm |>
-  ggplot(aes(residuals)) +
-  facet_wrap(~ name, scales="free") +
-  geom_histogram()
-```
-
-```{r identiy outlier, echo=TRUE}
-data_outliers <- 
-  residual_norm |>
-  group_by(name) |>
-  identify_outliers(residuals)
-```
-
-```{r}
-data_outliers$id[data_outliers$is.extreme==T]
-data_outliers$id[data_outliers$is.outlier==T] |> unique()
-```
-
-### Outliers
-
-```{r raw outliers, echo=FALSE}
-d_ex_test |> 
-  mutate(Cue = fct_relevel(ifelse(post_cue==T, "Post-cue", "Pre-cue"),"Post-cue", after=1),
-         Congruency = fct_relevel(ifelse(
-           congruent==T, "Congruent", "Incongruent"), "Congruent", after=1)) |>
-  pivot_longer(c(rt,pe,lisas,inv_bis)) |>
-  ggplot(aes(Cue, value, col = Congruency)) + 
-  facet_wrap(~ name, scales="free")+
-  geom_boxplot()
-```
-
-```{r raw distribution, echo=T}
-d_ex_test |> 
-  mutate(Cue = ifelse(post_cue==T, "Post", "Pre"),
-         Congruency = fct_relevel(ifelse(congruent==T, "Congruent", "Incongruent"), "Congruent", after=1)) |>
-  pivot_longer(c(rt,pe,lisas,inv_bis)) |>
-  ggplot(aes(value, col = Congruency)) + 
-  facet_wrap(name ~ Cue, scales="free", ncol=2) +
-  geom_density()
-  geom_boxplot()
-```
-
-```{r difference distribution, echo=TRUE}
-d_ex_test |> 
-  mutate(cue = ifelse(post_cue==T, "post","pre"),
-         congruent = ifelse(congruent==T, "Congruent", "Incongruent")) |>
-  select(-rt_sd,-pe_sd, -inv_bis,-post_cue) |>
-  pivot_longer(c(rt,pe,bis,lisas)) |> 
-  pivot_wider(
-    names_from=c(cue, congruent), 
-    values_from=c(value) 
-  ) |>
-  mutate(
-    pre_diff   = pre_Incongruent - pre_Congruent,
-    post_diff  = post_Incongruent - post_Congruent,
-  ) -> d_ex_test_diff
-
-d_ex_test_diff |>
-  pivot_longer(c(pre_diff,post_diff),names_to="name2") |>
-  ggplot(aes(y=value, col=name2))+
-  facet_wrap(~name, scales="free")+
-  geom_boxplot()+
-  labs(col="Cue")
-```
-
-```{r finding outliers and extreme outliers, echo=TRUE}
-# Exclude outliers
-outlier_values <-
-  d_ex_test_diff |> 
-  pivot_longer(c(pre_diff, post_diff), names_to="name2") |>
-  group_by(name)  |>
-  rstatix::identify_outliers(value)
-
-is_outlier <- outlier_values |> filter(is.outlier==T) |> pull(id) |> unique()
-is_extreme <- outlier_values |> filter(is.extreme==T) |> pull(id) |> unique()
-```
-
-```{r test data without outliers, echo=FALSE}
-
-aov_ez_rm_out <- ez::ezANOVA(
-  d_ex_test |> filter(!(id %in% is_outlier)), 
-  pe, id, within = c(post_cue, congruent), detailed = T)
-
-aov_ez_rm_out$ANOVA |> 
-  mutate(across(c(3:6,9), ~fmt_APA_numbers(.x, .chr = T)),
-         p = fmt_APA_numbers(p, .p=T)) |> 
-  gt()
-```
-
-```{r}
-
-```
