@@ -443,29 +443,26 @@ bis_aov <- aov_car(bis ~ Error(id/(congruent*post_cue)), d_ex_test, detailed=T,
 trns_mod(pe_aov) |> 
   mutate(group="Error rate") |>
   bind_rows(
-    trns_mod(rt_aov) |> 
-      mutate(group="Response time") ) |>
+    trns_mod(rt_aov) |> mutate(group="Response time") ) |>
   bind_rows(
-    trns_mod(lisas_aov) |>
-      mutate(group="LISAS") ) |>
+    trns_mod(lisas_aov) |> mutate(group="LISAS") ) |>
   bind_rows(
-    trns_mod(bis_aov) |>
-      mutate(group="BIS") ) |>
+    trns_mod(bis_aov) |> mutate(group="BIS") ) |>
   pivot_wider(names_from = group, values_from = c(`F (1,34)`, p, pes)) |>
   select(names, ends_with("Error rate"), ends_with("Response time"), ends_with("LISAS"), ends_with("BIS")) |>
   gt() |>
-  tab_spanner("Error rate", 
-              c(`F (1,34)_Error rate`, `p_Error rate`, `pes_Error rate`)) |>
-  tab_spanner("Response time", 
-              c(`F (1,34)_Response time`, `p_Response time`, `pes_Response time`)) |>
-  tab_spanner("LISAS", 
-              c(`F (1,34)_LISAS`, `p_LISAS`, `pes_LISAS`)) |>
-  tab_spanner("BIS", 
-              c(`F (1,34)_BIS`, `p_BIS`, `pes_BIS`)) |>
-  cols_label(`F (1,34)_BIS` = md("*F*(1,34)"), `F (1,34)_LISAS` = md("*F*(1,34)"), `F (1,34)_Response time` = md("*F*(1,34)"),
-             `F (1,34)_Error rate` = md("*F*(1,34)"), p_LISAS = md("*p*"), p_BIS = md("*p*"), `p_Error rate`= md("*p*"), 
-             `p_Response time` = md("*p*"), `pes_Error rate` =  )
-
+  tab_spanner(
+    "Error rate", c(`F (1,34)_Error rate`, `p_Error rate`, `pes_Error rate`)) |>
+  tab_spanner(
+    "Response time", c(`F (1,34)_Response time`, `p_Response time`, `pes_Response time`)) |>
+  tab_spanner("LISAS", c(`F (1,34)_LISAS`, `p_LISAS`, `pes_LISAS`)) |>
+  tab_spanner("BIS", c(`F (1,34)_BIS`, `p_BIS`, `pes_BIS`)) |>
+  cols_label(
+    `F (1,34)_BIS` = md("*F*(1,34)"), `F (1,34)_LISAS` = md("*F*(1,34)"), `F (1,34)_Response time` = md("*F*(1,34)"),
+    `F (1,34)_Error rate` = md("*F*(1,34)"), p_LISAS = md("*p*"), p_BIS = md("*p*"), `p_Error rate`= md("*p*"), 
+    `p_Response time` = md("*p*"), `pes_Error rate` = "n^2", `pes_Response time` = "n^2", pes_LISAS = "n^2", 
+    `pes_BIS`="n^2", names = "Variables") |>
+  cols_align("center", 2:13)
 ```
 
 #### Paragarph
@@ -605,23 +602,25 @@ trns_mod(o_pe_aov) |>
   ) |> 
   pivot_wider(names_from=group, values_from = c(`F (1,25)`, p, pes)  )
 
-
-tibble(names = "Error", `F (1,25)`=NA, p=NA, pes=NA) |>
+trns_mod(o_pe_aov) |> 
+  mutate(group="Error rate") |>
   bind_rows(
-    trns_mod(o_pe_aov) ) |> 
-  # bind_rows(
-  #   tibble(names = "Response time") ) |> 
-  # bind_rows(
-  #   trns_mod(rt_aov) ) |>
+    trns_mod(o_lisas_aov) |>
+      mutate(group="LISAS") ) |>
   bind_rows(
-    tibble(names = "LISAS") ) |> 
-  bind_rows(
-    trns_mod(o_lisas_aov) ) |>
-  bind_rows(
-    tibble(names = "BIS") ) |> 
-  bind_rows(
-    trns_mod(o_bis_aov) ) |>
-  gt()
+    trns_mod(o_bis_aov) |> 
+      mutate(group="BIS") ) |>
+  pivot_wider(names_from = group, values_from=c(`F (1,25)`, p, pes)) |>
+  gt() |>
+  tab_spanner("Error rate", c("F (1,25)_Error rate", "p_Error rate", "pes_Error rate")) |>
+  tab_spanner("LISAS", c("F (1,25)_LISAS", "p_LISAS", "pes_LISAS")) |>
+  tab_spanner("BIS", c("F (1,25)_BIS", "p_BIS", "pes_BIS")) |>
+  cols_label(
+    "F (1,25)_Error rate" = "F (1,25)", "F (1,25)_LISAS" = "F (1,25)", "F (1,25)_BIS" = "F (1,25)",
+    "p_Error rate" = md("*p*"), p_LISAS = md("*p*"), p_BIS = md("*p*"), "pes_Error rate"="n^2",
+    pes_LISAS="n^2", pes_BIS = "n^2", names = "Variables"
+  ) |>
+  cols_align("center", 2:10)
 ```
 
 
@@ -629,6 +628,7 @@ tibble(names = "Error", `F (1,25)`=NA, p=NA, pes=NA) |>
 
 ### Bayesian Analyses 
 
+#### Model selection
 ```{r bayesian rmanova, echo=FALSE}
 # Bayesian rmANOAV
 pe_bay <- anovaBF(pe ~ post_cue * congruent + id, 
@@ -658,6 +658,8 @@ For errors, the model containing only congruency is favoured (BF~10~ = `r fmt_AP
 For the LISAS, the model containing both the Congruency and Cue is favoured (BF~10~ = `r fmt_APA_numbers(lisas_bay@bayesFactor$bf[2])`), but in close succession of the model with the Congruency, Cue and their interaction (BF~10~ = `r fmt_APA_numbers(lisas_bay@bayesFactor$bf[4])`), followed by the model with only Congruency (BF~10~ = `r fmt_APA_numbers(lisas_bay@bayesFactor$bf[2])`), and only the Cue (BF~10~ = `r fmt_APA_numbers(lisas_bay@bayesFactor$bf[1])`). 
 
 A similar picture is found for the BIS model comparison: The model containing both Congruency and Cue is more favoured (BF~10~ = `r fmt_APA_numbers(bis_bay@bayesFactor$bf[3])`), but followed by the model including the interaciton term (BF~10~ = `r fmt_APA_numbers(bis_bay@bayesFactor$bf[4])`), only Congruency (BF~10~ = `r fmt_APA_numbers(bis_bay@bayesFactor$bf[2])`), and lastly, only the Cue (BF~10~ = `r fmt_APA_numbers(bis_bay@bayesFactor$bf[1])`). 
+
+##### 34 repeated test 
 
 ```{r n-1 repeated bayesian tests, echo=FALSE}
 rep_test <- function(dep){
@@ -703,18 +705,23 @@ rep$pe_34 |>
   mutate(across(where(is.double), ~fmt_APA_numbers(.x, .chr=T)),
          names = str_remove(names,"\\+ id$")) |>
   pivot_wider(names_from=group, values_from=c(minBF, maxBF)) |>
-  gt()
+  gt() |>
+  tab_spanner("Error rate", c(minBF_Error, maxBF_Error)) |>
+  tab_spanner("LISAS", c(minBF_LISAS, maxBF_LISAS)) |>
+  tab_spanner("BIS", c(minBF_BIS, maxBF_BIS)) |>
+  cols_label(
+    minBF_Error = md("minBF~10~"), maxBF_Error = md("maxBF~10~"), minBF_LISAS = md("minBF~10~"), 
+    maxBF_LISAS = md("maxBF~10~"), minBF_BIS = md("minBF~10~"), maxBF_BIS = md("maxBF~10~"), 
+    names = "Model selection") |>
+  cols_align("center", 2:7)
+  
 ```
 
 The pattern of results found for the 35 participants is reflected in all 34 sampled tests (n-1), per the preregistered sample size. 
 
-
+#### Coefficients
 
 ```{r bayesian rmanova, echo=FALSE}
-posterior(bay_res, 2, iterations = 10000) -> test
-test
-colnames(test)
-
 library(brms)
 library(cmdstanr)
 library(bayesplot)
@@ -738,9 +745,25 @@ fixef(bay_res2) |>
          across(where(is.double), ~fmt_APA_numbers(.x, .low_val=T)), 
          Est.Error=NULL)
 
+library(pbapply)
+library(parallel)
+
+pbapply::pblapply(1:35, \(x){
+  b <- brm(pe ~ congruent + post_cue + congruent:post_cue + (1|id), 
+           d_ex_test, save_pars = save_pars(all=T),
+           iter = 6000, chains = 6, backend = "cmdstanr", cores = 6, init=0)
+
+  fixef(b) |> 
+    as_tibble() |> 
+    mutate(.before=1, names = rownames(fixef(b)), 
+           across(where(is.double), ~fmt_APA_numbers(.x, .low_val=T)), 
+           Est.Error=NULL)
+})
+
+
 ```
 
-**SPHERISITY?**
+
 
 ## Figures
 
