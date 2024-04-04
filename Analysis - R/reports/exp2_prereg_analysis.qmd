@@ -467,7 +467,7 @@ trns_mod <- function(data){
 }
 ```
 
-```{r frequent rmanova and table, echo=TRUE}
+```{r frequent rmanova, echo=TRUE}
 pe_aov <- aov_car(pe ~ Error(id/(congruent*post_cue)), d_ex_test, detailed=T, 
                      anova_table = list(es="pes"))
 rt_aov <- aov_car(rt ~ Error(id/(congruent*post_cue)), d_ex_test, detailed=T, 
@@ -476,7 +476,9 @@ lisas_aov <- aov_car(lisas ~ Error(id/(congruent*post_cue)), d_ex_test, detailed
                      anova_table = list(es="pes"))
 bis_aov <- aov_car(bis ~ Error(id/(congruent*post_cue)), d_ex_test, detailed=T, 
                      anova_table = list(es="pes"))
+```
 
+```{r table rmanovas, echo=TRUE}
 trns_mod(pe_aov) |> 
   mutate(group="Error rate") |>
   bind_rows(
@@ -512,18 +514,88 @@ trns_mod(pe_aov) |>
   tab_footnote("dawd")
 ```
 
+
+
+```{r tukey test list, include=FALSE}
+tuk_t <- list()
+library(emmeans)
+```
+
+```{r linear mixed-effect model , include=FALSE}
+tuk_t$rt <- lmer(rt ~ post_cue * congruent + (1|id), d_ex_test)
+tuk_t$pe <- lmer(pe ~ post_cue * congruent + (1|id), d_ex_test)
+tuk_t$lisas <- lmer(lisas ~ post_cue * congruent  + (1|id), d_ex_test)
+tuk_t$bis <- lmer(bis ~ post_cue * congruent+ (1|id), d_ex_test)
+
+par_test <- function(dep){
+  emmeans(tuk_t[[dep]], pairwise ~ congruent * post_cue) -> test
+  test$contrasts |>
+    as_tibble() |> 
+    mutate(n=1:6) |> 
+    filter(n<4) |> 
+    mutate(.before=1,name=c("Congruency","Cue","Congruency_X_Cue"), n=NULL, contrast=NULL,
+           group=dep)
+}
+```
+
+```{r linear mixed-effect model , include=FALSE}
+par_test("rt") |>
+  bind_rows( par_test("pe") ) |> 
+  bind_rows( par_test("lisas") ) |>
+  bind_rows( par_test("bis") ) |>
+  pivot_wider(names_from=group, values_from=c(estimate,SE,df,t.ratio,p.value)) |>
+  mutate(across(where(is.double), ~fmt_APA_numbers(.x, .chr=T)),
+         em="",em2="",em3="",em4="") |>
+  gt() |>
+  tab_spanner("Response time", c(estimate_rt, df_rt, SE_rt, t.ratio_rt, p.value_rt)) |>
+  tab_spanner("Error rate", c(estimate_pe, df_pe, SE_pe, t.ratio_pe, p.value_pe)) |>
+  tab_spanner("LISAS", c(estimate_lisas, df_lisas, SE_lisas, t.ratio_lisas, p.value_lisas)) |>
+  tab_spanner("BIS", c(estimate_bis, df_bis, SE_bis, t.ratio_bis, p.value_bis)) |>
+  cols_label(starts_with("SE") ~ ("SE"), starts_with("estimate") ~ "Estimate",
+             starts_with("df") ~ md("df"), starts_with("p.value") ~ md("*p*"),
+             starts_with("t.ratio") ~ md("*t*" )) |>
+  cols_hide(c(starts_with("SE"), starts_with("df"), starts_with("em"))) |>
+  cols_move(em, p.value_rt) |> 
+  cols_move(em2, p.value_pe) |>
+  cols_move(em3, p.value_lisas) |>
+  cols_move(em4, p.value_bis) 
+```
+
+
 ##### Paragarph
 
 ```{r use this bfr paragraph, include=FALSE}
-pe_aov$anova_table |> 
-  as_tibble() |>
-  mutate(
-    `F` = fmt_APA_numbers(`F`, .chr=T),
-    `pes` = fmt_APA_numbers(`F`, .low_val=T ),
-    `Pr(>F)` = fmt_APA_numbers(`Pr(>F)`, .p=T ),
-  )
+text_report <- function(data){
+  data[["anova_table"]] |> 
+    as_tibble() |>
+    mutate(
+      `F` = fmt_APA_numbers(`F`, .chr=T),
+      `pes` = fmt_APA_numbers(`F`, .low_val=T ),
+      `Pr(>F)` = fmt_APA_numbers(`Pr(>F)`, .p=T ),
+    ) 
+}
+
+aov_report <- list()
+aov_report$rt <- text_report(rt_aov) 
+aov_report$pe <- text_report(pe_aov) 
+aov_report$lisas <- text_report(lisas_aov) 
+aov_report$bis <- text_report(bis_aov) 
 ```
 
+---
+
+The rmANOVA for error revealed a significant effect of
+Congruency (*F*\~`r aov_report$rt[["num Df"]][1]`, `r aov_report$rt[["den Df"]][1]`\~ =
+`r aov_report$rt$F[1])`, *p* `r aov_report$rt[["Pr(>F)"]][1]`, $\eta_p^2$ = `r aov_report$rt[["pes"]][1]`),
+suggesting lower errors for congruent trials. As for the cue,
+the analysis did not reveal a significant effect of the Cue
+(*F*\~`r aov_report$rt[["num Df"]][2]`, `r aov_report$rt[["den Df"]][2]`\~ =
+`r aov_report$rt$F[2])`, *p* `r aov_report$rt[["Pr(>F)"]][2]`, $\eta_p^2$ =
+`r aov_report$rt[["pes"]][2]`), nor an interaction effect
+(*F*\~`r aov_report$rt[["num Df"]][3]`, `r aov_report$rt[["den Df"]][3]`\~ =
+`r aov_report$rt$F[3]`, *p* `r aov_report$rt[["Pr(>F)"]][3]`, $\eta_p^2$ =`r aov_report$rt[["pes"]][3]`).
+
+---
 
 The rmANOVA for error revealed a significant effect of
 Congruency (*F*\~`r pe_aov$anova_table[["num Df"]][1]`,
@@ -601,9 +673,13 @@ participant to remove, we include tests of all data with n-1.
 We then report the minimum and maximum F and p value for the
 conditions and interaction.
 
-```{r anova with one participant removed, echo=FALSE, warning=FALSE}
+```{r id list, include=FALSE }
 d_ex_test |> 
   pull(id) |> unique() -> id_list
+```
+
+
+```{r anova with one participant removed, echo=FALSE, warning=FALSE}
 map_df(1:35, \(x){
   ez::ezANOVA(
     d_ex_test |> filter(!(id == id_list[x])), pe, id,
@@ -701,14 +777,42 @@ trns_mod(o_pe_aov) |>
 
 
 
-
 ### Bayesian Analyses 
 
 #### Coefficients
-```{r , include=FALSE}
+```{r bayesian list vars , include=FALSE}
 vars <- list()
 coefs <- list()
 co_bay <- list()
+
+bay_eff_prob <- function(data, var){
+  da <- as.matrix(data) 
+  m <- mean(da[, var])
+  
+  if(m >= 0){
+    fmt_APA_numbers( (sum( da[, var]>=0 ) / length( da[, var])), .p=T )
+  } else if(m<0){
+    paste0("-", 
+      fmt_APA_numbers( 1 - sum(da[, var]>=0) / length(da[, var]), .p=T ) 
+    )
+  }
+}
+bay_erate <- function(data, var){
+  da <- as.matrix(data) 
+  m <- mean(da[, var])
+  
+  if(m>=0){
+    fmt_APA_numbers( 
+      sum(da[, var]>=0) / sum(da[, var]<0), 
+      .chr=T
+    )
+  } else if(m<0){
+    fmt_APA_numbers( 
+      sum(da[, var]<=0) / sum(da[, var]>0),
+      .chr=T
+    )
+  }
+}
 ```
 
 ```{r rt bay coefs, echo=FALSE, warning=FALSE, message=FALSE}
@@ -732,7 +836,13 @@ coefs$rt <-
     names = rownames(fixef(co_bay$rt)), 
     across(where(is.double), ~fmt_APA_numbers(.x, .low_val=T)), 
     Est.Error=NULL,
-    group="Response Time") |>
+    group="RT") |>
+  mutate(
+    .after="Estimate", 
+    pdir = map_vec(colnames(as.matrix(co_bay$rt))[1:4], 
+                    \(x){ bay_eff_prob(co_bay$rt, x) }),
+    erat = map_vec(colnames(as.matrix(co_bay$rt))[1:4], 
+                    \(x){ bay_erate(co_bay$rt, x) }) ) |>
   filter(!(names=="Intercept"))
 ```
 
@@ -757,7 +867,13 @@ coefs$pe <-
     names = rownames(fixef(co_bay$pe)), 
     across(where(is.double), ~fmt_APA_numbers(.x, .low_val=T)), 
     Est.Error=NULL,
-    group="Error") |>
+    group="PE") |>
+  mutate(
+    .after="Estimate", 
+    pdir = map_vec(colnames(as.matrix(co_bay$pe))[1:4], 
+                    \(x){ bay_eff_prob(co_bay$pe, x) }),
+    erat = map_vec(colnames(as.matrix(co_bay$pe))[1:4], 
+                    \(x){ bay_erate(co_bay$pe, x) })  ) |>
   filter(!(names=="Intercept"))
 ```
 
@@ -783,6 +899,12 @@ coefs$lisas <-
     across(where(is.double), ~fmt_APA_numbers(.x, .low_val=T)), 
     Est.Error=NULL,
     group = "LISAS") |>
+  mutate(
+    .after="Estimate", 
+    pdir = map_vec(colnames(as.matrix(co_bay$lisas))[1:4], 
+                    \(x){ bay_eff_prob(co_bay$lisas, x) }),
+    erat = map_vec(colnames(as.matrix(co_bay$lisas))[1:4], 
+                    \(x){ bay_erate(co_bay$lisas, x) }) ) |>
   filter(!(names=="Intercept"))
 ```
 
@@ -808,40 +930,102 @@ coefs$bis <-
     across(where(is.double), ~fmt_APA_numbers(.x, .low_val=T)), 
     Est.Error=NULL,
     group = "BIS") |>
+  mutate(
+    .after="Estimate", 
+    pdir = map_vec(colnames(as.matrix(co_bay$bis))[1:4], 
+                    \(x){ bay_eff_prob(co_bay$bis, x) }),
+    erat = map_vec(colnames(as.matrix(co_bay$bis))[1:4], 
+                    \(x){ bay_erate(co_bay$bis, x) }) ) |>
   filter(!(names=="Intercept"))
 ```
+
+```{r table of bayesian coefs, echo=FALSE}
+coefs |> 
+  list_rbind() |>
+  pivot_wider(names_from=group, values_from=c(Estimate, Q2.5,Q97.5, erat, pdir)) |>
+  mutate(
+    names=case_when(
+      names=="congruentTRUE" ~ "Congruency",
+      names=="post_cueTRUE"~"Cue", 
+      T ~ "Cue_X_Congruency"),
+    e="",e2="",e3="",e4="",
+  ) |>
+  gt() |>
+  tab_spanner("HDI", c(Q2.5_RT, Q97.5_RT)) |>
+  tab_spanner("HDI ", c(Q2.5_PE, Q97.5_PE)) |>
+  tab_spanner("HDI  ", c(Q2.5_LISAS, Q97.5_LISAS)) |>
+  tab_spanner("HDI    ", c(Q2.5_BIS, Q97.5_BIS)) |>
+  tab_spanner("Response Time", c(Estimate_RT, pdir_RT, erat_RT, Q2.5_RT, Q97.5_RT)) |>
+  tab_spanner("Error rate", c(Estimate_PE, pdir_PE, erat_PE, Q2.5_PE, Q97.5_PE))  |>
+  tab_spanner("LISAS", c(Estimate_LISAS, pdir_LISAS, erat_LISAS, Q2.5_LISAS, Q97.5_LISAS)) |>
+  tab_spanner("BIS", c(Estimate_BIS, pdir_BIS, erat_BIS, Q2.5_BIS, Q97.5_BIS)) |> 
+  cols_label(
+    Estimate_PE = "Estimate", Estimate_LISAS="Estimate", Estimate_RT ="Estimate", Estimate_BIS="Estimate", 
+    Q2.5_PE = "Lower", Q2.5_RT="Lower",Q2.5_LISAS="Lower", Q2.5_BIS="Lower",
+    Q97.5_PE = "Upper",Q97.5_RT = "Upper", Q97.5_LISAS = "Upper", Q97.5_BIS ="Upper",
+    e="",e2="",e3="",e4="", pdir_RT = md("*p*~dir~"), pdir_PE = md("*p*~dir~"), pdir_LISAS = md("*p*~dir~"),
+    pdir_BIS = md("*p*~dir~"), erat_RT = md("ER+^"), erat_PE = md("ER+^"), erat_LISAS = md("ER+^"), 
+    erat_BIS = md("ER+^")) |> 
+  cols_move(c(pdir_RT, erat_RT, Q2.5_RT, Q97.5_RT), Estimate_RT) |>
+  cols_move(c(pdir_PE, erat_PE, Q2.5_PE, Q97.5_PE), Estimate_PE) |>
+  cols_move(c(pdir_LISAS, erat_LISAS, Q2.5_LISAS, Q97.5_LISAS), Estimate_LISAS) |>
+  cols_move(c(pdir_BIS, erat_BIS, Q2.5_BIS, Q97.5_BIS), Estimate_BIS) |>
+  cols_move(e, Q97.5_RT) |> 
+  cols_move(e2, Q97.5_PE) |> 
+  cols_move(e3, Q97.5_LISAS) |> 
+  cols_move(e4, Q97.5_BIS)
+```
+
+
+##### Paragraph
+
 
 ##### n-1 tests
 
 ```{r multi-tests, echo=FALSE}
-library(pbapply)
-
 bay_rep_test <- function(dep){
-  pblapply(1:35, \(x){
+  pblapply(1:2, \(x){
     b <- brm(
       as.formula(glue::glue("{dep} ~ congruent + post_cue + congruent:post_cue + (1|id)")), 
       d_ex_test |> filter(!(id == id_list[x])), 
       save_pars = save_pars(all=T), backend = "cmdstanr", cores = 6,
       iter = 6000, chains = 6,  init=0)
   
-    coefs$bis <- 
+    coefs <- 
       fixef(b) |> 
       as_tibble() |> 
       mutate(
         .before=1, 
-        names = rownames(fixef(bay_res2)), 
+        names = rownames(fixef(b)), 
         across(where(is.double), ~fmt_APA_numbers(.x, .low_val=T)), 
         Est.Error=NULL,
         group = dep,
         l_out = id_list[x]) |>
+      mutate(
+        .after="Estimate", 
+        pdir = bay_eff_prob(b, variables(b)[1:4]),
+        erat = bay_erate(b, variables(b)[1:4]),
+      ) |>
       filter(!(names=="Intercept"))
     
-    list(b, coefs)
+    coefs
   })
 }
 ```
 
-```{r}
+```{r bayesian coefficient n-1 cross prep, include=FALSE}
+n34_b_rep <- list()
+```
+
+
+```{r bayesian coefficient n-1 cross test, include=FALSE, warning=FALSE, message=FALSE}
+n34_b_rep$rt     <- bay_rep_test("rt")
+n34_b_rep$pe     <- bay_rep_test("pe")
+n34_b_rep$lisas  <- bay_rep_test("lisas")
+n34_b_rep$bis    <- bay_rep_test("bis")
+
+n34_b_rep$rt |> list_rbind()
+
 
 ```
 
@@ -930,26 +1114,26 @@ rep_test <- function(dep){
 }
 ```
 
-```{r}
-rep <- list()
+```{r baysian repeat ms start, include=FALSE}
+bay_ms_rep <- list()
 ```
 
 ```{r n-1 repeated bayesian tests, echo=FALSE}
-rep$rt_34 <- rep_test("rt")
-rep$pe_34 <- rep_test("pe")
-rep$lisas_34 <- rep_test("lisas")
-rep$bis_34 <- rep_test("bis")
+bay_ms_rep$rt_34 <- rep_test("rt")
+bay_ms_rep$pe_34 <- rep_test("pe")
+bay_ms_rep$lisas_34 <- rep_test("lisas")
+bay_ms_rep$bis_34 <- rep_test("bis")
 
-rep$rt_34 |>
+bay_ms_rep$rt_34 |>
   mutate(group="ResponseTime") |> 
   bind_rows(
-    rep$pe_34 |> 
+    bay_ms_rep$pe_34 |> 
       mutate(group = "Error") ) |> 
   bind_rows(
-    rep$lisas_34 |> 
+    bay_ms_rep$lisas_34 |> 
       mutate(group="LISAS") ) |> 
   bind_rows(
-    rep$bis_34 |>
+    bay_ms_rep$bis_34 |>
       mutate(group="BIS") ) |>
   mutate(across(where(is.double), ~fmt_APA_numbers(.x, .chr=T)),
          names = str_remove(names,"\\+ id$")) |>
