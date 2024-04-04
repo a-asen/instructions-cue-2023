@@ -8,20 +8,18 @@ editor:
 ---
 
 ```{r libraries and load data, include=FALSE, warning=FALSE}
-library(tidyverse)    # 
-library(broom)        # tidying
+library(tidyverse)    # Wraggling
+library(broom)        # Tidying
 library(afex)         # ANOVA
-library(lme4)         # Mixed 
-library(gt)
-library(BayesFactor)  # Bayesian model
+library(lme4)         # Regression mixed models
+library(gt)           # Tables
+library(BayesFactor)  # Bayesian model (bayes model selection)
 library(rstatix)      # Outliers (other?)
+library(brms)         # Bayes coefficients 
+library(cmdstanr)       # stan
+library(bayesplot)    # plots
 
-library(brms)   # bayesian regressionn
-# ??? 
-# library(bayestestR)
-# library(patchwork)
 # library(ggpp)
-# library(lsr)
 
 source("../lib/helper_functions.R")
 ```
@@ -327,6 +325,45 @@ d_ex |>
   summarise(n()) 
 ```
 
+## Visualize 
+
+```{r data vis calculation, include=FALSE}
+data_vis <- 
+  d_ex_test |> 
+  mutate(
+    Cue = ifelse(post_cue==T, 1,0),
+    Congruency = fct_relevel( ifelse(congruent==F, "Incongruent", "Congruent"), "Incongruent"),
+    bis_inv = -1 * bis,
+    con = ifelse(congruent==T, 1,0),
+  ) |>
+  rename(`Response time` = rt, `Error rate` = pe, LISAS = lisas, BIS = bis_inv) |>
+  pivot_longer(c(`Response time`,`Error rate`, LISAS, BIS)) |>
+  mutate(name = fct_relevel(name, "Response time", "Error rate", "LISAS", "BIS"))
+```
+
+```{r visualize across all, echo=TRUE}
+data_vis |>
+  ggplot(aes(Cue, value, col = Congruency)) +
+  facet_wrap(~name, scales="free") + 
+  stat_summary(fun.data = mean_se, position=position_dodge(.1)) +
+  stat_summary(fun.data = mean_se, geom="line", 
+               position=position_dodge(.1), ) +
+  scale_x_continuous(breaks=c(0,1),labels = c("Pre-cue", "Post-cue"))+
+  coord_cartesian(xlim=c(-.25,1.25))+
+  labs(x=NULL, y="Error rate")
+```
+
+```{r bar plot, echo=FALSE}
+data_vis |>   
+  filter(name == "Response time") |>
+  ggplot(aes(Cue, value, fill = Congruency)) +
+  stat_summary(fun.data = mean_se, position=position_dodge(.75), geom="col", width=.75)+
+  stat_summary(fun.data = mean_se, position=position_dodge(.75), geom="errorbar", width=.5) +
+  scale_x_continuous(breaks=c(0,1),labels = c("Pre-cue", "Post-cue"))+
+  coord_cartesian(xlim=c(-.4,1.40), ylim=c(550, 750))+
+  labs(x = NULL, y="Response time")
+```
+
 ## Statistical test
 
 ### Normality
@@ -407,7 +444,7 @@ id_is_extreme <- outlier_values |> filter(is.extreme==T) |> pull(id) |> unique()
 
 Some outliers, check without. 
 
-### Frequentist analyses
+### Frequentist rmANOVA
 Statistical test of all 35 participants:
 
 #### Table
@@ -450,22 +487,43 @@ trns_mod(pe_aov) |>
     trns_mod(bis_aov) |> mutate(group="BIS") ) |>
   pivot_wider(names_from = group, values_from = c(`F (1,34)`, p, pes)) |>
   select(names, ends_with("Error rate"), ends_with("Response time"), ends_with("LISAS"), ends_with("BIS")) |>
+  mutate(e="",e2="",e3="",e4="") |>
   gt() |>
-  tab_spanner(
-    "Error rate", c(`F (1,34)_Error rate`, `p_Error rate`, `pes_Error rate`)) |>
+  cols_move(c(`F (1,34)_Response time`, `p_Response time`, `pes_Response time`), names) |> 
   tab_spanner(
     "Response time", c(`F (1,34)_Response time`, `p_Response time`, `pes_Response time`)) |>
+  tab_spanner(
+    "Error rate", c(`F (1,34)_Error rate`, `p_Error rate`, `pes_Error rate`)) |>
   tab_spanner("LISAS", c(`F (1,34)_LISAS`, `p_LISAS`, `pes_LISAS`)) |>
   tab_spanner("BIS", c(`F (1,34)_BIS`, `p_BIS`, `pes_BIS`)) |>
+  cols_move(e, `pes_Response time`) |> 
+  cols_move(e2, `pes_Error rate`) |> 
+  cols_move(e3, `pes_LISAS`) |> 
+  cols_move(e4, `pes_BIS`) |> 
   cols_label(
-    `F (1,34)_BIS` = md("*F*(1,34)"), `F (1,34)_LISAS` = md("*F*(1,34)"), `F (1,34)_Response time` = md("*F*(1,34)"),
-    `F (1,34)_Error rate` = md("*F*(1,34)"), p_LISAS = md("*p*"), p_BIS = md("*p*"), `p_Error rate`= md("*p*"), 
-    `p_Response time` = md("*p*"), `pes_Error rate` = "n^2", `pes_Response time` = "n^2", pes_LISAS = "n^2", 
-    `pes_BIS`="n^2", names = "Variables") |>
-  cols_align("center", 2:13)
+    `F (1,34)_BIS` = md("*F*(1,34)"), `F (1,34)_LISAS` = md("*F*(1,34)"), 
+    `F (1,34)_Response time` = md("*F*(1,34)"), `F (1,34)_Error rate` = md("*F*(1,34)"), 
+    p_LISAS = md("*p*"), p_BIS = md("*p*"), `p_Error rate`= md("*p*"), 
+    `p_Response time` = md("*p*"), `pes_Error rate` = "n^2", `pes_Response time` = "n^2", 
+    pes_LISAS = "n^2", `pes_BIS`="n^2", names = "Variables",
+    e="", e2="",e3="",e4="") |>
+  cols_align("center", 2:13) |>
+  tab_header("Results for the whole sample", ) |>
+  tab_footnote("dawd")
 ```
 
-#### Paragarph
+##### Paragarph
+
+```{r use this bfr paragraph, include=FALSE}
+pe_aov$anova_table |> 
+  as_tibble() |>
+  mutate(
+    `F` = fmt_APA_numbers(`F`, .chr=T),
+    `pes` = fmt_APA_numbers(`F`, .low_val=T ),
+    `Pr(>F)` = fmt_APA_numbers(`Pr(>F)`, .p=T ),
+  )
+```
+
 
 The rmANOVA for error revealed a significant effect of
 Congruency (*F*\~`r pe_aov$anova_table[["num Df"]][1]`,
@@ -536,7 +594,7 @@ nor an interaction effect
 $\eta_p^2$ =
 `r fmt_APA_numbers(bis_aov$anova_table[["pes"]][3], .low_val=T)`).
 
-#### 34 partic tests
+#### Sample n=34 tests
 
 Since we preregistered a sample of 34, but do not know which
 participant to remove, we include tests of all data with n-1.
@@ -563,7 +621,23 @@ test_one_less |>
     maxF = max(`F`),
     maxP = max(p),
     minP = min(p),
-  )
+  ) |> 
+  rename(Variable = Effect) |> 
+  mutate(
+    Variable = case_when(Variable=="post_cue"~"Cue", 
+                         Variable=="congruent"~"Congruency", 
+                         Variable=="post_cue:congruent"~"Cue.X.Congruency"),
+    across(2:3, ~fmt_APA_numbers(.x, .chr=T)),
+    across(4:5, ~fmt_APA_numbers(.x, .p=T)),
+    e="") |>
+  gt() |>
+  tab_spanner("F test", c(minF, maxF)) |>
+  tab_spanner(md("*p*-value"), c(maxP, minP)) |>
+  cols_move(e, maxF) |>
+  cols_label(minF = "Min", maxF = "Max", maxP = "Max", minP = "Min", e="") |>
+  cols_align("center", 2:5) |> 
+  tab_header("Summary of the F and p value for all 34 combinations of the rmANOVA") |>
+  tab_footnote("Resulting F and p value for all combinations of a 34 participant sample size")
 ```
 
 #### Robustness check
@@ -620,7 +694,9 @@ trns_mod(o_pe_aov) |>
     "p_Error rate" = md("*p*"), p_LISAS = md("*p*"), p_BIS = md("*p*"), "pes_Error rate"="n^2",
     pes_LISAS="n^2", pes_BIS = "n^2", names = "Variables"
   ) |>
-  cols_align("center", 2:10)
+  cols_align("center", 2:10) |>
+  tab_header("Outliers removed from the rmANOVA") |>
+  tab_footnote("Outliers removed")
 ```
 
 
@@ -628,40 +704,206 @@ trns_mod(o_pe_aov) |>
 
 ### Bayesian Analyses 
 
-#### Model selection
-```{r bayesian rmanova, echo=FALSE}
-# Bayesian rmANOAV
-pe_bay <- anovaBF(pe ~ post_cue * congruent + id, 
-                  whichRandom = "id", 
-                  d_ex_test |> mutate(id=factor(id),
-                                      post_cue=factor(post_cue),
-                                      congruent=factor(congruent))) 
-pe_bay # only model with congruency 
-
-lisas_bay <- anovaBF(lisas ~ post_cue * congruent + id,
-                     whichRandom = "id", 
-                     d_ex_test |> mutate(id=factor(id),
-                                         post_cue=factor(post_cue),
-                                         congruent=factor(congruent))) 
-lisas_bay # Congruency + Cue  ---  secondary congruency+cue+interaction
-
-bis_bay <- anovaBF(bis ~ post_cue * congruent + id, 
-                   whichRandom = "id", 
-                   d_ex_test |> mutate(id=factor(id),
-                                       post_cue=factor(post_cue),
-                                       congruent=factor(congruent))) 
-bis_bay # Congruency + Cue  ---  secondary  congruency+cue+interaction
+#### Coefficients
+```{r , include=FALSE}
+vars <- list()
+coefs <- list()
+co_bay <- list()
 ```
+
+```{r rt bay coefs, echo=FALSE, warning=FALSE, message=FALSE}
+co_bay$rt <- brm(
+  rt ~ congruent + post_cue + congruent:post_cue + (1|id), 
+  d_ex_test, 
+  save_pars = save_pars(all=T), backend = "cmdstanr", cores = 6,
+  iter = 6000, chains = 6, init=0)
+
+variables(co_bay$rt) -> vars$rt
+vars$rt[str_detect(vars$rt, "b_")] -> vars$rt
+mcmc_acf(as.array(co_bay$rt), pars=vars$rt)   # autocorrelation
+mcmc_trace(as.array(co_bay$rt), pars=vars$rt) # mcmc draws
+bayes_plot(co_bay$rt, c("z_", "sigma"))    # coefficient plot
+
+coefs$rt <- 
+  fixef(co_bay$rt) |> 
+  as_tibble() |> 
+  mutate(
+    .before=1, 
+    names = rownames(fixef(co_bay$rt)), 
+    across(where(is.double), ~fmt_APA_numbers(.x, .low_val=T)), 
+    Est.Error=NULL,
+    group="Response Time") |>
+  filter(!(names=="Intercept"))
+```
+
+```{r pe bay coefs , echo=FALSE}
+co_bay$pe <- brm(
+  pe ~ congruent + post_cue + congruent:post_cue + (1|id), 
+  d_ex_test, 
+  save_pars = save_pars(all=T), backend = "cmdstanr", cores = 6, 
+  iter = 6000, chains = 6, init=0)
+
+variables(co_bay$pe) -> vars$pe
+vars$pe[str_detect(vars$pe, "b_")] -> vars$pe
+mcmc_acf(as.array(co_bay$pe), pars=vars$pe)   # autocorrelation
+mcmc_trace(as.array(co_bay$pe), pars=vars$pe) # mcmc draws
+bayes_plot(co_bay$pe, c("z_", "sigma"))    # coefficient plot
+
+coefs$pe <-
+  fixef(co_bay$pe) |> 
+  as_tibble() |> 
+  mutate(
+    .before=1, 
+    names = rownames(fixef(co_bay$pe)), 
+    across(where(is.double), ~fmt_APA_numbers(.x, .low_val=T)), 
+    Est.Error=NULL,
+    group="Error") |>
+  filter(!(names=="Intercept"))
+```
+
+```{r lisas bay coefs, echo=FALSE}
+co_bay$lisas <- brm(
+  lisas ~ congruent + post_cue + congruent:post_cue + (1|id), 
+  d_ex_test, 
+  save_pars = save_pars(all=T), backend = "cmdstanr", cores = 6,
+  iter = 6000, chains = 6, init=0)
+
+variables(co_bay$lisas) -> vars$lisas
+vars$lisas[str_detect(vars$lisas, "b_")] -> vars$lisas
+mcmc_acf(as.array(co_bay$lisas), pars=vars$lisas)   # autocorrelation
+mcmc_trace(as.array(co_bay$lisas), pars=vars$lisas) # mcmc draws
+bayes_plot(co_bay$lisas, c("z_", "sigma"))    # coefficient plot
+
+coefs$lisas <- 
+  fixef(co_bay$lisas) |> 
+  as_tibble() |> 
+  mutate(
+    .before=1, 
+    names = rownames(fixef(co_bay$lisas)), 
+    across(where(is.double), ~fmt_APA_numbers(.x, .low_val=T)), 
+    Est.Error=NULL,
+    group = "LISAS") |>
+  filter(!(names=="Intercept"))
+```
+
+```{r bis bay coefs, echo=FALSE}
+co_bay$bis <- brm(
+  bis ~ congruent + post_cue + congruent:post_cue + (1|id), 
+  d_ex_test, 
+  save_pars = save_pars(all=T), backend = "cmdstanr", cores = 6, 
+  iter = 6000, chains = 6, init=0)
+
+variables(co_bay$bis) -> vars$bis
+vars$bis[str_detect(vars$bis, "b_")] -> vars$bis
+mcmc_acf(as.array(co_bay$bis), pars=vars$bis)   # autocorrelation
+mcmc_trace(as.array(co_bay$bis), pars=vars$bis) # mcmc draws
+bayes_plot(co_bay$bis, c("z_", "sigma"))    # coefficient plot
+
+coefs$bis <- 
+  fixef(co_bay$bis) |> 
+  as_tibble() |> 
+  mutate(
+    .before=1, 
+    names = rownames(fixef(co_bay$bis)), 
+    across(where(is.double), ~fmt_APA_numbers(.x, .low_val=T)), 
+    Est.Error=NULL,
+    group = "BIS") |>
+  filter(!(names=="Intercept"))
+```
+
+##### n-1 tests
+
+```{r multi-tests, echo=FALSE}
+library(pbapply)
+
+bay_rep_test <- function(dep){
+  pblapply(1:35, \(x){
+    b <- brm(
+      as.formula(glue::glue("{dep} ~ congruent + post_cue + congruent:post_cue + (1|id)")), 
+      d_ex_test |> filter(!(id == id_list[x])), 
+      save_pars = save_pars(all=T), backend = "cmdstanr", cores = 6,
+      iter = 6000, chains = 6,  init=0)
+  
+    coefs$bis <- 
+      fixef(b) |> 
+      as_tibble() |> 
+      mutate(
+        .before=1, 
+        names = rownames(fixef(bay_res2)), 
+        across(where(is.double), ~fmt_APA_numbers(.x, .low_val=T)), 
+        Est.Error=NULL,
+        group = dep,
+        l_out = id_list[x]) |>
+      filter(!(names=="Intercept"))
+    
+    list(b, coefs)
+  })
+}
+```
+
+```{r}
+
+```
+
+
+
+
+#### Model selection
+```{r , include=FALSE}
+bay_ms <- list()
+```
+
+```{r model selection rt, echo=FALSE}
+bay_ms$rt <- anovaBF(
+  rt ~ post_cue * congruent + id, whichRandom = "id", 
+  d_ex_test |> mutate(
+    id=factor(id), post_cue=factor(post_cue), congruent=factor(congruent))
+  ) 
+bay_ms$rt
+```
+
+```{r bmodel selection pe, echo=FALSE}
+bay_ms$pe <- anovaBF(
+  pe ~ post_cue * congruent + id, whichRandom = "id", 
+  d_ex_test |> mutate(
+    id=factor(id), post_cue=factor(post_cue), congruent=factor(congruent))
+  ) 
+bay_ms$pe # only model with congruency
+```
+
+```{r model selection lisas, echo=FALSE}
+bay_ms$lisas <- anovaBF(
+  lisas ~ post_cue * congruent + id, whichRandom = "id", 
+  d_ex_test |> mutate(
+    id=factor(id),
+    post_cue=factor(post_cue),
+    congruent=factor(congruent))
+  ) 
+bay_ms$lisas # Congruency + Cue  ---  secondary congruency+cue+interaction
+```
+
+```{r model selection bis, echo=FALSE}
+bay_ms$bis <- anovaBF(
+  bis ~ post_cue * congruent + id, whichRandom = "id", 
+  d_ex_test |> mutate(
+    id=factor(id),
+    post_cue=factor(post_cue),
+    congruent=factor(congruent))
+  ) 
+bay_ms$bis # Congruency + Cue  ---  secondary  congruency+cue+interaction
+```
+
+##### Paragraph
 
 For errors, the model containing only congruency is favoured (BF~10~ = `r fmt_APA_numbers(pe_bay@bayesFactor$bf[2])`) compared to a model with only the Cue (BF~10~ = `r fmt_APA_numbers(pe_bay@bayesFactor$bf[1])`), Congruency and Cue (BF~10~ = `r fmt_APA_numbers(pe_bay@bayesFactor$bf[3])`), and Congruency, Cue and their interaction (BF~10~ = `r fmt_APA_numbers(pe_bay@bayesFactor$bf[4])`). 
 
 For the LISAS, the model containing both the Congruency and Cue is favoured (BF~10~ = `r fmt_APA_numbers(lisas_bay@bayesFactor$bf[2])`), but in close succession of the model with the Congruency, Cue and their interaction (BF~10~ = `r fmt_APA_numbers(lisas_bay@bayesFactor$bf[4])`), followed by the model with only Congruency (BF~10~ = `r fmt_APA_numbers(lisas_bay@bayesFactor$bf[2])`), and only the Cue (BF~10~ = `r fmt_APA_numbers(lisas_bay@bayesFactor$bf[1])`). 
 
-A similar picture is found for the BIS model comparison: The model containing both Congruency and Cue is more favoured (BF~10~ = `r fmt_APA_numbers(bis_bay@bayesFactor$bf[3])`), but followed by the model including the interaciton term (BF~10~ = `r fmt_APA_numbers(bis_bay@bayesFactor$bf[4])`), only Congruency (BF~10~ = `r fmt_APA_numbers(bis_bay@bayesFactor$bf[2])`), and lastly, only the Cue (BF~10~ = `r fmt_APA_numbers(bis_bay@bayesFactor$bf[1])`). 
+A similar picture is found for the BIS model comparison: The model containing both Congruency and Cue is more favoured (BF~10~ = `r fmt_APA_numbers(bis_bay@bayesFactor$bf[3])`), but followed by the model including the interaction term (BF~10~ = `r fmt_APA_numbers(bis_bay@bayesFactor$bf[4])`), only Congruency (BF~10~ = `r fmt_APA_numbers(bis_bay@bayesFactor$bf[2])`), and lastly, only the Cue (BF~10~ = `r fmt_APA_numbers(bis_bay@bayesFactor$bf[1])`). 
 
 ##### 34 repeated test 
 
-```{r n-1 repeated bayesian tests, echo=FALSE}
+```{r function n-1 repeated bayesian tests, echo=FALSE}
 rep_test <- function(dep){
   map(1:35, \(x){
     anovaBF(as.formula(glue::glue("{dep} ~ post_cue * congruent + id")), 
@@ -686,112 +928,52 @@ rep_test <- function(dep){
       maxBF = max(bf),
     )
 }
+```
 
+```{r}
 rep <- list()
+```
+
+```{r n-1 repeated bayesian tests, echo=FALSE}
+rep$rt_34 <- rep_test("rt")
 rep$pe_34 <- rep_test("pe")
 rep$lisas_34 <- rep_test("lisas")
 rep$bis_34 <- rep_test("bis")
 
-rep$pe_34 |> 
-  mutate(group = "Error") |> 
+rep$rt_34 |>
+  mutate(group="ResponseTime") |> 
+  bind_rows(
+    rep$pe_34 |> 
+      mutate(group = "Error") ) |> 
   bind_rows(
     rep$lisas_34 |> 
-      mutate(group="LISAS")
-  ) |> 
+      mutate(group="LISAS") ) |> 
   bind_rows(
     rep$bis_34 |>
-      mutate(group="BIS")
-  ) |>
+      mutate(group="BIS") ) |>
   mutate(across(where(is.double), ~fmt_APA_numbers(.x, .chr=T)),
          names = str_remove(names,"\\+ id$")) |>
   pivot_wider(names_from=group, values_from=c(minBF, maxBF)) |>
   gt() |>
+  tab_spanner("Response time", c(minBF_ResponseTime, maxBF_ResponseTime)) |>
   tab_spanner("Error rate", c(minBF_Error, maxBF_Error)) |>
   tab_spanner("LISAS", c(minBF_LISAS, maxBF_LISAS)) |>
   tab_spanner("BIS", c(minBF_BIS, maxBF_BIS)) |>
   cols_label(
-    minBF_Error = md("minBF~10~"), maxBF_Error = md("maxBF~10~"), minBF_LISAS = md("minBF~10~"), 
-    maxBF_LISAS = md("maxBF~10~"), minBF_BIS = md("minBF~10~"), maxBF_BIS = md("maxBF~10~"), 
+    minBF_ResponseTime="Min", maxBF_ResponseTime="Max", 
+    minBF_Error = md("Min"), maxBF_Error = md("Max"), minBF_LISAS = md("Min"), 
+    maxBF_LISAS = md("Max"), minBF_BIS = md("Min"), maxBF_BIS = md("Max"), 
     names = "Model selection") |>
-  cols_align("center", 2:7)
-  
+  cols_align("center", 2:7) |>
+  tab_header("Minimum and maximum Bayesian factor for the error rate, LISAS and BIS")
 ```
 
 The pattern of results found for the 35 participants is reflected in all 34 sampled tests (n-1), per the preregistered sample size. 
 
-#### Coefficients
-
-```{r bayesian rmanova, echo=FALSE}
-library(brms)
-library(cmdstanr)
-library(bayesplot)
-library(bayestestR)
-
-bay_res2 <- brm(pe ~ congruent + post_cue + congruent:post_cue + (1|id), 
-                d_ex_test, save_pars = save_pars(all=T),
-                iter = 6000, chains = 6, backend = "cmdstanr", cores = 6, init=0)
-
-variables(bay_res2) -> vars
-vars[str_detect(vars, "b_")] -> vars
-mcmc_acf(as.array(bay_res2), pars=vars)   # autocorrelation
-mcmc_trace(as.array(bay_res2), pars=vars) # mcmc draws
-bayes_plot(bay_res2, c("z_", "sigma"))    # coefficient plot
-
-summary(bay_res2)
-
-fixef(bay_res2) |> 
-  as_tibble() |> 
-  mutate(.before=1, names = rownames(fixef(bay_res2)), 
-         across(where(is.double), ~fmt_APA_numbers(.x, .low_val=T)), 
-         Est.Error=NULL)
-
-library(pbapply)
-library(parallel)
-
-pbapply::pblapply(1:35, \(x){
-  b <- brm(pe ~ congruent + post_cue + congruent:post_cue + (1|id), 
-           d_ex_test, save_pars = save_pars(all=T),
-           iter = 6000, chains = 6, backend = "cmdstanr", cores = 6, init=0)
-
-  fixef(b) |> 
-    as_tibble() |> 
-    mutate(.before=1, names = rownames(fixef(b)), 
-           across(where(is.double), ~fmt_APA_numbers(.x, .low_val=T)), 
-           Est.Error=NULL)
-})
-
-
-```
-
-
 
 ## Figures
 
-```{r data vis calculation, include=FALSE}
-data_vis <- 
-  d_ex_test |> 
-  mutate(
-    Cue = ifelse(post_cue==T, 1,0),
-    Congruency = fct_relevel( ifelse(congruent==F, "Incongruent", "Congruent"), "Incongruent"),
-    bis_inv = -1 * bis,
-    con = ifelse(congruent==T, 1,0),
-  ) |>
-  rename(`Response time` = rt, `Error rate` = pe, LISAS = lisas, BIS = bis_inv) |>
-  pivot_longer(c(`Response time`,`Error rate`, LISAS, BIS)) |>
-  mutate(name = fct_relevel(name, "Response time", "Error rate", "LISAS", "BIS"))
-```
 
-```{r visualize across all, echo=TRUE}
-data_vis |>
-  ggplot(aes(Cue, value, col = Congruency)) +
-  facet_wrap(~name, scales="free") + 
-  stat_summary(fun.data = mean_se, position=position_dodge(.1)) +
-  stat_summary(fun.data = mean_se, geom="line", 
-               position=position_dodge(.1), ) +
-  scale_x_continuous(breaks=c(0,1),labels = c("Pre-cue", "Post-cue"))+
-  coord_cartesian(xlim=c(-.25,1.25))+
-  labs(x=NULL, y="Error rate")
-```
 
 ```{r indiv vis, echo=TRUE}
 data_vis |>
@@ -816,17 +998,6 @@ data_vis |>
 
 
 
-```
-
-```{r bar plot, echo=FALSE}
-data_vis |>   
-  filter(name == "Response time") |>
-  ggplot(aes(Cue, value, fill = Congruency)) +
-  stat_summary(fun.data = mean_se, position=position_dodge(.75), geom="col", width=.75)+
-  stat_summary(fun.data = mean_se, position=position_dodge(.75), geom="errorbar", width=.5) +
-  scale_x_continuous(breaks=c(0,1),labels = c("Pre-cue", "Post-cue"))+
-  coord_cartesian(xlim=c(-.25,1.25), ylim=c(550, 750))+
-  labs(x = NULL, y="Response time")
 ```
 
 ## Table
