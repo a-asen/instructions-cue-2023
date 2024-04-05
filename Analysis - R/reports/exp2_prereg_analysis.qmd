@@ -1189,7 +1189,8 @@ n34_b_rep |>
       names=="post_cueTRUE"  ~ "Cue",
       T ~ "Congruency X Cue",
     ), 
-    across(3:12, ~fmt_APA_numbers(.x, .chr=T))
+    across(3:12, ~fmt_APA_numbers(.x, .chr=T)),
+    zz="", zz2="", zz3="",zz4=""
   ) |>
   gt(groupname_col = "group") |>
   tab_spanner("Estimate", starts_with("est")) |>
@@ -1200,7 +1201,12 @@ n34_b_rep |>
   cols_label(
     ends_with("_i") ~ "Low",
     ends_with("_x") ~ "High",
-  )
+    starts_with("zz") ~ ""
+  ) |> 
+  cols_move(zz, est_x) |>
+  cols_move(zz2, pdir_x) |>
+  cols_move(zz3, erat_x) |>
+  cols_move(zz4, q2.5_x) 
   
 ```
 
