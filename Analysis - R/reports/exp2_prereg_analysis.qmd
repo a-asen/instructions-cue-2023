@@ -53,8 +53,8 @@ demo |>
     n = length(Age),
     age = mean(Age),
     age_sd = sd(Age),
-    male = sum(s==1),
-    female = sum(s==0),
+    male = sum(Sex=="Female"),
+    female = sum(Sex=="Male"),
     sex = mean(s),
     sex_s = sd(s)
   ) |> round(2) -> dem
@@ -70,12 +70,9 @@ demo |>
 # }) |> list_rbind()
 ```
 
-We recruited `r length(demo$Age)+4`, participants from the
-United Kingdom via Prolific. Due to a coding mistake, four
-participants did not generate any data. This left us with a
-mean age of `r dem$age` (SD = `r dem$age_sd`; `r dem$females`
-females) from the United Kingdom via Prolific. Note that two
-participants were excluded from the data analysis, but cannot
+We recruited `r length(demo$Age)`, participants from the
+United Kingdom via Prolific. Participants had an average age of `r dem$age` (SD = `r dem$age_sd`; `r dem$female`
+females). Note that three participants were excluded from the data analysis, but cannot
 be removed from the demographics due to non-connections
 between data points and demographics variables.
 
@@ -318,6 +315,9 @@ data_vis <-
 ```
 
 ```{r visualize across all, echo=FALSE}
+#| fig-width: 8
+#| fig-height: 8
+#| fig-dpi: 300
 data_vis |>
   ggplot(aes(Cue, value, col = Congruency)) +
   facet_wrap(~name, scales="free") + 
@@ -326,7 +326,8 @@ data_vis |>
                position=position_dodge(.1), ) +
   scale_x_continuous(breaks=c(0,1),labels = c("Pre-cue", "Post-cue"))+
   coord_cartesian(xlim=c(-.25,1.25))+
-  labs(x=NULL, y="Error rate")
+  labs(x=NULL, y="")+
+  theme_bw()
 ```
 
 ```{r bar plot, echo=FALSE}
@@ -337,7 +338,8 @@ data_vis |>
   stat_summary(fun.data = mean_se, position=position_dodge(.75), geom="errorbar", width=.5) +
   scale_x_continuous(breaks=c(0,1),labels = c("Pre-cue", "Post-cue"))+
   coord_cartesian(xlim=c(-.4,1.40), ylim=c(550, 750))+
-  labs(x = NULL, y="Response time")
+  labs(x = NULL, y="Response time")+
+  theme_bw()
 ```
 
 ## Statistical test
@@ -355,7 +357,7 @@ residual_norm <-
   ) 
 ```
 
-```{r residual qqplot, echo=false}
+```{r residual qqplot, echo=FALSE}
 residual_norm |>
   ggplot(aes(sample = residuals)) +
   facet_wrap(~ name, scales="free") +
@@ -383,7 +385,7 @@ d_ex_test |>
 ```
 
 ### Outliers
-```{r difference distribution, echo=TRUE}
+```{r difference distribution, echo=FALSE}
 d_ex_test |> 
   mutate(cue = ifelse(post_cue==T, "post","pre"),
          congruent = ifelse(congruent==T, "Congruent", "Incongruent")) |>
@@ -508,11 +510,10 @@ trns_mod(aovs$rt) |>
   bind_rows(
     trns_mod(aovs$bis) |> mutate(group="BIS") ) |>
   gt(groupname_col = "group") |>
-  cols_label(p = md("*p*"), pes = "n^2",) 
-  cols_align("center", 2:13) |>
+  cols_label(p = md("*p*"), pes = "n^2",) |>
+  cols_align("center", 2:5) |>
   tab_header("Results for the whole sample", ) |>
   tab_footnote("dawd")
-
 ```
 
 
@@ -604,10 +605,10 @@ text_report <- function(data){
 }
 
 aov_report <- list()
-aov_report$rt <- text_report(rt_aov) 
-aov_report$pe <- text_report(pe_aov) 
-aov_report$lisas <- text_report(lisas_aov) 
-aov_report$bis <- text_report(bis_aov) 
+aov_report$rt <- text_report(aovs$rt) 
+aov_report$pe <- text_report(aovs$pe) 
+aov_report$lisas <- text_report(aovs$lisas) 
+aov_report$bis <- text_report(aovs$bis) 
 ```
 
 ---
@@ -626,73 +627,69 @@ the analysis did not reveal a significant effect of the Cue
 ---
 
 The rmANOVA for error revealed a significant effect of
-Congruency (*F*\~`r pe_aov$anova_table[["num Df"]][1]`,
-`r pe_aov$anova_table[["den Df"]][1]`\~ =
-`r fmt_APA_numbers(pe_aov$anova_table$F[1])`, *p*
-`r fmt_APA_numbers(pe_aov$anova_table[["Pr(>F)"]][1], .psym=T)`,
+Congruency (*F*\~`r aov_report$pe[["num Df"]][1]`,
+`r aov_report$pe[["den Df"]][1]`\~ =
+`r aov_report$pe$F[1]`, *p*
+`r aov_report$pe[["Pr(>F)"]][1]`,
 $\eta_p^2$ =
-`r fmt_APA_numbers(pe_aov$anova_table[["pes"]][1], .low_val=T)`),
-suggesting lower errors for congruent trials. As for the cue,
-the analysis did not reveal a significant effect of the Cue
-(*F*\~`r pe_aov$anova_table[["num Df"]][2]`,
-`r pe_aov$anova_table[["den Df"]][2]`\~ =
-`r fmt_APA_numbers(pe_aov$anova_table$F[2])`, *p*
-`r fmt_APA_numbers(pe_aov$anova_table[["Pr(>F)"]][2], .psym=T)`,
+`r aov_report$pe[["pes"]][1]`),
+suggesting lower errors for congruent trials. As for the cue, there was not revealed a main effect of Cue
+(*F*\~`r aov_report$pe[["num Df"]][2]`,
+`r aov_report$pe[["den Df"]][2]`\~ =
+`r aov_report$pe$F[2]`, *p*
+`r aov_report$pe[["Pr(>F)"]][2]`,
 $\eta_p^2$ =
-`r fmt_APA_numbers(pe_aov$anova_table[["pes"]][2], .low_val=T)`),
+`r aov_report$pe[["pes"]][2]`),
 nor an interaction effect
-(*F*\~`r pe_aov$anova_table[["num Df"]][3]`,
-`r pe_aov$anova_table[["den Df"]][3]`\~ =
-`r pe_aov$anova_table$F[3]`, *p*
-`r fmt_APA_numbers(pe_aov$anova_table[["Pr(>F)"]][3], .psym=T)`,
+(*F*\~`r aov_report$pe[["num Df"]][3]`,
+`r aov_report$pe[["den Df"]][3]`\~ =
+`r aov_report$pe$F[3]`, *p*
+`r aov_report$pe[["Pr(>F)"]][3]`,
 $\eta_p^2$ =
-`r fmt_APA_numbers(pe_aov$anova_table[["pes"]][3], .low_val=T)`).
+`r aov_report$pe[["pes"]][3]`).
 
-The rmANOVA for the LISAS revealed a significant effect of
-Congruency (*F*\~`r lisas_aov$anova_table[["num Df"]][1]`,
-`r lisas_aov$anova_table[["den Df"]][1]`\~ =
-`r fmt_APA_numbers(lisas_aov$anova_table$F[1])`, *p*
-`r fmt_APA_numbers(lisas_aov$anova_table[["Pr(>F)"]][1], .psym=T)`,
+The rmANOVA for the LISAS revealed a main effect of
+Congruency (*F*\~`r aov_report$lisas[["num Df"]][1]`,
+`r aov_report$lisas[["den Df"]][1]`\~ =
+`r aov_report$lisas$F[1])`, *p*
+`r aov_report$lisas[["Pr(>F)"]][1]`,
 $\eta_p^2$ =
-`r fmt_APA_numbers(lisas_aov$anova_table[["pes"]][1], .low_val=T)`),
-suggesting lower errors for congruent trials. As for the cue,
-the analysis did not reveal a significant effect of the Cue
-(*F*\~`r lisas_aov$anova_table[["num Df"]][2]`,
-`r lisas_aov$anova_table[["den Df"]][2]`\~ =
-`r fmt_APA_numbers(lisas_aov$anova_table$F[2])`, *p*
-`r fmt_APA_numbers(lisas_aov$anova_table[["Pr(>F)"]][2], .psym=T)`,
+`r aov_report$lisas[["pes"]][1]`) and Cue
+(*F*\~`r aov_report$lisas[["num Df"]][2]`,
+`r aov_report$lisas[["den Df"]][2]`\~ =
+`r aov_report$lisas$F[2]`, *p*
+`r aov_report$lisas[["Pr(>F)"]][2]`,
 $\eta_p^2$ =
-`r fmt_APA_numbers(lisas_aov$anova_table[["pes"]][2], .low_val=T)`),
-nor an interaction effect
-(*F*\~`r lisas_aov$anova_table[["num Df"]][3]`,
-`r lisas_aov$anova_table[["den Df"]][3]`\~ =
-`r lisas_aov$anova_table$F[3]`, *p*
-`r fmt_APA_numbers(lisas_aov$anova_table[["Pr(>F)"]][3], .psym=T)`,
+`r aov_report$lisas[["pes"]][2]`). Suggesting that congruent trials had lower LISAS and post-cue trials had higher LISAS. However, no interaction term was revealed 
+(*F*\~`r aov_report$lisas[["num Df"]][3]`,
+`r aov_report$lisas[["den Df"]][3]`\~ =
+`r aov_report$lisas$F[3]`, *p*
+`r aov_report$lisas[["Pr(>F)"]][3]`,
 $\eta_p^2$ =
-`r fmt_APA_numbers(lisas_aov$anova_table[["pes"]][3], .low_val=T)`).
+`r aov_report$lisas[["pes"]][3]`).
 
-The rmANOVA for the LISAS revealed a significant effect of
-Congruency (*F*\~`r bis_aov$anova_table[["num Df"]][1]`,
-`r bis_aov$anova_table[["den Df"]][1]`\~ =
-`r fmt_APA_numbers(bis_aov$anova_table$F[1])`, *p*
-`r fmt_APA_numbers(bis_aov$anova_table[["Pr(>F)"]][1], .psym=T)`,
+The rmANOVA for the BIS revealed a significant effect of
+Congruency (*F*\~`r aov_report$bis[["num Df"]][1]`,
+`r aov_report$bis[["den Df"]][1]`\~ =
+`r aov_report$bis$F[1]`, *p*
+`r aov_report$bis[["Pr(>F)"]][1]`,
 $\eta_p^2$ =
-`r fmt_APA_numbers(bis_aov$anova_table[["pes"]][1], .low_val=T)`),
+`r aov_report$bis[["pes"]][1]`),
 suggesting lower errors for congruent trials. As for the cue,
 the analysis did not reveal a significant effect of the Cue
-(*F*\~`r bis_aov$anova_table[["num Df"]][2]`,
-`r bis_aov$anova_table[["den Df"]][2]`\~ =
-`r fmt_APA_numbers(bis_aov$anova_table$F[2])`, *p*
-`r fmt_APA_numbers(bis_aov$anova_table[["Pr(>F)"]][2], .psym=T)`,
+(*F*\~`r aov_report$bis[["num Df"]][2]`,
+`r aov_report$bis[["den Df"]][2]`\~ =
+`r aov_report$bis$F[2]`, *p*
+`r aov_report$bis[["Pr(>F)"]][2]`,
 $\eta_p^2$ =
-`r fmt_APA_numbers(bis_aov$anova_table[["pes"]][2], .low_val=T)`),
+`r aov_report$bis[["pes"]][2]`),
 nor an interaction effect
-(*F*\~`r bis_aov$anova_table[["num Df"]][3]`,
-`r bis_aov$anova_table[["den Df"]][3]`\~ =
-`r bis_aov$anova_table$F[3]`, *p*
-`r fmt_APA_numbers(bis_aov$anova_table[["Pr(>F)"]][3], .psym=T)`,
+(*F*\~`r aov_report$bis[["num Df"]][3]`,
+`r aov_report$bis[["den Df"]][3]`\~ =
+`r aov_report$bis$F[3]`, *p*
+`r aov_report$bis[["Pr(>F)"]][3]`,
 $\eta_p^2$ =
-`r fmt_APA_numbers(bis_aov$anova_table[["pes"]][3], .low_val=T)`).
+`r aov_report$bis[["pes"]][3]`).
 
 #### Sample n=34 tests
 
@@ -1158,7 +1155,7 @@ if(run_bayesian_models){
   n34_b_rep$bis    <- bay_rep_test("bis") |> list_rbind()
   # save(n34_b_rep, file="../data/processed/bayesian_n34_rep_test.rdata")
 } else {
-  # load()
+  load("../data/processed/bayesian_n34_rep_test.rdata")
 }
 ```
 
