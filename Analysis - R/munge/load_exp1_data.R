@@ -3,11 +3,11 @@ list.files("data/raw/experiment1/task", pattern = "*.csv", full.names = T) -> fn
 
 map_df(fnames, \(x){
   read_csv(x)
-}) -> exp1_d
+}) -> exp1_data
 
 # Fix congrunecy:
 raw_d <-
-  exp1_d |>
+  exp1_data |>
   dplyr::select(id, trial_info, diagnostic_run, italic, inducer_run, stimulus,
                 congruent, correct_diag_response_side, response, correct_response,rt) |>
   filter(trial_info=="Diagnostic trial" | trial_info=="Inducer instructions" | trial_info =="Diagnostic instructions") |>
@@ -50,7 +50,7 @@ cat("\n\U00023E9 'exp1_d' \U00023EA  is the raw data with the new congruency ('c
 ## Excluded data ----------
 
 exp1_excluded <-
-  exp1_d |>
+  exp1_data |>
   dplyr::select(id, trial_info, inducer_run, diagnostic_run, correct_response, rt, con) |>
   mutate(rt = as.numeric( ifelse(rt=="null", NA, rt)) ) |>
   filter(trial_info == "Diagnostic trial" | trial_info == "Inducer trial") |>
@@ -66,7 +66,7 @@ loss <- list()
 loss$data_trials <- nrow(exp1_excluded)
 
 ### Overall accuracy      ====
-exp1_d |>
+exp1_data |>
   filter( trial_info == "Diagnostic trial" | trial_info == "Inducer trial" ) |>
   group_by( id ) |>
   mutate( correct_response = ifelse( trial_info=="Inducer trial" & is.na(rt), 0, correct_response) ) |>
