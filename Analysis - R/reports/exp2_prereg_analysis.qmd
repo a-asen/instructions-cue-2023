@@ -108,7 +108,7 @@ between data points and demographics variables.
 ```{r prep base data, echo=FALSE}
 d <- d_ex <- 
   exp2_d |> 
-  select(id, trial_info, inducer_run, diagnostic_run, post_cue, congruent, rt, correct_response) |>
+  dplyr::select(id, trial_info, inducer_run, diagnostic_run, post_cue, congruent, rt, correct_response) |>
   filter( trial_info == "Diagnostic trial" | trial_info == "Inducer trial" ) |>
   mutate(rt = as.integer(ifelse(rt=="null", NA,rt)),
          inducer_run = as.integer(inducer_run))
@@ -187,7 +187,7 @@ d_ex <- d_ex |>
         rt_crit = ifelse( ( (rt >= rt_crit_high) | (rt <= rt_crit_low) ), 1, NA ),
         rt_na = ifelse(is.na(rt), 1, NA)
       ) |>
-      select(id,inducer_run, diagnostic_run, rt_crit, rt_na)
+      dplyr::select(id,inducer_run, diagnostic_run, rt_crit, rt_na)
   )
 
 # lost trials
@@ -202,7 +202,7 @@ loss$rt_sd_prop <-
 # Exclude
 d_ex <- d_ex |>
   filter( is.na(rt_crit) & is.na(rt_na) ) |>
-  select(-rt_crit, -rt_na)
+  dplyr::select(-rt_crit, -rt_na)
 ```
 
 Furthermore, `r loss[["rt_sd_trials"]]` trials were lost due
@@ -235,7 +235,7 @@ loss$total_lost_prop <- loss$inducer_practice_prop + loss$rt_sd_prop + loss$indu
 d_ex <-
   d_ex |>
   filter( valid_trials == 1 ) |>
-  select(-valid_trials)
+  dplyr::select(-valid_trials)
 ```
 
 Lastly, `r round(loss[["inducer_fail_trials"]], 2)` trials
@@ -306,7 +306,7 @@ d_ex_test <- d_ex |>
     bis    = ( (pc - g_pc) / g_pc_sd ) - ( (rt - g_rt) / g_rt_sd ),
     inv_bis = bis*-1,
   ) |> 
-  select(id, post_cue, congruent, rt, rt_sd, pe, pe_sd, lisas, bis, inv_bis)
+  dplyr::select(id, post_cue, congruent, rt, rt_sd, pe, pe_sd, lisas, bis, inv_bis)
 ```
 
 ```{r why we have one more than expected, echo=FALSE}
@@ -411,7 +411,7 @@ d_ex_test |>
 d_ex_test |> 
   mutate(cue = ifelse(post_cue==T, "post","pre"),
          congruent = ifelse(congruent==T, "Congruent", "Incongruent")) |>
-  select(-rt_sd,-pe_sd, -inv_bis,-post_cue) |>
+  dplyr::select(-rt_sd,-pe_sd, -inv_bis,-post_cue) |>
   pivot_longer(c(rt,pe,bis,lisas)) |> 
   pivot_wider(
     names_from=c(cue, congruent), 
@@ -460,7 +460,7 @@ trns_mod <- function(data){
   d |> 
     mutate(names = c("Congrunecy","Cue", "Congruency_X_Cue")) |> 
     rename(!!Fname := `F`, p = `Pr(>F)`) |>
-    select(names, all_of(Fname), p, pes) |> 
+    dplyr::select(names, all_of(Fname), p, pes) |> 
     mutate(across(2, ~fmt_APA_numbers(.x, .chr=T)),
            p = fmt_APA_numbers(p, .p=T),
            pes = fmt_APA_numbers(pes, .low_val=T))
@@ -488,7 +488,7 @@ trns_mod(pe_aov) |>
   bind_rows(
     trns_mod(bis_aov) |> mutate(group="BIS") ) |>
   pivot_wider(names_from = group, values_from = c(`F (1,34)`, p, pes)) |>
-  select(names, ends_with("Error rate"), ends_with("Response time"), ends_with("LISAS"), ends_with("BIS")) |>
+  dplyr::select(names, ends_with("Error rate"), ends_with("Response time"), ends_with("LISAS"), ends_with("BIS")) |>
   mutate(e="",e2="",e3="",e4="") |>
   gt() |>
   cols_move(c(`F (1,34)_Response time`, `p_Response time`, `pes_Response time`), names) |> 
@@ -544,21 +544,24 @@ par_test("rt") |>
   bind_rows( par_test("lisas") ) |>
   bind_rows( par_test("bis") ) |>
   pivot_wider(names_from=group, values_from=c(estimate,SE,df,t.ratio,p.value)) |>
-  mutate(across(where(is.double), ~fmt_APA_numbers(.x, .chr=T)),
-         em="",em2="",em3="",em4="") |>
+  mutate(
+    across(c(starts_with("SE"), starts_with("t.rat"), starts_with("est")) , ~fmt_APA_numbers(.x, .chr=T)),
+    across(starts_with("p.value"), ~fmt_APA_numbers(.x, .p=T)),
+    em="",em2="",em3="",em4="") |>
   gt() |>
   tab_spanner("Response time", c(estimate_rt, df_rt, SE_rt, t.ratio_rt, p.value_rt)) |>
   tab_spanner("Error rate", c(estimate_pe, df_pe, SE_pe, t.ratio_pe, p.value_pe)) |>
   tab_spanner("LISAS", c(estimate_lisas, df_lisas, SE_lisas, t.ratio_lisas, p.value_lisas)) |>
   tab_spanner("BIS", c(estimate_bis, df_bis, SE_bis, t.ratio_bis, p.value_bis)) |>
-  cols_label(starts_with("SE") ~ ("SE"), starts_with("estimate") ~ "Estimate",
+  cols_label(starts_with("SE") ~ ("SE"), starts_with("estimate") ~ "Est.",
              starts_with("df") ~ md("df"), starts_with("p.value") ~ md("*p*"),
              starts_with("t.ratio") ~ md("*t*" )) |>
   cols_hide(c(starts_with("SE"), starts_with("df"), starts_with("em"))) |>
   cols_move(em, p.value_rt) |> 
   cols_move(em2, p.value_pe) |>
   cols_move(em3, p.value_lisas) |>
-  cols_move(em4, p.value_bis) 
+  cols_move(em4, p.value_bis) |>
+  cols_align("center", 2:25)
 ```
 
 
@@ -888,7 +891,7 @@ variables(co_bay$lisas) -> vars$lisas
 vars$lisas[str_detect(vars$lisas, "b_")] -> vars$lisas
 mcmc_acf(as.array(co_bay$lisas), pars=vars$lisas)   # autocorrelation
 mcmc_trace(as.array(co_bay$lisas), pars=vars$lisas) # mcmc draws
-bayes_plot(co_bay$lisas, c("z_", "sigma"))    # coefficient plot
+bayes_plot(co_bay$lisas, c("z_", "sigma"))    # rhat & coefficient plot
 
 coefs$lisas <- 
   fixef(co_bay$lisas) |> 
@@ -973,9 +976,9 @@ coefs |>
   cols_move(e, Q97.5_RT) |> 
   cols_move(e2, Q97.5_PE) |> 
   cols_move(e3, Q97.5_LISAS) |> 
-  cols_move(e4, Q97.5_BIS)
+  cols_move(e4, Q97.5_BIS) |> 
+  cols_align("center", 2:25)
 ```
-
 
 ##### Paragraph
 
@@ -984,31 +987,30 @@ coefs |>
 
 ```{r multi-tests, echo=FALSE}
 bay_rep_test <- function(dep){
-  pblapply(1:2, \(x){
+  pblapply(1:35, \(x){
     b <- brm(
       as.formula(glue::glue("{dep} ~ congruent + post_cue + congruent:post_cue + (1|id)")), 
       d_ex_test |> filter(!(id == id_list[x])), 
       save_pars = save_pars(all=T), backend = "cmdstanr", cores = 6,
       iter = 6000, chains = 6,  init=0)
   
-    coefs <- 
-      fixef(b) |> 
-      as_tibble() |> 
-      mutate(
-        .before=1, 
-        names = rownames(fixef(b)), 
-        across(where(is.double), ~fmt_APA_numbers(.x, .low_val=T)), 
-        Est.Error=NULL,
-        group = dep,
-        l_out = id_list[x]) |>
-      mutate(
-        .after="Estimate", 
-        pdir = bay_eff_prob(b, variables(b)[1:4]),
-        erat = bay_erate(b, variables(b)[1:4]),
-      ) |>
-      filter(!(names=="Intercept"))
-    
-    coefs
+    fixef(b) |> 
+    as_tibble() |> 
+    mutate(
+      .before=1, 
+      names = rownames(fixef(b)), 
+      across(where(is.double), ~fmt_APA_numbers(.x, .low_val=T)), 
+      Est.Error = NULL,
+      group = dep,
+      l_out = id_list[x]) |>
+    mutate(
+      .after="Estimate", 
+      pdir = map_vec(colnames(as.matrix(b))[1:4], 
+                  \(x){ bay_eff_prob(b, x) }),
+      erat = map_vec(colnames(as.matrix(b))[1:4], 
+                  \(x){ bay_erate(b, x) })
+    ) |>
+    filter(!(names=="Intercept"))
   })
 }
 ```
@@ -1025,14 +1027,18 @@ n34_b_rep$lisas  <- bay_rep_test("lisas")
 n34_b_rep$bis    <- bay_rep_test("bis")
 
 n34_b_rep$rt |> list_rbind()
-
+n34_b_rep$rt  
 
 ```
 
 
+### Model selection
+
+#### Freq 
 
 
-#### Model selection
+#### Bayesian
+
 ```{r , include=FALSE}
 bay_ms <- list()
 ```
@@ -1184,18 +1190,6 @@ data_vis |>
 
 ```
 
-## Table
-
-```{r finished table}
-#| echo: false
-
-
-exp2_statistic_table
-```
-
-*Note.* <br/>
-`r fmt_APA_p_table_fig(exp2_statistic_table$p[2])` <br/>
-<!--- This function could be improved by finding the lowest value in a p vector --->
 
 ## ELSE
 
@@ -1215,6 +1209,7 @@ exp2_feedback |>
   mutate(loss = id %in% loss$exclude_par) |> 
   view()
 ```
+
 
 ### Interactive
 
