@@ -426,6 +426,7 @@ Statistical test of all 35 participants:
 #### Table
 
 ```{r transform data object output, include=FALSE}
+aovs <- list()
 trns_mod <- function(data){
   d <- data$anova_table
   
@@ -439,32 +440,39 @@ trns_mod <- function(data){
     dplyr::select(names, all_of(Fname), p, pes) |> 
     mutate(across(2, ~fmt_APA_numbers(.x, .chr=T)),
            p = fmt_APA_numbers(p, .p=T),
-           pes = fmt_APA_numbers(pes, .low_val=T))
+           pes = fmt_APA_numbers(pes, .low_val=T)) |> 
+    as_tibble()
 }
+
+freq_test <- function(data, dep){
+  aov_car(
+    as.formula(glue::glue("{dep} ~ Error(id/(congruent*post_cue))")),
+    data, 
+    detailed=T, anova_table = list(es="pes"))
+}
+
 ```
 
-```{r frequent rmanova, echo=FALSE}
-rt_aov <- aov_car(rt ~ Error(id/(congruent*post_cue)), d_ex_test, detailed=T, 
-                     anova_table = list(es="pes"))
-pe_aov <- aov_car(pe ~ Error(id/(congruent*post_cue)), d_ex_test, detailed=T, 
-                     anova_table = list(es="pes"))
-lisas_aov <- aov_car(lisas ~ Error(id/(congruent*post_cue)), d_ex_test, detailed=T, 
-                     anova_table = list(es="pes"))
-bis_aov <- aov_car(bis ~ Error(id/(congruent*post_cue)), d_ex_test, detailed=T, 
-                     anova_table = list(es="pes"))
+```{r frequent rmanova models, echo=FALSE}
+aovs$rt <- freq_test(d_ex_test, "rt")
+aovs$pe <- freq_test(d_ex_test, "pe")
+aovs$lisas <- freq_test(d_ex_test, "lisas")
+aovs$bis <- freq_test(d_ex_test, "bis")
 ```
 
 ```{r table rmanovas, echo=FALSE}
-trns_mod(pe_aov) |> 
-  mutate(group="Error rate") |>
+trns_mod(aovs$rt) |> 
+  mutate(group="Response time") |>
   bind_rows(
-    trns_mod(rt_aov) |> mutate(group="Response time") ) |>
+    trns_mod(aovs$pe) |> mutate(group="Error rate") ) |>
   bind_rows(
-    trns_mod(lisas_aov) |> mutate(group="LISAS") ) |>
+    trns_mod(aovs$lisas) |> mutate(group="LISAS") ) |>
   bind_rows(
-    trns_mod(bis_aov) |> mutate(group="BIS") ) |>
+    trns_mod(aovs$bis) |> mutate(group="BIS") ) |>
   pivot_wider(names_from = group, values_from = c(`F (1,34)`, p, pes)) |>
-  dplyr::select(names, ends_with("Error rate"), ends_with("Response time"), ends_with("LISAS"), ends_with("BIS")) |>
+  dplyr::select(names, ends_with("Error rate"), 
+                ends_with("Response time"), 
+                ends_with("LISAS"), ends_with("BIS")) |>
   mutate(e="",e2="",e3="",e4="") |>
   gt() |>
   cols_move(c(`F (1,34)_Response time`, `p_Response time`, `pes_Response time`), names) |> 
@@ -490,6 +498,24 @@ trns_mod(pe_aov) |>
   tab_footnote("dawd")
 ```
 
+```{r long-table frequentist rmanova, echo=FALSE}
+trns_mod(aovs$rt) |> 
+  mutate(group="Response time") |>
+  bind_rows(
+    trns_mod(aovs$pe) |> mutate(group="Error rate") ) |>
+  bind_rows(
+    trns_mod(aovs$lisas) |> mutate(group="LISAS") ) |>
+  bind_rows(
+    trns_mod(aovs$bis) |> mutate(group="BIS") ) |>
+  gt(groupname_col = "group") |>
+  cols_label(p = md("*p*"), pes = "n^2",) 
+  cols_align("center", 2:13) |>
+  tab_header("Results for the whole sample", ) |>
+  tab_footnote("dawd")
+
+```
+
+
 ##### Pairwise test
 
 ```{r tukey test list, include=FALSE}
@@ -513,7 +539,7 @@ tuk_t$lisas <- lmer(lisas ~ post_cue * congruent  + (1|id), d_ex_test)
 tuk_t$bis <- lmer(bis ~ post_cue * congruent+ (1|id), d_ex_test)
 ```
 
-```{r table - linear mixed-effect model , echo=FALSE}
+```{r wide-table - linear mixed-effect model , echo=FALSE}
 par_test("rt") |>
   bind_rows( par_test("pe") ) |> 
   bind_rows( par_test("lisas") ) |>
@@ -537,6 +563,30 @@ par_test("rt") |>
   cols_move(em3, p.value_lisas) |>
   cols_move(em4, p.value_bis) |>
   cols_align("center", 2:25)
+```
+
+```{r long-table - linear mixed-effect model , echo=FALSE}
+par_test("rt") |>
+  bind_rows( par_test("pe") ) |> 
+  bind_rows( par_test("lisas") ) |>
+  bind_rows( par_test("bis") ) |>
+  mutate(
+    across(2:6, ~fmt_APA_numbers(.x, .chr=T)),
+    across(7, ~fmt_APA_numbers(.x, .p=T)),
+    group=case_when(
+      group=="rt"~ "Response time", 
+      group=="pe"~"Error rate",
+      group=="lisas" ~ "LISAS",
+      group=="bis" ~ "BIS" ,
+    )
+  ) |>
+  gt(groupname_col = "group") |>
+  cols_label(
+    "estimate" ~ "Est.",
+    "t.ratio" = md("*t*"),
+    p.value = md("*p*") ) |>
+  cols_hide(c("SE", "df")) |>
+  cols_align("center", 2:7)
 ```
 
 
@@ -654,42 +704,72 @@ conditions and interaction.
 ```{r id list, include=FALSE }
 d_ex_test |> 
   pull(id) |> unique() -> id_list
+freq_n34 <- list()
 ```
 
+```{r function to repeat test, echo=FALSE, warning=FALSE}
+freq_n34_test <- function(dep){
+  map_df(1:35, \(x){
+    d <- d_ex_test |> filter(!(id == id_list[x])) 
+    an <- freq_test(d, dep)
+    an[["anova_table"]] |>
+      as_tibble() |>
+      mutate(
+        .before=1,
+        group = dep,
+        rm_id = id_list[x],
+        names = rownames(an[["anova_table"]])
+      )
+  })
+}
+```
 
-```{r anova with one participant removed, echo=FALSE, warning=FALSE}
-map_df(1:35, \(x){
-  ez::ezANOVA(
-    d_ex_test |> filter(!(id == id_list[x])), pe, id,
-    within = c(post_cue, congruent), detailed = T)[["ANOVA"]] |>
-    mutate(
-      .before=1,
-      rm_id = id_list[x]
+```{r long-table anovas with one participant removed, echo=FALSE, warning=FALSE}
+freq_n34$rt <- freq_n34_test("rt")
+freq_n34$pe <- freq_n34_test("pe")
+freq_n34$lisas <- freq_n34_test("lisas")
+freq_n34$bis <- freq_n34_test("bis")
+
+freq_n34 |> 
+  list_rbind() |>
+  mutate(
+    names = case_when(
+      names=="congruent"~"Congruency", 
+      names=="post_cue"~"Cue",
+      names=="congruent:post_cue" ~ "Cue X Congruency"
+    ),
+    group = case_when(
+      group=="rt"~"Response time",
+      group=="pe"~"Error rate",
+      group=="lisas"~"LISAS",
+      group=="bis"~"BIS",
     )
-}) -> test_one_less
-test_one_less |> 
-  filter(Effect != "(Intercept)") |>
+  ) |>
   summarise(
-    .by = Effect,
+    .by = c(group, names),
     minF = min(`F`),
     maxF = max(`F`),
-    maxP = max(p),
-    minP = min(p),
-  ) |> 
-  rename(Variable = Effect) |> 
+    maxP = max(`Pr(>F)`),
+    minP = min(`Pr(>F)`),
+    minpe = min(pes),
+    maxpe = max(pes)
+  ) |>
   mutate(
-    Variable = case_when(Variable=="post_cue"~"Cue", 
-                         Variable=="congruent"~"Congruency", 
-                         Variable=="post_cue:congruent"~"Cue_X_Congruency"),
-    across(2:3, ~fmt_APA_numbers(.x, .chr=T)),
-    across(4:5, ~fmt_APA_numbers(.x, .p=T)),
-    e="") |>
-  gt() |>
-  tab_spanner("F test", c(minF, maxF)) |>
-  tab_spanner(md("*p*-value"), c(maxP, minP)) |>
-  cols_move(e, maxF) |>
-  cols_label(minF = "Min", maxF = "Max", maxP = "Max", minP = "Min", e="") |>
-  cols_align("center", 2:5) |> 
+    across(3:8, ~fmt_APA_numbers(.x, .chr=T)),
+    zz="",zz2=""
+  ) |>
+  gt(groupname_col = "group") |>
+  tab_spanner("F test", ends_with("F")) |>
+  tab_spanner(md("*p*-value"), ends_with("P")) |>
+  tab_spanner("n^2", ends_with("pe")) |>
+  cols_move(zz, maxF) |>
+  cols_move(zz2, minP) |>
+  cols_label(
+    starts_with("min") ~ "Min", 
+    starts_with("max") ~ "Max",
+    "zz"="", "zz2"=""
+  ) |>
+  cols_align("center", 2:10) |>
   tab_header("Summary of the F and p value for all 34 combinations of the rmANOVA") |>
   tab_footnote("Resulting F and p value for all combinations of a 34 participant sample size")
 ```
@@ -718,7 +798,7 @@ o_bis_aov <- aov_car(bis ~ Error(id/(congruent*post_cue)),
                    anova_table = list(es="pes"))
 ```
 
-```{r table - remove outliers and test, echo=FALSE}
+```{r wide-table - remove outliers and test, echo=FALSE}
 trns_mod(o_rt_aov) |> 
   mutate(group="Response time") |> 
   bind_rows(
@@ -751,6 +831,31 @@ trns_mod(o_rt_aov) |>
   cols_move(zz3, "pes_LISAS") |>
   cols_move(zz4, "pes_BIS") |>
   cols_align("center", 2:10) |>
+  tab_header("Outliers removed from the rmANOVA") |>
+  tab_footnote("Outliers removed")
+```
+
+```{r long-table - remove outliers and test, echo=FALSE}
+trns_mod(o_rt_aov) |> 
+  mutate(group="Response time") |> 
+  bind_rows(
+    trns_mod(o_pe_aov) |> 
+      mutate(group = "Error rate") 
+  ) |>
+  bind_rows(
+    trns_mod(o_lisas_aov) |>
+      mutate(group="LISAS")
+  ) |>
+  bind_rows(
+    trns_mod(o_bis_aov) |>
+      mutate(group="BIS")
+  ) |> 
+  gt(groupname_col = "group") |>
+  cols_label(
+    "pes" = "n^2",
+    p = md("*p*"),
+  ) |>
+  cols_align("center", 2:4) |>
   tab_header("Outliers removed from the rmANOVA") |>
   tab_footnote("Outliers removed")
 ```
@@ -864,11 +969,10 @@ bayes_coefs_to_table <- function(model, group){
 }
 ```
 
-
 ```{r bayesian list vars , include=FALSE}
 if(!run_bayesian_models){ 
   load(file = "../data/processed/exp2_bayesian_models.Rdata") 
-} else {
+} else if (run_bayesian_models) {
   co_bay <- list()
 }
 coefs <- list()
@@ -924,7 +1028,7 @@ if(run_bayesian_models & save_bayes_models){
 }
 ```
 
-```{r table of bayesian coefs, echo=FALSE, warning=FALSE, message=FALSE} 
+```{r wide-table of bayesian coefs, echo=FALSE, warning=FALSE, message=FALSE} 
 coefs |> 
   list_rbind() |>
   pivot_wider(names_from=group, values_from=c(Estimate, Q2.5,Q97.5, erat, pdir)) |>
@@ -961,6 +1065,30 @@ coefs |>
   cols_move(zz3, Q97.5_lisas) |> 
   cols_move(zz4, Q97.5_bis) |> 
   cols_align("center", 2:25)
+```
+
+```{r long-table of bayesian coefs, echo=FALSE, warning=FALSE, message=FALSE} 
+coefs |> 
+  list_rbind() |>
+  mutate(
+    names=case_when(
+      names=="congruentTRUE" ~ "Congruency",
+      names=="post_cueTRUE"~"Cue", 
+      T ~ "Cue X Congruency"),
+    group=case_when( 
+      group=="rt"~"Response time", 
+      group=="pe"~"Error rate", 
+      group=="lisas"~"LISAS", 
+      T ~ "BIS"),
+    across(where(is.double), ~fmt_APA_numbers(.x, .chr=T))
+  ) |>
+  gt(groupname_col = "group") |>
+  tab_spanner("HDI", c(Q2.5, Q97.5)) |>
+  cols_label(
+    Estimate = "Est.", pdir = md("*p*~dir"), erat="ER~dir",
+    Q2.5 = "Low", Q97.5 = "High",
+    ) |> 
+  cols_align("center", 2:7)
 ```
 
 ##### Paragraph
@@ -1034,7 +1162,7 @@ if(run_bayesian_models){
 }
 ```
 
-```{r}
+```{r table for n34 bayesian rep, echo=FALSE}
 n34_b_rep |>
   list_rbind() |>
   reframe(
