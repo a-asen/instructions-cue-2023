@@ -10,18 +10,20 @@ editor:
 ```{r libraries and load data, include=FALSE, warning=FALSE}
 library(tidyverse)    # Wraggling
 library(broom)        # Tidying
+library(gt)           # Tables
+library(rstatix)      # Outliers (other?)
+library(emmeans)
+library(pbapply)      # Progresion bar
+library(glue)
+#
 library(afex)         # ANOVA
 library(lme4)         # Regression mixed models
-library(gt)           # Tables
-library(BayesFactor)  # Bayesian model (bayes model selection)
-library(rstatix)      # Outliers (other?)
+#
 library(brms)         # Bayes coefficients 
 library(cmdstanr)       # stan
 library(bayesplot)    # plots
-library(emmeans)
-library(pbapply)      # Progresion bar
 library(bayestestR)
-library(glue)
+library(BayesFactor)  # model comparison, not used 
 # library(ggpp)
 
 source("../lib/helper_functions.R")
@@ -555,7 +557,7 @@ par_test("rt") |>
   tab_spanner("Error rate", c(estimate_pe, df_pe, SE_pe, t.ratio_pe, p.value_pe)) |>
   tab_spanner("LISAS", c(estimate_lisas, df_lisas, SE_lisas, t.ratio_lisas, p.value_lisas)) |>
   tab_spanner("BIS", c(estimate_bis, df_bis, SE_bis, t.ratio_bis, p.value_bis)) |>
-  cols_label(starts_with("SE") ~ ("SE"), starts_with("estimate") ~ "Est.",
+  cols_label(starts_with("SE") ~ ("SE"), starts_with("estimate") ~ md("*b*"),
              starts_with("df") ~ md("df"), starts_with("p.value") ~ md("*p*"),
              starts_with("t.ratio") ~ md("*t*" )) |>
   cols_hide(c(starts_with("SE"), starts_with("df"), starts_with("em"))) |>
@@ -583,7 +585,7 @@ par_test("rt") |>
   ) |>
   gt(groupname_col = "group") |>
   cols_label(
-    "estimate" ~ "Est.",
+    "estimate" ~ md("*b*"),
     "t.ratio" = md("*t*"),
     p.value = md("*p*") ) |>
   cols_hide(c("SE", "df")) |>
@@ -651,7 +653,7 @@ $\eta_p^2$ =
 The rmANOVA for the LISAS revealed a main effect of
 Congruency (*F*\~`r aov_report$lisas[["num Df"]][1]`,
 `r aov_report$lisas[["den Df"]][1]`\~ =
-`r aov_report$lisas$F[1])`, *p*
+`r aov_report$lisas$F[1]`, *p*
 `r aov_report$lisas[["Pr(>F)"]][1]`,
 $\eta_p^2$ =
 `r aov_report$lisas[["pes"]][1]`) and Cue
@@ -721,12 +723,15 @@ freq_n34_test <- function(dep){
 }
 ```
 
-```{r long-table anovas with one participant removed, echo=FALSE, warning=FALSE}
+```{r anovas with one participant removed tests, echo=FALSE, warning=FALSE}
 freq_n34$rt <- freq_n34_test("rt")
 freq_n34$pe <- freq_n34_test("pe")
 freq_n34$lisas <- freq_n34_test("lisas")
 freq_n34$bis <- freq_n34_test("bis")
+```
 
+
+```{r long-table anovas with one participant removed, echo=FALSE, warning=FALSE}
 freq_n34 |> 
   list_rbind() |>
   mutate(
@@ -740,7 +745,7 @@ freq_n34 |>
       group=="pe"~"Error rate",
       group=="lisas"~"LISAS",
       group=="bis"~"BIS",
-    )
+    ),
   ) |>
   summarise(
     .by = c(group, names),
@@ -752,7 +757,8 @@ freq_n34 |>
     maxpe = max(pes)
   ) |>
   mutate(
-    across(3:8, ~fmt_APA_numbers(.x, .chr=T)),
+    across(c(3,4,7,8),  ~fmt_APA_numbers(.x, .chr=T)),
+    across(c(5,6), ~fmt_APA_numbers(.x, .p=T, .chr=T)),
     zz="",zz2=""
   ) |>
   gt(groupname_col = "group") |>
@@ -920,9 +926,7 @@ bay_eff_prob <- function(model, var){
   if(m >= 0){
     fmt_APA_numbers( (sum( da[, var]>=0 ) / length( da[, var])), .p=T )
   } else if(m<0){
-    paste0("-", 
-      fmt_APA_numbers( 1 - sum(da[, var]>=0) / length(da[, var]), .p=T ) 
-    )
+    fmt_APA_numbers( 1 - sum(da[, var]>=0) / length(da[, var]), .p=T ) 
   }
 }
 
@@ -937,13 +941,9 @@ bay_erate <- function(model, var){
       .chr=T
     )
   } else if(m<0){
-    paste0(
-      "-",
-      fmt_APA_numbers(
-        sum(da[, var]<=0) / sum(da[, var]>0),
-        .chr=T
-      )
-    )
+    fmt_APA_numbers(
+      sum(da[, var]<=0) / sum(da[, var]>0),
+      .chr=T)
   }
 }
 
@@ -1109,7 +1109,7 @@ coef_hdi <- function(x){
   } else {
     erat=sprintf("%.2f",erat)
   }
-  sprintf("$b=%.2f, [%.2f, %.2f], p^{%s}=%s, \\text{ER}^{%s}=%s$", m, ll, ul, dir, pval, dir, erat)
+  sprintf("$b=%.2f, [%.2f, %.2f], p_b=%s, \\text{ER}_b=%s$", m, ll, ul, pval, erat)
 }
 co_bay_m <- list() 
 co_bay_m$bis <- as.matrix(co_bay$bis)
@@ -1174,9 +1174,7 @@ n34_b_rep |>
     q2.5_x = max(Q2.5),
     q97.5_i = max(Q97.5),
     q97.5_x = max(Q97.5),
-    erat_i = ifelse(est_i<0, -erat_i, erat_i),
-    erat_x = ifelse(est_x<0, -erat_x, erat_x),
-  ) |> 
+  )  |>
   mutate(
     group = case_when( 
       group=="rt" ~ "Response time", 
@@ -1193,9 +1191,9 @@ n34_b_rep |>
     zz="", zz2="", zz3="",zz4=""
   ) |>
   gt(groupname_col = "group") |>
-  tab_spanner("Estimate", starts_with("est")) |>
-  tab_spanner(md("*p*~dir"), starts_with("pdir")) |>
-  tab_spanner(md("ER"), starts_with("erat")) |>
+  tab_spanner(md("*b*"), starts_with("est")) |>
+  tab_spanner(md("*p*~b"), starts_with("pdir")) |>
+  tab_spanner(md("ER~b"), starts_with("erat")) |>
   tab_spanner("Low", starts_with("q2.5")) |>
   tab_spanner("High", starts_with("q97.5")) |>
   cols_label(
@@ -1207,7 +1205,240 @@ n34_b_rep |>
   cols_move(zz2, pdir_x) |>
   cols_move(zz3, erat_x) |>
   cols_move(zz4, q2.5_x) 
+```
+
+##### Outliers removed
+
+```{r bayesia test rm outliers, echo=FALSE}
+bay_out_rm <- function(data, dep){
+  b <- bayes_run_model(
+    data, dep
+  )
   
+  bayes_coefs_to_table(b, dep)
+}
+
+if(run_bayesian_models){
+  b_rm_out <- list() 
+  b_rm_out$rt <- bay_out_rm( d_ex_test |> filter(!(id %in% id_is_outlier)), "rt" )
+  b_rm_out$pe <- bay_out_rm( d_ex_test |> filter(!(id %in% id_is_outlier)), "pe" )
+  b_rm_out$lisas <- bay_out_rm( d_ex_test |> filter(!(id %in% id_is_outlier)), "lisas" )
+  b_rm_out$bis <- bay_out_rm( d_ex_test |> filter(!(id %in% id_is_outlier)), "bis" )
+  # save(b_rm_out, file="../data/processed/bayesian_rm_outliers.rdata")
+} else {
+  load("../data/processed/bayesian_rm_outliers.rdata")
+}
+```
+
+
+```{r long-table bayesian estimate rm-outliers, echo=FALSE}
+b_rm_out |> 
+  list_rbind() |> 
+  mutate(
+    group = case_when(
+      group=="rt" ~ "Response time", 
+      group=="pe" ~ "Error rate", 
+      group=="lisas" ~ "LISAS", 
+      group=="bis" ~ "BIS", 
+    ),
+    names = case_when( 
+      names=="congruentTRUE" ~ "Congruency",
+      names=="post_cueTRUE" ~ "Cue",
+      names=="congruentTRUE:post_cueTRUE" ~ "Congruency x Cue",
+    ),
+    across(c("Estimate", contains("Q")), ~fmt_APA_numbers(.x, .chr=T))
+  ) |>
+  gt(groupname_col = "group") |>
+  tab_spanner("HDI", contains("Q")) |>
+  cols_label(
+    "Q2.5" = "Low", "Q97.5" = "High",
+    Estimate = md("*b*"), pdir = md("*p*~b"), erat = md("ER~b")
+  ) 
+```
+
+## Exploratory
+
+### Inducer RT compared to exp1
+```{r inducer rt , echo=FALSE, warning=FALSE, message=FALSE}
+list.files("../data/raw/experiment1/task", pattern = "*.csv", full.names = T) -> fnames1
+
+map_df(fnames1, \(x){
+  read_csv(x)
+}) -> exp1_d
+
+source("rep_munge/exp1_preprocess.R")
+```
+
+```{r inducer rt  test, echo=FALSE}
+d_ex1 |> 
+  filter(trial_info == "Inducer trial") |>
+  summarise(
+    .by = id,
+    mean = mean(rt),
+    sd = sd(rt),
+    exp = 1,
+  ) |> 
+  bind_rows(
+    d_ex |> 
+      filter(trial_info == "Inducer trial") |>
+      summarise( 
+        .by = id,
+        mean = mean(rt),
+        sd = sd(rt),
+        exp = 2,
+      )
+  ) |>
+  pivot_wider(
+    names_from = exp, 
+    values_from = c(mean, sd)
+  ) |>
+  reframe(
+    m1 = mean(mean_1, na.rm=T),
+    sd1 = sd(mean_1, na.rm=T),
+    m2 = mean(mean_2, na.rm=T),
+    sd2 = sd(mean_2, na.rm=T),
+    mdiff = m1-m2,
+    t = t.test(mean_1, mean_2, alternative = "greater")$statistic,
+    df = t.test(mean_1, mean_2, alternative = "greater")$parameter,
+    p = t.test(mean_1, mean_2, alternative = "greater")$p.value,
+  ) |> 
+  mutate(across(1:7, ~fmt_APA_numbers(.x, .chr=T)),
+         p = fmt_APA_numbers(p, .p=T)) -> exp1_inducer
+exp1_inducer
+```
+
+Comparing response time between the first (*M* = `r exp1_inducer$m1`, *SD* `r exp1_inducer$sd1`) and second experiment (*M* = `r exp1_inducer$m2`, *SD* = `r exp1_inducer$sd2`) did not reveal any significant difference in response time (*M* = `r exp1_inducer$mdiff`, *t*(`r exp1_inducer$df`) = `r exp1_inducer$t`, *p* = `r exp1_inducer$p`). 
+
+### Time-course of post-cue rt 
+
+```{r post-cue RT and PE, echo=FALSE}  
+d_ex |> 
+  filter(post_cue==T) |>
+  mutate(
+    .by = c(id, inducer_run),
+    .before = 3,
+    cue_n = 1:length(rt)) |>
+  pivot_longer(c(rt, correct_response)) |>
+  ggplot(aes(cue_n, value, col=congruent)) +
+  facet_wrap(~name, scales="free") +
+  stat_summary(fun.data=mean_se, position = position_dodge(.1)) +
+  stat_summary(fun.data=mean_se, position = position_dodge(.1), geom="line")
+```
+
+```{r post-cue RT and PE, echo=FALSE}  
+d_ex |> 
+  filter(post_cue==T) |>
+  mutate(
+    .by = c(id, inducer_run),
+    .before=3,
+    cue_n = 1:length(rt)) |>
+  pivot_longer(c(rt, correct_response)) |>
+  ggplot(aes(cue_n, value, col=inducer_run, group=inducer_run)) +
+  facet_wrap(congruent~name, scales = "free") +
+  stat_summary(fun.data=mean_se, position = position_dodge(.3)) +
+  stat_summary(fun.data=mean_se, position = position_dodge(.3), geom="line")
+```
+
+
+### Three split
+
+```{r RT half split vis, echo=FALSE}
+#| fig-dpi: 300
+#| fig-width: 6
+#| fig-height: 4
+d_ex |> 
+  mutate(
+    three = case_when(
+      inducer_run > 2*(max(inducer_run)/3)   ~ "Third", 
+      inducer_run > max(inducer_run) / 3     ~ "Second", 
+      T ~ "First", 
+    ), 
+    cue = ifelse(post_cue==T, 1,0),
+    Congruency = ifelse(congruent==T, "Congruent", "Incongruent")) |>
+  filter(!is.na(congruent)) |>
+  summarise(
+    .by = c(id, three, cue, Congruency),
+    rt = mean(rt),
+    pe = 1 - mean(correct_response) ) |> 
+  ggplot(aes(cue, rt, col=Congruency)) +
+  facet_wrap(~three, scale="free") +
+  stat_summary(fun.data=mean_se, position = position_dodge(.1)) + 
+  stat_summary(fun.data=mean_se, geom="line", position = position_dodge(.1)) + 
+  coord_cartesian(xlim=c(-.25, 1.25)) +
+  scale_x_continuous(breaks=c(0,1), labels = c("Pre-cue","Post-cue")) +
+  labs(x="", y="Response time") +
+  theme_bw()
+```
+
+```{r RT half split vis, echo=FALSE}
+#| fig-dpi: 300
+#| fig-width: 6
+#| fig-height: 4
+d_ex |> 
+  mutate(
+    three = case_when(
+      inducer_run > 2*(max(inducer_run)/3)   ~ "Third", 
+      inducer_run > max(inducer_run) / 3     ~ "Second", 
+      T ~ "First", 
+    ), 
+    cue = ifelse(post_cue==T, 1,0),
+    Congruency = ifelse(congruent==T, "Congruent", "Incongruent")) |>
+  filter(!is.na(congruent)) |>
+  summarise(
+    .by = c(id, three, cue, Congruency),
+    rt = mean(rt),
+    pe = 1 - mean(correct_response) ) |> 
+  ggplot(aes(cue, pe, col=Congruency)) +
+  facet_wrap(~three, scale="free") +
+  stat_summary(fun.data=mean_se, position = position_dodge(.1)) + 
+  stat_summary(fun.data=mean_se, geom="line", position = position_dodge(.1)) + 
+  coord_cartesian(xlim=c(-.25, 1.25), ylim = c(0,.3)) +
+  scale_x_continuous(breaks=c(0,1), labels = c("Pre-cue","Post-cue")) +
+  scale_y_continuous(breaks=seq(0,1, .05)) +
+  labs(x="", y="Response time") +
+  theme_bw()
+```
+
+#### Tests
+
+```{r half split test, echo=FALSE}
+time_intr_fq <- lmer(rt ~ post_cue*congruent*inducer_run + (1|id), d_ex |> filter(trial_info=="Diagnostic trial"))
+summary(time_intr_fq)
+```
+
+```{r}
+time_intr_ba <- brm(
+  rt ~ congruent*post_cue*inducer_run, d_ex |> filter(trial_info=="Diagnostic trial"),
+  init=0, chains = 6, iter= 6000, backend = "cmdstanr", cores = 6)
+
+bayes_plot(time_intr_ba, c("b_congruentTRUE", "b_post_cueTRUE", "sigma", "b_congruentTRUE:post_cueTRUE"), par_match = F)
+
+map(colnames(as.matrix(time_intr_ba))[2:8], \(x){
+  paste(x, 
+  coef_hdi(as.matrix(time_intr_ba)[,x])
+  )
+}) 
+
+coef_hdi(as.matrix(time_intr_ba)[,"b_congruentTRUE:post_cueTRUE:inducer_run"])
+```
+
+```{r last quarter interaction, echo=FALSE}
+d_ex |> 
+  mutate(
+    three = case_when(
+      inducer_run > 2*(max(inducer_run)/3)   ~ "Third", 
+      inducer_run > max(inducer_run) / 3     ~ "Second", 
+      T ~ "First", 
+    ), 
+    cue = ifelse(post_cue==T, 1,0),
+    Congruency = ifelse(congruent==T, "Congruent", "Incongruent")) |>
+  filter(!is.na(congruent)) |>
+  summarise(
+    .by = c(id, three, cue, Congruency),
+    rt = mean(rt),
+    pe = 1 - mean(correct_response) ) |>
+  filter(three=="Third") |> 
+  lmer(rt ~ cue*Congruency + (1|id), data = _) |> summary()
 ```
 
 
@@ -1226,7 +1457,8 @@ map_df(unique(exp2_d$id),\(x){
 }) -> exp2_feedback
 
 exp2_feedback |>
-  mutate(loss = id %in% loss$exclude_par)
+  mutate(loss = id %in% loss$exclude_par) |> 
+  gt()
 ```
 
 ### Interactive
@@ -1240,7 +1472,8 @@ map_df(unique(exp2_d$id),\(x){
     mutate( id = x)
 }) -> exp2_interactive
 exp2_interactive |> 
-  arrange(trial) 
+  arrange(trial) |> 
+  gt()
 ```
 
 Interactive looks fine. 
