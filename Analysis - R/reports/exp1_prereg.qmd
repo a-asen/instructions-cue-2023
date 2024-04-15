@@ -379,7 +379,8 @@ d2 |>
   facet_wrap(~name, scales="free") +
   geom_histogram(aes(y = after_stat(density))) +
   geom_density(aes(fill = NULL, col = NULL), alpha = .3, linewidth=1.2) +
-  labs(x = "Difference between means", y = "Density", title="a")+
+  labs(x = "Difference between means", y = "Density", title="a") +
+  theme_bw() + 
   theme(legend.position = "none")
 ```
 
@@ -397,11 +398,12 @@ d2 |>
   ) |> 
   rename(`Response time` = rt, `Error rate` = pe) |>
   pivot_longer(c(`Response time`, `Error rate`)) |>
-  ggplot(aes(x=name, y=value, col = name))+
-  facet_wrap(~name, scales="free")+
-  geom_boxplot()+
-  geom_point(aes(col=NULL), position = position_jitter(.3), alpha=.4)+
-  labs(y="Difference between means", x="", title ="b")+
+  ggplot(aes(x=name, y=value, col = name)) +
+  facet_wrap(~name, scales="free") +
+  geom_boxplot() +
+  geom_point(aes(col=NULL), position = position_jitter(.3), alpha=.4) +
+  labs(y="Difference between means", x="", title ="b") +
+  theme_bw() + 
   theme(legend.position = "none", 
         axis.title.x = NULL)
 ```
@@ -411,7 +413,7 @@ d2 |>
 ### t-test (no removed)
 
 #### Table
-```{r , include=FALSE}
+```{r , include=FALSE, eval=FALSE}
 # Better table.
 exp2_statistic_table <- 
   d_ex |>
@@ -816,11 +818,11 @@ d2 |>
   ) |> 
   rename(`Response time` = rt, `Error rate` = pe) |>
   pivot_longer(c(`Response time`, `Error rate`)) |>
-  ggplot(aes(value, col = name, fill = name))+
-  facet_wrap(~name, scales="free")+
-  geom_histogram(aes(y = after_stat(density)))+
-  geom_density(aes(fill = NULL, col = NULL ), linewidth=1.2)+
-  labs(x = "Difference between means", y ="Density", title="b")+
+  ggplot(aes(value, col = name, fill = name)) +
+  facet_wrap(~name, scales="free") +
+  geom_histogram(aes(y = after_stat(density))) +
+  geom_density(aes(fill = NULL, col = NULL ), linewidth=1.2) +
+  labs(x = "Difference between means", y ="Density", title="b") +
   theme_bw() +
   theme(legend.position = "none")
 ```
