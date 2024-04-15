@@ -40,7 +40,7 @@ if(run_simulations){
     library(tidyverse)
     library(tidymodels)
   })
-  clusterExport(cl, "d_ex")
+  clusterExport(cl, "d_ex1")
 } else { cl <- NULL }
 ```
 
@@ -48,21 +48,32 @@ if(run_simulations){
 
 ```{r load data}
 #| include: false
-load("../data/processed/exp1_data.rdata")
+list.files("../data/raw/experiment1/task", pattern = "*.csv", full.names = T) -> fnames1
+
+map_df(fnames1, \(x){
+  read_csv(x)
+}) -> exp1_d
+
 load("../data/simulations/diag_simu_sum.rdata")
 
 if(load_simulation_data){
   # Random slicing: 
   ## Random slicing of the 27 participants: 
-  rnd_slice_diag_exclu <- read_parquet("../data/simulations/exp2_diagnostic_length_sampling_from_exp1_raw.parquet")
-  sum_rnd_slice_diag_exclu <- read_parquet("../data/simulations/exp2_diagnostic_length_sampling_from_exp1_sum.parquet")
+  rnd_slice_diag_exclu <- 
+    read_parquet("../data/simulations/exp2_diagnostic_length_sampling_from_exp1_raw.parquet")
+  sum_rnd_slice_diag_exclu <-
+    read_parquet("../data/simulations/exp2_diagnostic_length_sampling_from_exp1_sum.parquet")
   ## Random slicing over increasing sample size (fake ids)
-  rnd_extended_slice_diag_exclu <- read_parquet("../data/simulations/exp1_rnd_sampling_inc_samp_size.parquet")
-  sum_rnd_extended_slice_diag_exclu <- read_parquet("../data/simulations/exp1_sum_rnd_sampling_inc_samp_size.parquet")
+  rnd_extended_slice_diag_exclu <- 
+    read_parquet("../data/simulations/exp1_rnd_sampling_inc_samp_size.parquet")
+  sum_rnd_extended_slice_diag_exclu <-
+    read_parquet("../data/simulations/exp1_sum_rnd_sampling_inc_samp_size.parquet")
  
   ## Random slicing over increasing sample size and integrated score calculations
-  rnd_int_scores_extended_slice_diag_exclu <- read_parquet( "../data/simulations/exp1_rnd_sampling_inc_samp_size_integrated_scores.parquet")
-  sum_rnd_int_scores_extended_slice_diag_exclu <- read_parquet( "../data/simulations/exp1_sum_rnd_sampling_inc_samp_size_integrated_scores.parquet") 
+  rnd_int_scores_extended_slice_diag_exclu <- 
+    read_parquet( "../data/simulations/exp1_rnd_sampling_inc_samp_size_integrated_scores.parquet")
+  sum_rnd_int_scores_extended_slice_diag_exclu <- 
+    read_parquet( "../data/simulations/exp1_sum_rnd_sampling_inc_samp_size_integrated_scores.parquet") 
   #    write_parquet(diag_lens_over_samp_sizes, "../data/simulations/diag_lens_over_sample_sizes.parquet")
     #write_parquet(sum_diag_lens_over_samp_sizes, "../data/simulations/diag_lens_over_sample_sizes_sum.parquet")
 }
@@ -80,7 +91,7 @@ source("rep_munge/exp1_preprocess.R")
 
 ```{r}
 #| include: false
-d_ex |>
+d_ex1 |>
   filter(trial_info=="Diagnostic trial") |>
   group_by(id) |>
   count() |> 
@@ -110,7 +121,7 @@ effect sizes from experiment 1.
 ```{r exp1 outcomes}
 #| echo: false
 
-d_ex |> 
+d_ex1 |> 
   ungroup() |>
   filter(!is.na(con)) |>
   summarise(
@@ -150,7 +161,7 @@ We determine to use around 36 pairs (72 trials) for the post-cue run, correspond
 ```{r}
 #| echo: false
 pblapply(2:90, \(pairs){
-  d_ex |>
+  d_ex1 |>
     filter(inducer_run>0) |>
     slice_head(n = pairs, by = c(id, con)) |>
     summarise(
@@ -176,12 +187,18 @@ pblapply(2:90, \(pairs){
 ```{r slice from start}
 #| echo: false
 head_slice_diag_exclu |>
+  mutate(
+    n = ifelse(n=="pe", "Error rate", "Response time")
+  ) |>
   #pivot_wider(names_from=n, values_from = 3:10) |>
   ggplot(aes(pairs, p.value, col = n)) + 
   geom_line()+
   geom_hline(yintercept=.05)+
   geom_vline(xintercept=n_diag_pairs, linetype="dashed")+
-  geom_vline(xintercept=n_diag_pairs*loss_trials, linetype="dashed", col="red")
+  geom_vline(xintercept=n_diag_pairs*loss_trials, linetype="dashed", col="red") +
+  labs(x = "Diagnostic pairs", y = "p value", col = "Variable") +
+  theme_bw() +
+  theme(legend.position = "none")
 ```
 
 Slicing from the **start** (!) suggest that we need around 20
@@ -192,7 +209,7 @@ pairs (i.e., 40 trials) to a achieve a significance result.
 ```{r slice from end}
 #| include: false
 pblapply(2:90, \(pairs){
-  d_ex |>
+  d_ex1 |>
     filter(inducer_run>0) |>
     slice_tail(n = pairs, by = c(id, con)) |>
     summarise(
@@ -218,17 +235,39 @@ pblapply(2:90, \(pairs){
 ```{r end slice vis }
 #| echo: false
 tail_slice_diag_exclu |>
+  mutate(
+    n = ifelse(n=="pe", "Error rate", "Response time")
+  ) |>
   #pivot_wider(names_from=n, values_from = 3:10) |>
   ggplot(aes(pairs, p.value, col = n)) + 
-  geom_line()+
-  geom_hline(yintercept=.05)+
-  geom_vline(xintercept=n_diag_pairs, linetype="dashed")+
-  geom_vline(xintercept=n_diag_pairs*loss_trials, linetype="dashed", col="red")
+  geom_line() +
+  geom_hline(yintercept=.05) +
+  geom_vline(xintercept=n_diag_pairs, linetype="dashed") +
+  geom_vline(xintercept=n_diag_pairs*loss_trials, linetype="dashed", col="red") + 
+  labs(x = "Diagnostic pairs", y = "p value", col = "Variable") +
+  theme_bw() +
+  theme(legend.position = "none") -> p1
+p1
 ```
 
 Slicing from the **end** reveal a similar pattern, but would
 require more trials - around 25 trials for PE, but even more
 for RT.
+
+```{r legends for e-s, echo=FALSE}
+tail_slice_diag_exclu |>
+  mutate(
+    n = ifelse(n=="pe", "Error rate", "Response time")
+  ) |>
+  #pivot_wider(names_from=n, values_from = 3:10) |>
+  ggplot(aes(pairs, p.value, col = n)) + 
+  labs(col="Variable") +
+  theme_bw() + 
+  theme(legend.position = "top") +
+  geom_line() -> p1
+ggpubr::as_ggplot(ggpubr::get_legend(p1))
+```
+
 
 ## Randomly slicing
 
@@ -239,7 +278,7 @@ Instead of slicing from the start/end, we can randomly slice.
 if(run_simulations){
   pblapply(2:100, \(pairs){
     map_df(1:900, \(itr){
-      d_ex |>
+      d_ex1 |>
         filter(!is.na(con)) |>
         slice_sample(n = pairs, by = c(id, con)) |>
         summarise(
@@ -295,17 +334,20 @@ if(run_simulations){
 }
 ```
 
-```{r vis power}
-#| echo: false
-#| warning: false
-
+```{r vis power, echo=FALSE, warning=FALSE}
 sum_rnd_slice_diag_exclu |>
+  mutate(
+    name = ifelse(name=="pe", "Error rate", "Response time")
+  ) |>
   ggplot(aes(pairs, power, col=name)) + 
   geom_line()+
   geom_hline(yintercept=.8)+
   scale_y_continuous(breaks=seq(0,1,.1))+
   geom_vline(xintercept=n_diag_pairs, linetype="dashed")+
-  geom_vline(xintercept=n_diag_pairs*loss_trials, linetype="dashed", col="red")
+  geom_vline(xintercept=n_diag_pairs*loss_trials, linetype="dashed", col="red") + 
+  labs(x = "Diagnostic pairs", y = "Power", col="Variable") + 
+  theme_bw() +
+  theme(legend.position="none")
 ```
 
 For 27 participants we will have less than 50% power for RT
@@ -320,27 +362,51 @@ the set post-cue diagnostic length or `r n_diag_pairs`
 ### Changes in the difference in mean and SD by increasing the number of pairs
 
 How the mean differences for PE and RT change with increase pairs of the diagnostic trial. 
-```{r}
-#| echo: false
-#| warning: false
-#| message: false
+```{r changes in mean difference with increaseing diag, echo=FALSE, warning=FALSE, message=FALSE}
 rnd_slice_diag_exclu |> 
-  ggplot(aes(pairs, m_d, col=name))+
-  stat_summary(geom="line")+
-  geom_vline(xintercept=n_diag_pairs, linetype="dashed")+
-  geom_vline(xintercept=n_diag_pairs*loss_trials, linetype="dashed", col="red")
+  mutate(
+    name = ifelse(name=="pe", "Error rate", "Response time")
+  ) |>
+  ggplot(aes(pairs, m_d, col=name)) +
+  stat_summary(geom="line") + 
+  geom_vline(xintercept=n_diag_pairs, linetype="dashed") +
+  geom_vline(xintercept=n_diag_pairs*loss_trials, linetype="dashed", col="red") +
+  labs(x = "Diagnostic pairs", y = "Difference between means", col = "Variable") + 
+  scale_y_continuous(breaks=seq(0,2,.15)) +
+  coord_cartesian(ylim=c(.10, .75)) +
+  theme_bw() + 
+  theme(legend.position = "none")
 ```
 
-```{r}
-#| echo: false
-#| warning: false
-#| message: false
+
+```{r SD changes with increase diag, echo=FALSE, message=FALSE, warning=FALSE}
 sum_rnd_slice_diag_exclu |> 
   ggplot(aes(pairs, sd_d, col=name))+
   geom_line() +
   geom_vline(xintercept=n_diag_pairs, linetype="dashed")+
-  geom_vline(xintercept=n_diag_pairs*loss_trials, linetype="dashed", col="red")
+  geom_vline(xintercept=n_diag_pairs*loss_trials, linetype="dashed", col="red") + 
+  labs(x = "Diagnostic pairs", y = "Standard deviation") +
+  scale_y_continuous(breaks=seq(0,2,.25)) +
+  theme_bw() +
+  theme(legend.position = "none")
 ```
+
+
+```{r legends for m-sd , echo=FALSE}
+sum_rnd_slice_diag_exclu |>
+  mutate(
+    name = ifelse(name=="pe", "Error rate", "Response time")
+  ) |>
+  #pivot_wider(names_from=n, values_from = 3:10) |>
+  ggplot(aes(pairs, p.value, col = name)) + 
+  labs(col="Variable") +
+  theme_bw() + 
+  theme(legend.position = "top") +
+  geom_line() -> p1
+ggpubr::as_ggplot(ggpubr::get_legend(p1))
+```
+
+
 
 ```{r}
 #| include: false
@@ -366,7 +432,7 @@ if(run_simulations){
         # We create random "ids" by randomly sampling "samp_s" times,
         # And create a fake id "rnd_id_" 
         map_df(1:samp_s, \(rnd_samp){
-          d_ex |>
+          d_ex1 |>
             filter(!is.na(con)) |>
             slice_sample(n = pairs, by = con) |> 
             mutate(id = paste0("rnd_id_", rnd_samp))
@@ -417,13 +483,20 @@ Power increase over pairs, split by sample size.
 ```{r}
 #| echo: false
 sum_rnd_extended_slice_diag_exclu |> 
+  mutate( 
+    n = ifelse(n=="pe", "Error rate", "Response time")
+  ) |>
   ggplot(aes(pairs, power, col=samp,group=samp))+
   facet_wrap(~n)+
   geom_line()+
   geom_hline(yintercept=.8)+
   scale_y_continuous(breaks=seq(0,1,.1))+
+  scale_x_continuous(breaks=seq(0,100,10))+
   geom_vline(xintercept=n_diag_pairs, linetype="dashed")+
-  geom_vline(xintercept=n_diag_pairs*loss_trials, linetype="dashed", col="red")
+  geom_vline(xintercept=n_diag_pairs*loss_trials, linetype="dashed", col="red") +
+  labs(x = "Diagnostic pairs", y = "Power", col = "Sample size", title = "a") +
+  theme_bw() + 
+  theme(legend.position = "none")
 ```
 
 Power over sample size split by pairs.
@@ -432,25 +505,57 @@ Power over sample size split by pairs.
 #| echo: false
 #| warning: false
 sum_rnd_extended_slice_diag_exclu |>
+  mutate( 
+    n = ifelse(n=="pe", "Error rate", "Response time")
+  ) |>
   ggplot(aes(samp, power, col=pairs,group=pairs))+
   facet_wrap(~n)+
   geom_hline(yintercept=.8)+
-  geom_line()
+  geom_line() +
+  scale_y_continuous(breaks=seq(0,1,.2))+
+  scale_x_continuous(breaks=seq(0,100,10))+
+  labs(x = "Sample size", y = "Power", col = "Diagnostic pairs", title="b") +
+  theme_bw() + 
+  theme(legend.position = "none")
 ```
 
 Power over sample size split by 36 and 26 pairs of
 observations.
 
+```{r legend for other stuff, echo=FALSE}
+sum_rnd_extended_slice_diag_exclu |> 
+  mutate( 
+    n = ifelse(n=="pe", "Error rate", "Response time")
+  ) |>
+  ggplot(aes(pairs, power, col=samp,group=samp))+
+  facet_wrap(~n)+
+  geom_line()+
+  labs(x = "Diagnostic pairs", y = "Power", col = "Sample size") +
+  theme_bw() + 
+  theme(legend.position = "top") -> p2
+ggpubr::as_ggplot(ggpubr::get_legend(p2))
+```
+
+
+#### Split by relevance
+
+
 ```{r}
 #| echo: false
 sum_rnd_extended_slice_diag_exclu |> 
+  mutate( 
+    n = ifelse(n=="pe", "Error rate", "Response time")
+  ) |>
   filter(pairs %in% c(n_diag_pairs, round(n_diag_pairs*loss_trials))) |>
   ggplot(aes(samp, power, col=factor(pairs),group=factor(pairs)))+
   facet_wrap(~n)+
   geom_line()+ 
   geom_hline(yintercept=.8)+
   geom_hline(yintercept=.9, linetype="dashed", col="darkblue")+
-  geom_vline(xintercept=34)
+  geom_vline(xintercept=34) +
+  labs(x = "Sample size", y = "Power", col = "Diagnostic pairs") +
+  theme_bw() + 
+  theme(legend.position = "top")
 ```
 
 Random slicing from the first experiment suggests that we
@@ -467,14 +572,14 @@ of the integrated scores.
 ```{r}
 #| echo: false
 if(run_simulations){
-  clusterExport(cl, c("d_ex"))
+  clusterExport(cl, c("d_ex1"))
   pblapply(22:82, \(samp_s){
     map_df(10:120, \(pairs){
       map_df(1:500, \(itr){
         # We create random "ids" by randomly sampling "samp_s" times,
         # And create a fake id "rnd_id_" 
         map_df(1:samp_s, \(rnd_samp){
-          d_ex |>
+          d_ex1 |>
             filter(inducer_run>0) |>
             filter(!is.na(con)) |>
             slice_sample(n = pairs, by = con) |> 
@@ -569,23 +674,31 @@ rnd_int_scores_extended_slice_diag_exclu |>
 ```{r summarise integrated score}
 #| echo: false
 #| warning: false
+#| fig-dpi: 300
+#| fig-width: 7
 sum_rnd_int_scores_extended_slice_diag_exclu |>
   ggplot(aes(samp, power, col=pairs,group=pairs))+
   facet_wrap(~n)+
   geom_hline(yintercept=.8)+
-  geom_line()
+  geom_line() +
+  labs(x = "Sample size", y = "Power", col = "Diagnostic pairs") +
+  theme_bw() 
 ```
 
 ```{r integrated scores summary of relevant pairs}
 #| echo: false
+#| fig-dpi: 300
+#| fig-width: 6
 sum_rnd_int_scores_extended_slice_diag_exclu |> 
   filter(pairs %in% c(n_diag_pairs, round(n_diag_pairs*loss_trials))) |>
   ggplot(aes(samp, power, col=factor(pairs),group=factor(pairs)))+
-  facet_wrap(~n)+
-  geom_line()+ 
-  geom_hline(yintercept=.8)+
-  geom_hline(yintercept=.9, linetype="dashed", col="darkblue")+
-  geom_vline(xintercept=34)
+  facet_wrap(~n) +
+  geom_line() + 
+  geom_hline(yintercept=.8) +
+  geom_hline(yintercept=.9, linetype="dashed", col="darkblue") +
+  geom_vline(xintercept=34) +
+  labs(x = "Sample size", y = "Power", col = "Diagnostic pairs") +
+  theme_bw() 
 ```
 
 Relying on the BIS or LISAS will give us at least 80% power
