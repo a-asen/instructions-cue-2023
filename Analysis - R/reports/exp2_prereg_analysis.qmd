@@ -5,6 +5,8 @@ lang: en-GB
 editor: 
   markdown:
       wrap: 62
+execute:
+  echo: false
 ---
 
 ```{r libraries and load data, include=FALSE, warning=FALSE}
@@ -12,9 +14,8 @@ library(tidyverse)    # Wraggling
 library(broom)        # Tidying
 library(gt)           # Tables
 library(rstatix)      # Outliers (other?)
-library(emmeans)
+library(emmeans)      # ANOVA diffs
 library(pbapply)      # Progresion bar
-library(glue)
 #
 library(afex)         # ANOVA
 library(lme4)         # Regression mixed models
@@ -23,7 +24,8 @@ library(brms)         # Bayes coefficients
 library(cmdstanr)       # stan
 library(bayesplot)    # plots
 library(bayestestR)
-library(BayesFactor)  # model comparison, not used 
+# 
+library(BayesFactor)  # model comparison, not used
 # library(ggpp)
 
 source("../lib/helper_functions.R")
@@ -32,6 +34,7 @@ source("../lib/helper_functions.R")
 ```{r parameters, include=FALSE}
 run_bayesian_models <- FALSE
 save_bayes_models <- FALSE
+save_figures_to_outputs <- FALSE
 ```
 
 ```{r load data, include=FALSE, message=FALSE}
@@ -316,11 +319,15 @@ data_vis <-
   mutate(name = fct_relevel(name, "Response time", "Error rate", "LISAS", "BIS"))
 ```
 
+#### Dot plot
+##### Collective
+
 ```{r visualize across all, echo=FALSE}
 #| fig-width: 8
 #| fig-height: 8
 #| fig-dpi: 300
-data_vis |>
+p1 <- 
+  data_vis |>
   ggplot(aes(Cue, value, col = Congruency)) +
   facet_wrap(~name, scales="free") + 
   stat_summary(fun.data = mean_se, position=position_dodge(.1)) +
@@ -330,7 +337,112 @@ data_vis |>
   coord_cartesian(xlim=c(-.25,1.25))+
   labs(x=NULL, y="")+
   theme_bw()
+p1 
 ```
+
+##### Individual
+
+```{r response time indiv vis, echo=FALSE}
+#| fig-width: 3
+#| fig-height: 3
+#| fig-dpi: 300
+p1 <- 
+  data_vis |>
+  filter(name == "Response time") |>
+  ggplot(aes(Cue, value, col = Congruency)) +
+  facet_wrap(~name, scales="free") + 
+  stat_summary(fun.data = mean_se, position=position_dodge(.1)) +
+  stat_summary(fun.data = mean_se, geom="line", position=position_dodge(.1), ) +
+  scale_x_continuous(breaks=c(0,1),labels = c("Pre-cue", "Post-cue"))+
+  coord_cartesian(xlim=c(-.25,1.25))+
+  labs(x=NULL, y="", title="a")+
+  theme_bw() + 
+  theme(legend.position = "none") 
+p1
+if(save_figures_to_outputs){
+  ggsave("../outputs/figs/exp2_RT_Cue-X-Congruency-indiv.jpeg", p1, height = 3, width = 3, dpi =300)
+}
+```
+
+```{r error rate individual plot, echo=FALSE}
+#| fig-width: 3
+#| fig-height: 3
+#| fig-dpi: 300
+p2 <- 
+  data_vis |>
+  filter(name == "Error rate") |>
+  ggplot(aes(Cue, value, col = Congruency)) +
+  facet_wrap(~name, scales="free") + 
+  stat_summary(fun.data = mean_se, position=position_dodge(.1)) +
+  stat_summary(fun.data = mean_se, geom="line", position=position_dodge(.1), ) +
+  scale_x_continuous(breaks=c(0,1),labels = c("Pre-cue", "Post-cue"))+
+  scale_y_continuous(breaks=seq(0,1,.05)) +
+  coord_cartesian(xlim=c(-.25,1.25), ylim=c(0,.3))+
+  labs(x=NULL, y="", title="b")+
+  theme_bw() +
+  theme(legend.position = "none")
+p2
+if(save_figures_to_outputs){
+  ggsave("../outputs/figs/exp2_PE_Cue-X-Congruency-indiv.jpeg", p2, height = 3, width = 3, dpi =300)
+}
+```
+
+```{r lisas individual plot, echo=FALSE}
+#| fig-width: 3
+#| fig-height: 3
+#| fig-dpi: 300
+p3 <- 
+  data_vis |>
+  filter(name == "LISAS") |>
+  ggplot(aes(Cue, value, col = Congruency)) +
+  facet_wrap(~name, scales="free") + 
+  stat_summary(fun.data = mean_se, position=position_dodge(.1)) +
+  stat_summary(fun.data = mean_se, geom="line", position=position_dodge(.1), ) +
+  scale_x_continuous(breaks=c(0,1),labels = c("Pre-cue", "Post-cue"))+
+  coord_cartesian(xlim=c(-.25,1.25))+
+  labs(x=NULL, y="", title="c")+
+  theme_bw() + 
+  theme(legend.position = "none")
+if(save_figures_to_outputs){
+  ggsave("../outputs/figs/exp2_LISAS_Cue-X-Congruency-indiv.jpeg", p3, height = 3, width = 3, dpi =300)
+}
+```
+
+```{r BIS individual plot, echo=FALSE}
+#| fig-width: 3
+#| fig-height: 3
+#| fig-dpi: 300
+p4 <- 
+  data_vis |>
+  filter(name == "BIS") |>
+  ggplot(aes(Cue, value, col = Congruency)) +
+  facet_wrap(~name, scales="free") + 
+  stat_summary(fun.data = mean_se, position=position_dodge(.1)) +
+  stat_summary(fun.data = mean_se, geom="line", position=position_dodge(.1), ) +
+  scale_x_continuous(breaks=c(0,1),labels = c("Pre-cue", "Post-cue"))+
+  scale_y_continuous(breaks=seq(-1,1, .1))+
+  coord_cartesian(xlim=c(-.25,1.25))+
+  labs(x=NULL, y="", title="d")+
+  theme_bw() + 
+  theme(legend.position = "none")
+if(save_figures_to_outputs){
+  ggsave("../outputs/figs/exp2_BIS_Cue-X-Congruency-indiv.jpeg", p4, height = 3, width = 3, dpi =300)
+}
+```
+
+```{r legend, echo=FALSE}
+#| fig-width: 4
+#| fig-height: 1
+#| fig-dpi: 300
+ggpubr::as_ggplot(ggpubr::get_legend(p1)) -> p5
+p5
+if(save_figures_to_outputs){
+  ggsave("../outputs/figs/exp2_Y_Cue-X-Congruency-indiv_legend.jpeg", p5, height = 1, width = 4, dpi =300)
+}
+```
+
+
+#### Bar
 
 ```{r bar plot, echo=FALSE}
 data_vis |>   
@@ -341,7 +453,7 @@ data_vis |>
   scale_x_continuous(breaks=c(0,1),labels = c("Pre-cue", "Post-cue"))+
   coord_cartesian(xlim=c(-.4,1.40), ylim=c(550, 750))+
   labs(x = NULL, y="Response time")+
-  theme_bw()
+  theme_bw() 
 ```
 
 ## Statistical test
@@ -361,17 +473,33 @@ residual_norm <-
 
 ```{r residual qqplot, echo=FALSE}
 residual_norm |>
+  mutate(name=case_when(
+    name=="rt"~"Response time",
+    name=="pe"~"Error rate", 
+    name=="lisas"~"LISAS",
+    name=="bis"~"BIS"
+  )) |>
   ggplot(aes(sample = residuals)) +
   facet_wrap(~ name, scales="free") +
   geom_qq() +
-  geom_qq_line()
+  geom_qq_line() +
+  theme_bw() +
+  labs(y="Sample Quantiles", x="Theoretical Quantiles", title="a")
 ```
 
 ```{r residual histogram, echo=FALSE}
 residual_norm |>
+  mutate(name=case_when(
+    name=="rt"~"Response time",
+    name=="pe"~"Error rate", 
+    name=="lisas"~"LISAS",
+    name=="bis"~"BIS"
+  )) |>
   ggplot(aes(residuals)) +
   facet_wrap(~ name, scales="free") +
-  geom_histogram()
+  geom_histogram() +
+  theme_bw() +
+  labs(y="Count", x="Residual", title="b")
 ```
 
 Generally, the residual errors seems to be normally distributed around 0. There are a couple of outliers, but they are also uniform (i.e., as much on both sides), albeit for the Errors with a slight skew. 
@@ -429,8 +557,7 @@ Statistical test of all 35 participants:
 
 #### Table
 
-```{r transform data object output, include=FALSE}
-aovs <- list()
+```{r functions for rmanova outputs, include=FALSE}
 trns_mod <- function(data){
   d <- data$anova_table
   
@@ -450,29 +577,33 @@ trns_mod <- function(data){
 
 freq_test <- function(data, dep){
   aov_car(
-    as.formula(glue::glue("{dep} ~ Error(id/(congruent*post_cue))")),
+    as.formula(str_glue("{dep} ~ Error(id/(congruent*post_cue))")),
     data, 
     detailed=T, anova_table = list(es="pes"))
 }
 
 ```
 
+
 ```{r frequent rmanova models, echo=FALSE}
+aovs <- list()
 aovs$rt <- freq_test(d_ex_test, "rt")
 aovs$pe <- freq_test(d_ex_test, "pe")
 aovs$lisas <- freq_test(d_ex_test, "lisas")
 aovs$bis <- freq_test(d_ex_test, "bis")
 ```
 
-```{r table rmanovas, echo=FALSE}
-trns_mod(aovs$rt) |> 
-  mutate(group="Response time") |>
-  bind_rows(
-    trns_mod(aovs$pe) |> mutate(group="Error rate") ) |>
-  bind_rows(
-    trns_mod(aovs$lisas) |> mutate(group="LISAS") ) |>
-  bind_rows(
-    trns_mod(aovs$bis) |> mutate(group="BIS") ) |>
+
+```{r table rmanovas}
+map(names(aovs), \(x){
+  trns_mod(aovs[[x]]) |> 
+    mutate(group = x) 
+}) |> list_rbind() |> 
+  mutate(group = case_when(
+    group=="rt"~"Response time",
+    group=="pe"~"Error rate", 
+    group=="lisas"~"LISAS",
+    group=="bis"~"BIS") ) |>
   pivot_wider(names_from = group, values_from = c(`F (1,34)`, p, pes)) |>
   dplyr::select(names, ends_with("Error rate"), 
                 ends_with("Response time"), 
@@ -502,20 +633,68 @@ trns_mod(aovs$rt) |>
   tab_footnote("dawd")
 ```
 
-```{r long-table frequentist rmanova, echo=FALSE}
-trns_mod(aovs$rt) |> 
-  mutate(group="Response time") |>
-  bind_rows(
-    trns_mod(aovs$pe) |> mutate(group="Error rate") ) |>
-  bind_rows(
-    trns_mod(aovs$lisas) |> mutate(group="LISAS") ) |>
-  bind_rows(
-    trns_mod(aovs$bis) |> mutate(group="BIS") ) |>
-  gt(groupname_col = "group") |>
+
+```{r long-table frequentist rmanova}
+map(names(aovs), \(x){
+  trns_mod(aovs[[x]]) |> 
+    mutate(group = x) 
+}) |> list_rbind() |> 
+  mutate(group = case_when(
+    group=="rt"~"Response time",
+    group=="pe"~"Error rate", 
+    group=="lisas"~"LISAS",
+    group=="bis"~"BIS") ) |>
+  relocate(group, .before=1) |> 
+  gt() |>
   cols_label(p = md("*p*"), pes = "n^2",) |>
-  cols_align("center", 2:5) |>
+  cols_align("center", 3:5) |>
   tab_header("Results for the whole sample", ) |>
   tab_footnote("dawd")
+```
+
+
+##### Mean values
+
+```{r mean values of rmanova , echo=FALSE}
+d_ex_test |>
+  pivot_longer(c(rt, pe, lisas, bis)) |>
+  summarise(
+    .by = c(name, post_cue, congruent), 
+    m = mean(value),
+    sd = sd(value)
+  ) |> 
+  mutate(cue = ifelse(post_cue==T, "Post", "Pre"),
+         con = ifelse(congruent==T, "Congruent", "Incongruent"),
+         post_cue=NULL, congruent=NULL) |>
+  pivot_wider(names_from = c(cue, con), values_from = c(m,sd)) |>
+  mutate(across(everything(), ~fmt_APA_numbers(.x, .chr=T)),
+         name = case_when(
+           name=="rt"~"Response time",
+           name=="pe"~"Error rate", 
+           name=="lisas"~"LISAS",
+           name=="bis"~"BIS"
+         ),
+         zz="",zz2="",zz3="") |>
+  gt() |>
+  tab_spanner("Incongruent", c(m_Pre_Incongruent, sd_Pre_Incongruent, zz)) |>
+  tab_spanner("Congruent", c(m_Pre_Congruent, sd_Pre_Congruent,zz2)) |>
+  tab_spanner("Pre-cue", c(m_Pre_Incongruent, sd_Pre_Incongruent, m_Pre_Congruent, sd_Pre_Congruent, zz, zz2)) |>
+  tab_spanner("Incongruent ", c(m_Post_Incongruent, sd_Post_Incongruent, zz3)) |>
+  tab_spanner("Congruent ", c(m_Post_Congruent, sd_Post_Congruent)) |>
+  tab_spanner("Post-cue", 
+              c(m_Post_Incongruent, sd_Post_Incongruent,zz3, m_Post_Congruent, sd_Post_Congruent, )) |>
+  cols_align("center", 2:12) |>
+  cols_label(
+    starts_with("m_") ~ md("*M*"),
+    starts_with("sd_") ~ md("*SD*"),
+    name = "Dependent variable",
+    starts_with("zz") ~ ""
+  ) |>
+  cols_move(
+    c(m_Post_Incongruent, sd_Post_Incongruent, zz3), zz2
+  ) 
+  # ) |>
+  # gtsave("exp2_mean_values_across_conditions.docx", "../outputs/tables/")
 ```
 
 
@@ -567,6 +746,7 @@ par_test("rt") |>
   cols_move(em4, p.value_bis) |>
   cols_align("center", 2:25)
 ```
+
 
 ```{r long-table - linear mixed-effect model , echo=FALSE}
 par_test("rt") |>
@@ -866,6 +1046,7 @@ trns_mod(o_rt_aov) |>
 ### Bayesian Analyses 
 
 #### Coefficients
+##### Functions
 ```{r bayesian functions, include=FALSE}
 bayes_plot <- function( data_list, rm_vars = NULL, par_match = TRUE){
   #' @param rm_vars   Vector string. Remove variables from coefficient plot 
@@ -900,20 +1081,30 @@ bayes_plot <- function( data_list, rm_vars = NULL, par_match = TRUE){
 # BAYES MODEL
 bayes_run_model <- function(data, dep){
   bay_mod <- brm(
-    as.formula(glue::glue("{dep} ~ congruent + post_cue + congruent:post_cue + (1|id)")),
+    as.formula(str_glue("{dep} ~ congruent + post_cue + congruent:post_cue + (1|id)")),
     data, # data  
     save_pars = save_pars(all=T), backend = "cmdstanr", cores = 6,
     iter = 6000, chains = 6, init=0)
 }
 
-bayes_diag <- function(model, range){
-  vars <- variables(model)[range]
+bayes_diag <- function(model, rm_vars = NULL, par_match = TRUE){
   
+  if(par_match){
+    map(rm_vars, \(var){
+       variables(model)[str_detect(variables(model), var)]
+    }) |> unlist() -> remove_variables
+  } else {
+    remove_variables <- rm_vars
+  }
+  
+  remove_list <- c( c("disc","lp__", "lprior", "Intercept"), remove_variables)
+  vars <- setdiff(variables(model), remove_list)
+
   list(
-    rhat = mcmc_rhat(brms::rhat(model)[range]),         # Chains at equilibrium? 
-    neff = mcmc_neff(brms::neff_ratio(model)[range]),   # Ratio of effective sample size
-    acf = mcmc_acf(as.array(model), pars=vars),   # autocorrelation
-    trace = mcmc_trace(as.array(model), pars=vars) # mcmc draws
+     rhat = mcmc_rhat(brms::rhat(model, pars = vars)),         # Chains at equilibrium? 
+     neff = mcmc_neff(brms::neff_ratio(model, pars = vars)),   # Ratio of effective sample size
+     acf = mcmc_acf(as.array(model), pars=vars),   # autocorrelation
+     trace = mcmc_trace(as.array(model), pars=vars) # mcmc draws
   )
 }
 
@@ -936,36 +1127,37 @@ bay_erate <- function(model, var){
   m <- mean(da[, var])
   
   if(m>=0){
-    fmt_APA_numbers( 
-      sum(da[, var]>=0) / sum(da[, var]<0), 
-      .chr=T
-    )
+    fmt_APA_numbers(
+      sum(da[, var]>=0) / sum(da[, var]<0),
+      .chr=T )
   } else if(m<0){
     fmt_APA_numbers(
       sum(da[, var]<=0) / sum(da[, var]>0),
-      .chr=T)
+      .chr=T )
   }
 }
 
 bayes_coefs_to_table <- function(model, group, rm_vars=NULL, partial_matching=TRUE){
-  vars <- variables(model)  
-  
-  if(partial_matching){
-    map(rm_vars, \(var){
-       vars[str_detect(vars, var)]
-    }) |> unlist() -> remove_variables
-  } else {
-    remove_variables <- rm_vars
+  if(!is.null(rm_vars)){
+    if(partial_matching){
+      map(rm_vars, \(var){
+         vars[str_detect(vars, var)]
+      }) |> unlist() -> remove_variables
+    } else {
+      remove_variables <- rm_vars
+    }
+    
+    vars_ex <- setdiff(vars, c("sigma", "lprior", "lp__", "Intercept", remove_variables))
   }
   
-  vars_ex <- setdiff(vars, c("sigma", "lprior", "lp__", "Intercept", remove_variables))
+  vars_ex <-  variables(model)[1:length(rownames(fixef(model)))]
   
   fixef(model) |> 
     as_tibble() |> 
     mutate(
       .before=1, 
       names = rownames(fixef(model)), 
-      across(where(is.double), ~fmt_APA_numbers(.x, .low_val=T)), 
+      across(where(is.double), ~fmt_APA_numbers(.x, .chr=T)),
       Est.Error=NULL,
       group=group) |>
     mutate(
@@ -976,7 +1168,30 @@ bayes_coefs_to_table <- function(model, group, rm_vars=NULL, partial_matching=TR
         vars_ex, \(x){ bay_erate(model, x) }) ) |>
     filter(!(names=="Intercept"))
 }
+
+bayes_model_fit <- function(model, group){
+  as.matrix(model) -> m1
+  
+  sigma <- mean(m1[,"sigma"]) |> fmt_APA_numbers()
+  sigma_l <- hdi(m1[,"sigma"])[2] |> fmt_APA_numbers()
+  sigma_h <- hdi(m1[,"sigma"])[3] |> fmt_APA_numbers()
+  r2 <- bayes_R2(model) |> fmt_APA_numbers(.low_val = T)
+  loo_a <- loo(model)$estimates["looic",] |> fmt_APA_numbers()
+  
+  tibble(
+    names    = c("Model fit", "Sigma (subject)", "R^2", "LOOIC"),
+    group    = group, 
+    Estimate = c("", sigma, r2[1], loo_a[1]),
+    pdir     = c("", bay_eff_prob(m1, "sigma"), rep("", 2)),
+    erat     = c("", bay_erate(m1, "sigma"), rep("", 2)), 
+    Q2.5     = c("", sigma_l, r2[3], paste("SE = ", loo_a[2])),
+    Q97.5    = c("", sigma_h, r2[4], ""),
+  )
+}
 ```
+
+
+##### Tests
 
 ```{r bayesian list vars , include=FALSE}
 if(!run_bayesian_models){ 
@@ -985,50 +1200,56 @@ if(!run_bayesian_models){
   co_bay <- list()
 }
 coefs <- list()
+mod_fit <- list()
+
 ```
 
 ```{r rt bay coefs, echo=FALSE, warning=FALSE, message=FALSE}
 if(run_bayesian_models){
   co_bay$rt <- bayes_run_model(d_ex_test, "rt")
   
-  bayes_diag(co_bay$rt, 1:4)
+  bayes_diag(co_bay$rt, c("r_id", "z_1", "Intercept"))
   # looks ok
 }
 
-coefs$rt <- bayes_coefs_to_table(co_bay$rt, "rt", c("r_id", "z_1", "sd_id"))
+coefs$rt <- bayes_coefs_to_table(co_bay$rt, "rt")
+mod_fit$rt <- bayes_model_fit(co_bay$rt,"rt")
 ```
 
 ```{r pe bay coefs , echo=FALSE, warning=FALSE, message=FALSE}
 if(run_bayesian_models){
   co_bay$pe <- bayes_run_model(d_ex_test, "pe")
   
-  bayes_diag(co_bay$pe, 1:4)
+  bayes_diag(co_bay$pe, c("r_id", "z_1", "Intercept"))
   # looks good
 }
 
-coefs$pe <- bayes_coefs_to_table(co_bay$pe, "pe", c("r_id", "z_1", "sd_id"))
+coefs$pe <- bayes_coefs_to_table(co_bay$pe, "pe")
+mod_fit$pe <- bayes_model_fit(co_bay$pe,"pe")
 ```
 
 ```{r lisas bay coefs, echo=FALSE, warning=FALSE, message=FALSE}
 if(run_bayesian_models){
   co_bay$lisas <- bayes_run_model(d_ex_test, "lisas")
   
-  bayes_diag(co_bay$lisas, 1:4)
+  bayes_diag(co_bay$lisas, c("r_id", "z_1", "Intercept"))
   # looks good
 }
 
-coefs$lisas <- bayes_coefs_to_table(co_bay$lisas, "lisas", c("r_id", "z_1", "sd_id"))
+coefs$lisas <- bayes_coefs_to_table(co_bay$lisas, "lisas")
+mod_fit$lisas <- bayes_model_fit(co_bay$lisas,"lisas")
 ```
 
-```{r bis bay coefs, echo=FALSE, warning=FALSE, message=FALSE}
+```{r bis bay coefs, warning=FALSE, message=FALSE}
 if(run_bayesian_models){
   co_bay$bis <- bayes_run_model(d_ex_test, "bis")
   
-  bayes_diag(co_bay$bis, 1:4)
+  bayes_diag(co_bay$bis, c("r_id", "z_1", "Intercept"))
   # looks good
 }
 
-coefs$bis <- bayes_coefs_to_table(co_bay$bis, "bis", c("r_id", "z_1", "sd_id"))
+coefs$bis <- bayes_coefs_to_table(co_bay$bis, "bis")
+mod_fit$bis <- bayes_model_fit(co_bay$bis,"bis")
 ```
 
 ```{r save models if set, include=FALSE}
@@ -1037,15 +1258,23 @@ if(run_bayesian_models & save_bayes_models){
 }
 ```
 
+##### Table
+
 ```{r wide-table of bayesian coefs, echo=FALSE, warning=FALSE, message=FALSE} 
 coefs |> 
   list_rbind() |>
-  pivot_wider(names_from=group, values_from=c(Estimate, Q2.5,Q97.5, erat, pdir)) |>
   mutate(
     names=case_when(
       names=="congruentTRUE" ~ "Congruency",
       names=="post_cueTRUE"~"Cue", 
-      T ~ "Cue_X_Congruency"),
+      names=="congruentTRUE:post_cueTRUE" ~ "Cue X Congruency") 
+  ) |>
+  pivot_wider(names_from=group, values_from=c(Estimate, pdir, erat, Q2.5, Q97.5)) |>
+  bind_rows(
+    mod_fit |> list_rbind() |>
+    pivot_wider(names_from=group, values_from=c(Estimate, pdir, erat, Q2.5, Q97.5))
+  ) |> 
+  mutate(
     zz="",zz2="",zz3="",zz4="",
   ) |>
   gt() |>
@@ -1057,18 +1286,19 @@ coefs |>
   tab_spanner("Error rate",    ends_with("_PE"))  |>
   tab_spanner("LISAS",         ends_with("LISAS")) |>
   tab_spanner("BIS",           ends_with("BIS")) |> 
-  cols_label(
-    starts_with("Estimate") ~ "Est.",
-    starts_with("Q2.5") ~ "Low",
-    starts_with("Q97.5") ~ "High",
-    starts_with("pdir") ~ md("*p*~dir"),
-    starts_with("erat") ~ md("ER"),
-    starts_with("zz") ~ "",
-    ) |> 
-  cols_move(ends_with("_RT"),   Estimate_rt) |>
+  cols_move(ends_with("_rt"),   Estimate_rt) |>
   cols_move(ends_with("_PE"),   Estimate_pe) |>
   cols_move(ends_with("LISAS"), Estimate_lisas) |>
   cols_move(ends_with("BIS"),   Estimate_bis) |>
+  cols_label(
+    starts_with("Estimate") ~ md("*b*"),
+    starts_with("Q2.5") ~ "Low",
+    starts_with("Q97.5") ~ "High",
+    starts_with("pdir") ~ md("*p*~*b*."),
+    starts_with("erat") ~ md("ER~*b*"),
+    starts_with("zz") ~ "",
+    names = "Predictors"
+    ) |> 
   cols_move(zz, Q97.5_rt) |> 
   cols_move(zz2, Q97.5_pe) |> 
   cols_move(zz3, Q97.5_lisas) |> 
@@ -1076,28 +1306,41 @@ coefs |>
   cols_align("center", 2:25)
 ```
 
-```{r long-table of bayesian coefs, echo=FALSE, warning=FALSE, message=FALSE} 
-coefs |> 
-  list_rbind() |>
+```{r long-table of bayesian coefs, warning=FALSE, message=FALSE} 
+
+map(names(coefs), \(x){
+  coefs[[x]] |> 
+    add_row(
+      .before=1, names = "Predictors", group = x, 
+    )
+}) |> list_rbind() |> 
   mutate(
     names=case_when(
       names=="congruentTRUE" ~ "Congruency",
       names=="post_cueTRUE"~"Cue", 
-      T ~ "Cue X Congruency"),
-    group=case_when( 
+      names=="congruentTRUE:post_cueTRUE" ~ "Cue X Congruency",
+      T ~ names) 
+  ) |>
+  rbind(
+    mod_fit |> list_rbind()
+  ) |>
+  arrange(desc(group)) |>
+  mutate(
+    group = case_when( 
       group=="rt"~"Response time", 
       group=="pe"~"Error rate", 
       group=="lisas"~"LISAS", 
       T ~ "BIS"),
-    across(where(is.double), ~fmt_APA_numbers(.x, .chr=T))
+    across(where(is.double), ~fmt_APA_numbers(.x, .chr=T)) 
   ) |>
-  gt(groupname_col = "group") |>
+  relocate(group, .before=1) |>
+  gt() |>
   tab_spanner("HDI", c(Q2.5, Q97.5)) |>
   cols_label(
-    Estimate = "Est.", pdir = md("*p*~dir"), erat="ER~dir",
+    Estimate = md("*b*"), pdir = md("*p*~*b*"), erat=md("ER~*b*"),
     Q2.5 = "Low", Q97.5 = "High",
-    ) |> 
-  cols_align("center", 2:7)
+    ) |>
+  cols_align("center", 3:7)
 ```
 
 ##### Paragraph
@@ -1151,16 +1394,18 @@ bay_rep_test <- function(dep){
     
     bayes_coefs_to_table(b, dep) |>
       mutate(.after=group, id_rmd = id_list[x])
+    
+    # Add model fit stuff? 
+    # bayes_model_fit(b, dep)
+    
   })
 }
 ```
 
-```{r bayesian coefficient n-1 cross prep, include=FALSE}
-n34_b_rep <- list()
-```
 
 ```{r bayesian coefficient n-1 cross test, include=FALSE, warning=FALSE, message=FALSE}
 if(run_bayesian_models){
+  n34_b_rep <- list()
   n34_b_rep$rt     <- bay_rep_test("rt") |> list_rbind()
   n34_b_rep$pe     <- bay_rep_test("pe") |> list_rbind()
   n34_b_rep$lisas  <- bay_rep_test("lisas") |> list_rbind()
@@ -1170,6 +1415,7 @@ if(run_bayesian_models){
   load("../data/processed/bayesian_n34_rep_test.rdata")
 }
 ```
+
 
 ```{r table for n34 bayesian rep, echo=FALSE}
 n34_b_rep |>
@@ -1222,30 +1468,33 @@ n34_b_rep |>
 ##### Outliers removed
 
 ```{r bayesia test rm outliers, echo=FALSE}
-bay_out_rm <- function(data, dep){
-  b <- bayes_run_model(
-    data, dep
-  )
-  
-  bayes_coefs_to_table(b, dep)
-}
-
 if(run_bayesian_models){
   b_rm_out <- list() 
-  b_rm_out$rt <- bay_out_rm( d_ex_test |> filter(!(id %in% id_is_outlier)), "rt" )
-  b_rm_out$pe <- bay_out_rm( d_ex_test |> filter(!(id %in% id_is_outlier)), "pe" )
-  b_rm_out$lisas <- bay_out_rm( d_ex_test |> filter(!(id %in% id_is_outlier)), "lisas" )
-  b_rm_out$bis <- bay_out_rm( d_ex_test |> filter(!(id %in% id_is_outlier)), "bis" )
+  b_rm_out$rt <- bayes_run_model( d_ex_test |> filter(!(id %in% id_is_outlier)), "rt" )
+  b_rm_out$pe <- bayes_run_model( d_ex_test |> filter(!(id %in% id_is_outlier)), "pe" )
+  b_rm_out$lisas <- bayes_run_model( d_ex_test |> filter(!(id %in% id_is_outlier)), "lisas" )
+  b_rm_out$bis <- bayes_run_model( d_ex_test |> filter(!(id %in% id_is_outlier)), "bis" )
   # save(b_rm_out, file="../data/processed/bayesian_rm_outliers.rdata")
 } else {
   load("../data/processed/bayesian_rm_outliers.rdata")
 }
 ```
 
+```{r entable the outliers}
+map(names(b_rm_out), \(x){
+  bayes_coefs_to_table(b_rm_out[[x]], x) |>
+    add_row(
+      .before = 1, names = "Predictors", group = x
+    ) |>
+    bind_rows(
+      bayes_model_fit(b_rm_out[[x]], x)
+    )
+}) |> list_rbind() -> b_rm_out_tab
+```
+
 
 ```{r long-table bayesian estimate rm-outliers, echo=FALSE}
-b_rm_out |> 
-  list_rbind() |> 
+b_rm_out_tab |>
   mutate(
     group = case_when(
       group=="rt" ~ "Response time", 
@@ -1257,13 +1506,15 @@ b_rm_out |>
       names=="congruentTRUE" ~ "Congruency",
       names=="post_cueTRUE" ~ "Cue",
       names=="congruentTRUE:post_cueTRUE" ~ "Congruency x Cue",
+      T ~ names,
     ),
-    across(c("Estimate", contains("Q")), ~fmt_APA_numbers(.x, .chr=T))
+    across(c("Estimate", contains("Q"), erat), ~fmt_APA_numbers(.x, .chr=T))
   ) |>
-  gt(groupname_col = "group") |>
+  relocate(.before = 1, group) |>
+  gt() |>
   tab_spanner("HDI", contains("Q")) |>
   cols_label(
-    "Q2.5" = "Low", "Q97.5" = "High",
+    "Q2.5" = "Low", "Q97.5" = "High", names = "Predictors",
     Estimate = md("*b*"), pdir = md("*p*~b"), erat = md("ER~b")
   ) 
 ```
@@ -1299,7 +1550,18 @@ d_ex1 |>
         sd = sd(rt),
         exp = 2,
       )
-  ) |>
+  ) -> exp_comb_data
+
+
+exp_indu_diff <- list()
+exp_indu_diff$bayes <- ttestBF(
+  exp_comb_data$mean[exp_comb_data$exp==1], 
+  exp_comb_data$mean[exp_comb_data$exp==2])
+
+exp_indu_diff$bay_post <- posterior(exp_indu_diff$bayes, iterations = 10000) 
+exp_indu_diff$hdi <- hdi(exp_indu_diff$bay_post)
+
+exp_comb_data |>
   pivot_wider(
     names_from = exp, 
     values_from = c(mean, sd)
@@ -1313,6 +1575,15 @@ d_ex1 |>
     t = t.test(mean_1, mean_2, alternative = "greater")$statistic,
     df = t.test(mean_1, mean_2, alternative = "greater")$parameter,
     p = t.test(mean_1, mean_2, alternative = "greater")$p.value,
+    best = fmt_APA_numbers(mean(exp_indu_diff$bay_post[,2])),
+    bf = fmt_APA_numbers(extractBF(exp_indu_diff$bayes)$bf),
+    hdi = paste0(
+      "[", 
+      fmt_APA_numbers(exp_indu_diff$hdi$CI_low[exp_indu_diff$hdi$Parameter=="beta (x - y)"])
+      ," ",
+      fmt_APA_numbers(exp_indu_diff$hdi$CI_high[exp_indu_diff$hdi$Parameter=="beta (x - y)"]), 
+      "]"
+    )
   ) |> 
   mutate(across(1:7, ~fmt_APA_numbers(.x, .chr=T)),
          p = fmt_APA_numbers(p, .p=T)) -> exp1_inducer
@@ -1321,7 +1592,7 @@ exp1_inducer
 
 Comparing response time between the first (*M* = `r exp1_inducer$m1`, *SD* `r exp1_inducer$sd1`) and second experiment (*M* = `r exp1_inducer$m2`, *SD* = `r exp1_inducer$sd2`) did not reveal any significant difference in response time (*M* = `r exp1_inducer$mdiff`, *t*(`r exp1_inducer$df`) = `r exp1_inducer$t`, *p* = `r exp1_inducer$p`). 
 
-### Time-course of post-cue rt 
+### Effect of Time (interaction)
 
 ```{r post-cue RT and PE, echo=FALSE}  
 d_ex |> 
@@ -1337,6 +1608,92 @@ d_ex |>
   stat_summary(fun.data=mean_se, position = position_dodge(.1), geom="line")
 ```
 
+
+```{r ressponse time across trial number split by cue-run, echo=FALSE}
+#| fig-width: 6
+#| fig-height: 5
+#| fig-dpi: 300
+p1 <- 
+  d_ex |> 
+  filter(!is.na(congruent)) |>
+  mutate(
+    .by = c(id, inducer_run, post_cue),
+    Trial = 1:length(post_cue),
+    Congruency = fct_rev(ifelse(congruent==T, "Congruent", "Incongruent")),
+    Cue = fct_rev(ifelse(post_cue==T, "Post-cue", "Pre-cue")),
+  ) |>
+  ggplot(aes(Trial, rt, col=Congruency)) +
+  facet_wrap(~Cue, scales="free", nrow=2) +
+  stat_summary(fun.data=mean_se, position = position_dodge(.2)) +
+  stat_summary(fun.data=mean_se, position = position_dodge(.2), geom="line") +
+  scale_x_continuous(breaks = seq(0,20,1)) + 
+  labs(y="Response time", title="a") +
+  theme_bw() +
+  theme(legend.position = "top")
+p1
+if(save_figures_to_outputs){
+  ggsave(p1, filename = "../outputs/figs/exp2_rt_time-course.jpeg",  height = 5, width = 6, dpi =300)
+}
+```
+
+
+```{r error rate across trial number split by cue-run, echo=FALSE}
+#| fig-width: 6
+#| fig-height: 5
+#| fig-dpi: 300
+p2 <- 
+  d_ex |> 
+  filter(!is.na(congruent)) |>
+  mutate(
+    .by = c(id, inducer_run, post_cue),
+    Trial = 1:length(post_cue),
+    Congruency = fct_rev(ifelse(congruent==T, "Congruent", "Incongruent")),
+    Cue = fct_rev(ifelse(post_cue==T, "Post-cue", "Pre-cue")),
+  ) |>
+  ggplot(aes(Trial, 1-correct_response, col=Congruency)) +
+  facet_wrap(~Cue, scales="free", nrow=2) +
+  stat_summary(fun.data=mean_se, position = position_dodge(.2)) +
+  stat_summary(fun.data=mean_se, position = position_dodge(.2), geom="line") +
+  scale_x_continuous(breaks = seq(0,20,1)) + 
+  labs(y="Error rate", title="b") +
+  theme_bw() +
+  theme(legend.position = "none")
+p2
+if(save_figures_to_outputs){
+  ggsave(p2, filename = "../outputs/figs/exp2_pe_time-course.jpeg",  height = 5, width = 6, dpi =300)
+}
+```
+
+```{r , include=FALSE}
+
+d_ex |> 
+  filter(!is.na(congruent)) |>
+  mutate(
+    three = case_when(
+      inducer_run > 2*(max(inducer_run)/3)   ~ "Third", 
+      inducer_run > max(inducer_run) / 3     ~ "Second", 
+      T ~ "First",),
+  ) |>
+  mutate(
+    .by = c(id, inducer_run, post_cue),
+    Trial = 1:length(post_cue),
+    Congruency = fct_rev(ifelse(congruent==T, "Congruent", "Incongruent")),
+    Cue = fct_rev(ifelse(post_cue==T, "Post-cue", "Pre-cue")),
+  ) |>
+  ggplot(aes(Trial, 1-correct_response, col=Congruency)) +
+  facet_wrap(three~Cue, scales="free", nrow=3) +
+  stat_summary(fun.data=mean_se, position = position_dodge(.2)) +
+  stat_summary(fun.data=mean_se, position = position_dodge(.2), geom="line") +
+  scale_x_continuous(breaks = seq(0,20,1)) + 
+  labs(y="Error rate", ) +
+  theme_bw() +
+  theme(legend.position = "top")
+```
+
+
+
+
+
 ```{r post-cue RT and PE split by inducer run, echo=FALSE}  
 d_ex |> 
   filter(post_cue==T) |>
@@ -1351,10 +1708,12 @@ d_ex |>
   stat_summary(fun.data=mean_se, position = position_dodge(.3), geom="line")
 ```
 
-#### Half-split
+#### Visualization
+##### Half-split 
 
 ```{r add bis-lisas to inducer-calced, echo=FALSE}
-d_ex_exp_test <- d_ex |>
+d_ex_exp_test <- 
+  d_ex |>
   filter(trial_info=="Diagnostic trial") |>
   summarise(
     .by = c(id, inducer_run, post_cue, congruent), 
@@ -1375,10 +1734,10 @@ d_ex_exp_test <- d_ex |>
 ```
 
 
-```{r RT three-quater split vis, echo=FALSE}
+```{r RT half split vis, echo=FALSE}
 #| fig-dpi: 300
-#| fig-width: 6
-#| fig-height: 4
+#| fig-width: 4
+#| fig-height: 3.5
 d_ex |> 
   mutate(
     half = case_when(
@@ -1397,14 +1756,16 @@ d_ex |>
   stat_summary(fun.data=mean_se, geom="line", position = position_dodge(.1)) + 
   coord_cartesian(xlim=c(-.25, 1.25)) +
   scale_x_continuous(breaks=c(0,1), labels = c("Pre-cue","Post-cue")) +
-  labs(x="", y="Response time") +
-  theme_bw()
+  labs(x="", y="Response time", title="a") +
+  theme_bw() + 
+  theme(legend.position = "none")
 ```
 
-```{r PE three-quater split vis, echo=FALSE}
+
+```{r PE half split vis, echo=FALSE}
 #| fig-dpi: 300
-#| fig-width: 6
-#| fig-height: 4
+#| fig-width: 4
+#| fig-height: 3.5
 d_ex |> 
   mutate(
     half = case_when(
@@ -1424,13 +1785,105 @@ d_ex |>
   coord_cartesian(xlim=c(-.25, 1.25), ylim = c(0,.3)) +
   scale_x_continuous(breaks=c(0,1), labels = c("Pre-cue","Post-cue")) +
   scale_y_continuous(breaks=seq(0,1, .05)) +
-  labs(x="", y="Error rate") +
-  theme_bw()
+  labs(x="", y="Error rate", title="b") +
+  theme_bw() +
+  theme(legend.position = "none")
 ```
 
-#### Three split
+```{r lisas half-split, echo=FALSE}
+#| fig-dpi: 300
+#| fig-width: 4
+#| fig-height: 3.5
+d_ex_exp_test |>
+  mutate(
+     two = case_when(
+      inducer_run > max(inducer_run)/2   ~ "Second", 
+      T ~ "First", ),
+     Cue = ifelse(post_cue==T, 1,0),
+     Congruency = fct_rev(ifelse(congruent==T, "Congruent", "Incongruent")) 
+  ) |>
+  ggplot(aes(Cue, lisas, col=Congruency)) +
+  facet_wrap(~two) +
+  coord_cartesian(xlim=c(-.25, 1.25)) +
+  stat_summary(fun.data=mean_se) +
+  stat_summary(fun.data=mean_se, geom="line") +
+  scale_x_continuous(breaks=c(0,1), labels = c("Pre-cue","Post-cue")) +
+  scale_y_continuous(breaks=seq(0,1000, 25)) +
+  labs(x = "", y="LISAS", title="c") +
+  theme_bw() +
+  theme(legend.position = "none")
+```
 
-```{r RT half-split vis, echo=FALSE}
+```{r bis half-split, echo=FALSE}
+#| fig-dpi: 300
+#| fig-width: 4
+#| fig-height: 3.5
+d_ex_exp_test |>
+  mutate(
+     two = case_when(
+      inducer_run > max(inducer_run)/2   ~ "Second", 
+      T ~ "First", ),
+     Cue = ifelse(post_cue==T, 1,0),
+     Congruency = fct_rev(ifelse(congruent==T, "Congruent", "Incongruent")) 
+  ) |>
+  ggplot(aes(Cue, bis, col=Congruency))+
+  facet_wrap(~two) +
+  coord_cartesian(xlim=c(-.25, 1.25), ylim = c(-.42,.25)) +
+  stat_summary(fun.data=mean_se) +
+  stat_summary(fun.data=mean_se, geom="line") +
+  scale_x_continuous(breaks=c(0,1), labels = c("Pre-cue","Post-cue")) +
+  scale_y_continuous(breaks=seq(-1,1, .10)) +
+  labs(x = "", y="BIS", title="d") +
+  theme_bw() +
+  theme(legend.position = "none")
+```
+
+
+```{r only for legend , echo=FALSE}
+#| fig-dpi: 300
+#| fig-width: 4
+#| fig-height: 3.5
+d_ex_exp_test |>
+  mutate(
+     two = case_when(
+      inducer_run > max(inducer_run)/2   ~ "Second", 
+      T ~ "First", ),
+     Cue = ifelse(post_cue==T, 1,0),
+     Congruency = fct_rev(ifelse(congruent==T, "Congruent", "Incongruent")) 
+  ) |>
+  ggplot(aes(Cue, bis, col=Congruency))+
+  stat_summary() +
+  theme_bw() +
+  theme(legend.position = "top")
+```
+
+##### Three split
+
+```{r legend  wdwd, echo=FALSE}
+#| fig-dpi: 300
+#| fig-width: 6
+#| fig-height: 4
+d_ex |> 
+  mutate(
+    three = case_when(
+      inducer_run > 2*(max(inducer_run)/3)   ~ "Third", 
+      inducer_run > max(inducer_run) / 3     ~ "Second", 
+      T ~ "First", 
+    ), 
+    cue = ifelse(post_cue==T, 1,0),
+    Congruency = fct_rev(ifelse(congruent==T, "Congruent", "Incongruent"))) |>
+  filter(!is.na(congruent)) |>
+  summarise(
+    .by = c(id, three, cue, Congruency),
+    rt = mean(rt),
+    pe = 1 - mean(correct_response) ) |> 
+  ggplot(aes(cue, rt, col=Congruency)) +
+  stat_summary() + 
+  theme_bw() + 
+  theme(legend.position = "top") 
+```
+
+```{r RT three-quater split vis, echo=FALSE}
 #| fig-dpi: 300
 #| fig-width: 6
 #| fig-height: 4
@@ -1454,12 +1907,12 @@ d_ex |>
   stat_summary(fun.data=mean_se, geom="line", position = position_dodge(.1)) + 
   coord_cartesian(xlim=c(-.25, 1.25)) +
   scale_x_continuous(breaks=c(0,1), labels = c("Pre-cue","Post-cue")) +
-  labs(x="", y="Response time") +
+  labs(x="", y="Response time", title="a") +
   theme_bw() + 
-  theme(legend.position = "top") 
+  theme(legend.position = "none") 
 ```
 
-```{r PE half-spit vis, echo=FALSE}
+```{r PE three-quater split vis, echo=FALSE}
 #| fig-dpi: 300
 #| fig-width: 6
 #| fig-height: 4
@@ -1484,72 +1937,128 @@ d_ex |>
   coord_cartesian(xlim=c(-.25, 1.25), ylim = c(0,.3)) +
   scale_x_continuous(breaks=c(0,1), labels = c("Pre-cue","Post-cue")) +
   scale_y_continuous(breaks=seq(0,1, .05)) +
-  labs(x="", y="Error rate") +
+  labs(x="", y="Error rate", title="b") +
   theme_bw() + 
-  theme(legend.position = "top") 
+  theme(legend.position = "none") 
 ```
 
-
-```{r bis half-split, echo=FALSE}
+```{r lisas three-quater split, echo=FALSE}
+#| fig-dpi: 300
+#| fig-width: 6
+#| fig-height: 4
 d_ex_exp_test |>
   mutate(
      three = case_when(
-      inducer_run > max(inducer_run)/2   ~ "Second", 
-      T ~ "First", ),
-  ) |>
-  ggplot(aes(post_cue, bis, col=congruent))+
-  facet_wrap(~three) +
-  stat_summary()
-```
-
-
-```{r bis quater-split, echo=FALSE}
-d_ex_exp_test |>
-  mutate(
-     three = case_when(
-      inducer_run > 2*(max(inducer_run)/3)   ~ "Third", 
+      inducer_run > 2*(max(inducer_run) / 3)   ~ "Third", 
       inducer_run > max(inducer_run) / 3     ~ "Second", 
       T ~ "First", 
     ),    
-    cue = ifelse(post_cue==T, 1,0),
+    Cue = ifelse(post_cue==T, 1,0),
     Congruency = fct_rev(ifelse(congruent==T, "Congruent", "Incongruent"))
   ) |>
-  ggplot(aes(post_cue, bis, col=congruent))+
+  ggplot(aes(Cue, bis, col=Congruency))+
   facet_wrap(~three) +
-  stat_summary()
+  coord_cartesian(xlim=c(-.25, 1.25), ylim = c(-.48,.25)) +
+  stat_summary(fun.data=mean_se) +
+  stat_summary(fun.data=mean_se, geom="line") +
+  scale_x_continuous(breaks=c(0,1), labels = c("Pre-cue","Post-cue")) +
+  scale_y_continuous(breaks=seq(-1,1, .10)) +
+  labs(y="LISAS", x="", title="c") + 
+  theme_bw() +
+  theme(legend.position = "none")
 ```
 
-#### Tests (Time interaction)
+```{r bis three-quater split, echo=FALSE}
+#| fig-dpi: 300
+#| fig-width: 6
+#| fig-height: 4
+d_ex_exp_test |>
+  mutate(
+     three = case_when(
+      inducer_run > 2*(max(inducer_run) / 3)   ~ "Third", 
+      inducer_run > max(inducer_run) / 3     ~ "Second", 
+      T ~ "First", 
+    ),    
+    Cue = ifelse(post_cue==T, 1,0),
+    Congruency = fct_rev(ifelse(congruent==T, "Congruent", "Incongruent"))
+  ) |>
+  ggplot(aes(Cue, bis, col=Congruency))+
+  facet_wrap(~three) +
+  coord_cartesian(xlim=c(-.25, 1.25), ylim = c(-.48,.25)) +
+  stat_summary(fun.data=mean_se) +
+  stat_summary(fun.data=mean_se, geom="line") +
+  scale_x_continuous(breaks=c(0,1), labels = c("Pre-cue","Post-cue")) +
+  scale_y_continuous(breaks=seq(-1,1, .10)) +
+  labs(y="BIS", x="", title="d") + 
+  theme_bw() +
+  theme(legend.position = "none")
+```
+
+
+
+```{r across inducer-trial - attempt, include=FALSE}
+d_ex_exp_test |>
+  mutate(
+    Cue = fct_rev(ifelse(post_cue==T, "Post-cue", "Pre-cue"))
+  ) |>
+  ggplot(aes(inducer_run, lisas, col=congruent)) + 
+  facet_wrap(~Cue, nrow=2) +
+  stat_summary() +
+  stat_summary(geom="line")
+```
+
+
+#### Statistical test
 
 ```{r prep , echo=FALSE}
 fq_intr3way <- list()
 ba_intr3way <- list()
+scale_values <- function(x){(x-min(x))/(max(x)-min(x))}
 ```
 
 ```{r freq con-cue-time interaction models, echo=FALSE}
 fq_intr3way$rt <- lmer(
   rt ~ congruent*post_cue*inducer_run + (1|id), 
-  d_ex_exp_test)
+  d_ex_exp_test |> mutate(inducer_run = scale_values(inducer_run))
+)
 
 fq_intr3way$pe <- lmer(
   pe ~ congruent*post_cue*inducer_run + (1|id),
-  d_ex_exp_test)
+  d_ex_exp_test |> mutate(inducer_run = scale_values(inducer_run))
+)
 
 fq_intr3way$lisas <- lmer(
   lisas ~ congruent*post_cue*inducer_run + (1|id),
-  d_ex_exp_test)
+  d_ex_exp_test |> mutate(inducer_run = scale_values(inducer_run))
+)
 
 fq_intr3way$bis <- lmer(
   bis ~ congruent*post_cue*inducer_run + (1|id),
-  d_ex_exp_test)
+  d_ex_exp_test |> mutate(inducer_run = scale_values(inducer_run))
+)
+```
+
+
+```{r check residual normal distribution for freq models}
+dtibble(
+  rt = resid(fq_intr3way$rt),
+  pe = resid(fq_intr3way$pe),
+  lisas = resid(fq_intr3way$lisas),
+  bis = resid(fq_intr3way$bis)
+  ) |>
+  pivot_longer(c(rt,pe,lisas,bis)) |>
+  ggplot(aes(sample = value)) +
+  facet_wrap(~name, scales="free") + 
+  geom_qq() +
+  geom_qq_line()
 ```
 
 
 ```{r brms inducer-run interaction  , echo=FALSE, warning=FALSE, message=FALSE}
 brm_3_way_test <- function(data, dep){
   time_intr_ba <- brm(
-    as.formula(glue::glue("{dep} ~ congruent*post_cue*inducer_run + (1|id)")),
-    data,
+    as.formula(str_glue("{dep} ~ congruent*post_cue*inducer_run + (1|id)")),
+    data |> mutate(inducer_run = scale_values(inducer_run)),
     init=0, chains = 6, iter= 6000, backend = "cmdstanr", cores = 6)
 }
 if(run_bayesian_models){
@@ -1567,7 +2076,7 @@ if(run_bayesian_models){
 
 #### Table
 
-```{r interaction 3 way table, echo=FALSE}
+```{r function to extract frequency coefficients}
 intr3_to_table <- function(data, group){
   data |>
     summary() |> 
@@ -1580,31 +2089,31 @@ intr3_to_table <- function(data, group){
 }
 ```
 
-```{r 3 way interaction table done, echo=FALSE}
-intr3_to_table(fq_intr3way$rt, "rt") |>
-  bind_rows(
-    intr3_to_table(fq_intr3way$pe, "pe"),
-  ) |> 
-  bind_rows(
-    intr3_to_table(fq_intr3way$lisas, "lisas"),
-  ) |>
-  bind_rows(
-    intr3_to_table(fq_intr3way$bis, "bis"),
-  ) |>
-  filter(!(vars=="(Intercept)")) |>
+
+```{r get bayesian coefs and model fit}
+intr3_way_tab <- 
+  map(names(ba_intr3way), \(x){
+    bayes_coefs_to_table(ba_intr3way[[x]], x) |> 
+      add_row(.before=1, names = "Predictors", group = x) |>
+      bind_rows(
+        bayes_model_fit(ba_intr3way[[x]], x)
+      )
+  }) |> list_rbind()
+```
+
+
+```{r 3 way interaction table done}
+intr3_way_tab |> 
   left_join(
-    bayes_coefs_to_table(ba_intr3way$rt, "rt", c("r_id", "sd_id")) |>
-      bind_rows(
-        bayes_coefs_to_table(ba_intr3way$pe, "pe", c("r_id", "sd_id"))
-      ) |>
-      bind_rows(
-        bayes_coefs_to_table(ba_intr3way$lisas, "lisas", c("r_id", "sd_id"))
-      ) |>
-      bind_rows(
-        bayes_coefs_to_table(ba_intr3way$bis, "bis", c("r_id", "sd_id")) 
-      ),
-    by = join_by("vars"=="names", "group")
+    map(names(fq_intr3way), \(x){
+      intr3_to_table(fq_intr3way[[x]], x)
+    }) |> list_rbind() |>
+      filter(vars!="(Intercept)") |> 
+      mutate(across(starts_with("Pr"), ~fmt_APA_numbers(.x, .p=T)),
+             across(is.double, ~fmt_APA_numbers(.x, .chr=T))),
+    by = join_by("names"=="vars", "group")
   ) |>
+  relocate(group, .before=1) |>
   mutate(
     group = case_when(
       group=="rt"~"Response time",
@@ -1612,39 +2121,41 @@ intr3_to_table(fq_intr3way$rt, "rt") |>
       group=="lisas"~"LISAS",
       group=="bis"~"BIS",
     ),
-    vars = case_when( 
-      vars=="post_cueTRUE" ~ "Cue", 
-      vars=="congruentTRUE" ~ "Congruency", 
-      vars=="inducer_run" ~ "Time", 
-      vars=="congruentTRUE:post_cueTRUE" ~ "Congruency x Cue", 
-      vars=="congruentTRUE:inducer_run" ~ "Congruency x Time", 
-      vars=="post_cueTRUE:inducer_run" ~ "Cue x Time", 
-      vars=="congruentTRUE:post_cueTRUE:inducer_run" ~ "Cue x Congruency x Time", 
+    names = case_when( 
+      names=="post_cueTRUE" ~ "Cue", 
+      names=="congruentTRUE" ~ "Congruency", 
+      names=="inducer_run" ~ "Time", 
+      names=="congruentTRUE:post_cueTRUE" ~ "Congruency x Cue", 
+      names=="congruentTRUE:inducer_run" ~ "Congruency x Time", 
+      names=="post_cueTRUE:inducer_run" ~ "Cue x Time", 
+      names=="congruentTRUE:post_cueTRUE:inducer_run" ~ "Congruency x Cue x Time", 
+      T ~ names,
     ),
     `Std. Error` = NULL,
-    across(c(starts_with("Estimate"), "df", "t value", starts_with("Q")), 
-           ~fmt_APA_numbers(.x, .chr=T)),
-    across(starts_with("Pr"), ~fmt_APA_numbers(.x, .p=T)),
+    # across(c(starts_with("Estimate"), "df", "t value", starts_with("Q")), 
+    #        ~fmt_APA_numbers(.x, .chr=T)),
+    # across(starts_with("Pr"), ~fmt_APA_numbers(.x, .p=T)),
     zz="",
-  ) |> 
-  mutate(.before=1, g=group, group=NULL) |>
+  ) |>
+  relocate(Estimate.y, df, "t value", "Pr(>|t|)", .before=3) |>
   gt() |>
   tab_spanner("HDI", c(Q2.5, Q97.5)) |>
-  tab_spanner("", c(Estimate.x, df, "t value", "Pr(>|t|)")) |>
-  tab_spanner("Frequentist", c(Estimate.x, df, "t value", "Pr(>|t|)")) |>
-  tab_spanner("Bayesian", c(Estimate.y, pdir, erat, Q2.5, Q97.5)) |>
+  tab_spanner("", c(Estimate.y, df, "t value", "Pr(>|t|)")) |>
+  tab_spanner("Frequentist", c(Estimate.y, df, "t value", "Pr(>|t|)")) |>
+  tab_spanner("Bayesian", c(Estimate.x, pdir, erat, Q2.5, Q97.5)) |>
   cols_align("center", 3:12) |>
   cols_move(zz, "Pr(>|t|)") |>
   cols_label(zz="",
-    Estimate.x = md("*M*~diff~"),"t value" = md("*t*"), "Pr(>|t|)" = md("*p*"),
-    Estimate.y = md("*b*"), pdir=md("*p*~b~"), erat = md("ER~b~"),
-    Q2.5 = "Low", Q97.5 = "High", vars = "Predictors"
+    Estimate.y = md("B"),"t value" = md("*t*"), "Pr(>|t|)" = md("*p*"),
+    Estimate.x = md("*b*"), pdir=md("*p*~*b*~"), erat = md("ER~*b*~"),
+    Q2.5 = "Low", Q97.5 = "High", names = "Predictors"
   ) -> int_tab
+int_tab
 gtsave(int_tab, "exp2_3_way_interaction_table.docx", path = "../outputs/tables/")
 ```
 
-
 #### Other
+
 ```{r last quarter interaction, echo=FALSE}
 d_ex |> 
   mutate(
@@ -1663,7 +2174,6 @@ d_ex |>
   filter(three=="Third") |> 
   lmer(rt ~ cue*Congruency + (1|id), data = _) |> summary()
 ```
-
 
 
 ## ELSE
