@@ -700,9 +700,7 @@ d_ex_test |>
 
 ##### Pairwise test
 
-```{r tukey test list, include=FALSE}
-tuk_t <- list()
-
+```{r function tukey test, include=FALSE}
 par_test <- function(dep){
   emmeans(tuk_t[[dep]], pairwise ~ congruent * post_cue) -> test
   test$contrasts |>
@@ -714,18 +712,20 @@ par_test <- function(dep){
 }
 ```
 
+
 ```{r linear mixed-effect model , include=FALSE}
+tuk_t <- list()
 tuk_t$rt <- lmer(rt ~ post_cue * congruent + (1|id), d_ex_test)
 tuk_t$pe <- lmer(pe ~ post_cue * congruent + (1|id), d_ex_test)
 tuk_t$lisas <- lmer(lisas ~ post_cue * congruent  + (1|id), d_ex_test)
 tuk_t$bis <- lmer(bis ~ post_cue * congruent+ (1|id), d_ex_test)
 ```
 
-```{r wide-table - linear mixed-effect model , echo=FALSE}
-par_test("rt") |>
-  bind_rows( par_test("pe") ) |> 
-  bind_rows( par_test("lisas") ) |>
-  bind_rows( par_test("bis") ) |>
+
+```{r wide-table - linear mixed-effect model}
+map(names(tuk_t), \(x){
+  par_test(x)
+  }) |> list_rbind() |>
   pivot_wider(names_from=group, values_from=c(estimate,SE,df,t.ratio,p.value)) |>
   mutate(
     across(c(starts_with("SE"), starts_with("t.rat"), starts_with("est")) , ~fmt_APA_numbers(.x, .chr=T)),
@@ -748,11 +748,10 @@ par_test("rt") |>
 ```
 
 
-```{r long-table - linear mixed-effect model , echo=FALSE}
-par_test("rt") |>
-  bind_rows( par_test("pe") ) |> 
-  bind_rows( par_test("lisas") ) |>
-  bind_rows( par_test("bis") ) |>
+```{r long-table - linear mixed-effect model}
+map(names(tuk_t), \(x){
+  par_test(x)
+  }) |> list_rbind() |>
   mutate(
     across(2:6, ~fmt_APA_numbers(.x, .chr=T)),
     across(7, ~fmt_APA_numbers(.x, .p=T)),
@@ -763,19 +762,20 @@ par_test("rt") |>
       group=="bis" ~ "BIS" ,
     )
   ) |>
-  gt(groupname_col = "group") |>
+  relocate(group, .before = 1) |>
+  gt() |>
   cols_label(
     "estimate" ~ md("*b*"),
     "t.ratio" = md("*t*"),
     p.value = md("*p*") ) |>
   cols_hide(c("SE", "df")) |>
-  cols_align("center", 2:7)
+  cols_align("center", 3:7)
 ```
 
 
 ##### Paragarph
 
-```{r use this bfr paragraph, include=FALSE}
+```{r function transform values to sentence, include=FALSE}
 text_report <- function(data){
   data[["anova_table"]] |> 
     as_tibble() |>
@@ -785,7 +785,10 @@ text_report <- function(data){
       `Pr(>F)` = fmt_APA_numbers(`Pr(>F)`, .psym=T ),
     ) 
 }
+```
 
+
+```{r data for rmanova paragraph, include=FALSE}
 aov_report <- list()
 aov_report$rt <- text_report(aovs$rt) 
 aov_report$pe <- text_report(aovs$pe) 
@@ -959,7 +962,7 @@ freq_n34 |>
 
 #### Robustness check
 
-```{r remove outliers and test, echo=FALSE}
+```{r remove outliers and test}
 o_rt_aov <- aov_car(rt ~ Error(id/(congruent*post_cue)), 
                     d_ex_test |> 
                       filter(!(id %in% id_is_outlier)), detailed=T, 
@@ -981,7 +984,7 @@ o_bis_aov <- aov_car(bis ~ Error(id/(congruent*post_cue)),
                    anova_table = list(es="pes"))
 ```
 
-```{r wide-table - remove outliers and test, echo=FALSE}
+```{r wide-table - remove outliers and test}
 trns_mod(o_rt_aov) |> 
   mutate(group="Response time") |> 
   bind_rows(
@@ -1307,7 +1310,6 @@ coefs |>
 ```
 
 ```{r long-table of bayesian coefs, warning=FALSE, message=FALSE} 
-
 map(names(coefs), \(x){
   coefs[[x]] |> 
     add_row(
@@ -1609,7 +1611,36 @@ d_ex |>
 ```
 
 
-```{r ressponse time across trial number split by cue-run, echo=FALSE}
+```{r legend for ressponse time across trial number split by cue-run}
+#| fig-width: 6
+#| fig-height: 5
+#| fig-dpi: 300
+leg <- 
+  d_ex |> 
+  filter(!is.na(congruent)) |>
+  mutate(
+    .by = c(id, inducer_run, post_cue),
+    Trial = 1:length(post_cue),
+    Congruency = fct_rev(ifelse(congruent==T, "Congruent", "Incongruent")),
+    Cue = fct_rev(ifelse(post_cue==T, "Post-cue", "Pre-cue")),
+  ) |>
+  ggplot(aes(Trial, rt, col=Congruency)) +
+  stat_summary(fun.data=mean_se, position = position_dodge(.2)) +
+  theme_bw() +
+  theme(legend.position = "top")
+
+if(save_figures_to_outputs){
+  ggsave(
+    ggpubr::as_ggplot(ggpubr::get_legend(leg)), 
+    filename = "../outputs/figs/exp2_diagnostic_time-course_legend.jpeg",  height = 5, width = 6, dpi =300)
+}
+```
+
+#### Effect over diagnostic trial 
+
+##### By run type
+
+```{r ressponse time across trial number split by cue-run}
 #| fig-width: 6
 #| fig-height: 5
 #| fig-dpi: 300
@@ -1623,13 +1654,13 @@ p1 <-
     Cue = fct_rev(ifelse(post_cue==T, "Post-cue", "Pre-cue")),
   ) |>
   ggplot(aes(Trial, rt, col=Congruency)) +
-  facet_wrap(~Cue, scales="free", nrow=2) +
+  facet_wrap(~Cue, scales="free", nrow=3) +
   stat_summary(fun.data=mean_se, position = position_dodge(.2)) +
   stat_summary(fun.data=mean_se, position = position_dodge(.2), geom="line") +
   scale_x_continuous(breaks = seq(0,20,1)) + 
   labs(y="Response time", title="a") +
   theme_bw() +
-  theme(legend.position = "top")
+  theme(legend.position = "none")
 p1
 if(save_figures_to_outputs){
   ggsave(p1, filename = "../outputs/figs/exp2_rt_time-course.jpeg",  height = 5, width = 6, dpi =300)
@@ -1637,7 +1668,7 @@ if(save_figures_to_outputs){
 ```
 
 
-```{r error rate across trial number split by cue-run, echo=FALSE}
+```{r diagnostic n summary error rate across split by cue-run}
 #| fig-width: 6
 #| fig-height: 5
 #| fig-dpi: 300
@@ -1664,9 +1695,43 @@ if(save_figures_to_outputs){
 }
 ```
 
-```{r , include=FALSE}
 
-d_ex |> 
+##### By three * run-type
+
+```{r diagnostic n summary rt - split by three and run type}
+p3 <- 
+  d_ex |> 
+  filter(!is.na(congruent)) |>
+  mutate(
+    three = case_when(
+      inducer_run > 2*(max(inducer_run) / 3)   ~ "Third", 
+      inducer_run > max(inducer_run) / 3     ~ "Second", 
+      T ~ "First", )
+  ) |>
+  mutate(
+    .by = c(id, inducer_run, post_cue),
+    Trial = 1:length(post_cue),
+    Congruency = fct_rev(ifelse(congruent==T, "Congruent", "Incongruent")),
+    Cue = fct_rev(ifelse(post_cue==T, "Post-cue", "Pre-cue")),
+  ) |>
+  ggplot(aes(Trial, rt, col=Congruency)) +
+  facet_wrap(three~Cue, scales="free", nrow=3) +
+  stat_summary(fun.data=mean_se, position = position_dodge(.2)) +
+  stat_summary(fun.data=mean_se, position = position_dodge(.2), geom="line") +
+  scale_x_continuous(breaks = seq(0,20,1)) + 
+  labs(y="Response time", title="a") +
+  theme_bw() +
+  theme(legend.position = "none")
+p3
+if(save_figures_to_outputs){
+  ggsave(p3, filename = "../outputs/figs/exp2_rt_time-course--three.jpeg",  height = 8, width = 6, dpi =300)
+}
+```
+
+
+```{r diagnostic n summary - error rate split by three and run type}
+p4 <- 
+  d_ex |> 
   filter(!is.na(congruent)) |>
   mutate(
     three = case_when(
@@ -1685,16 +1750,17 @@ d_ex |>
   stat_summary(fun.data=mean_se, position = position_dodge(.2)) +
   stat_summary(fun.data=mean_se, position = position_dodge(.2), geom="line") +
   scale_x_continuous(breaks = seq(0,20,1)) + 
-  labs(y="Error rate", ) +
+  labs(y="Error rate", title = "b") +
   theme_bw() +
-  theme(legend.position = "top")
+  theme(legend.position = "none")
+p4
+if(save_figures_to_outputs){
+  ggsave(p4, filename = "../outputs/figs/exp2_pe_time-course--three.jpeg",  height = 8, width = 6, dpi =300)
+}
 ```
 
 
-
-
-
-```{r post-cue RT and PE split by inducer run, echo=FALSE}  
+```{r post-cue RT and PE split by inducer run}  
 d_ex |> 
   filter(post_cue==T) |>
   mutate(
@@ -1711,7 +1777,7 @@ d_ex |>
 #### Visualization
 ##### Half-split 
 
-```{r add bis-lisas to inducer-calced, echo=FALSE}
+```{r add bis-lisas to inducer-calced}
 d_ex_exp_test <- 
   d_ex |>
   filter(trial_info=="Diagnostic trial") |>
@@ -2040,7 +2106,7 @@ fq_intr3way$bis <- lmer(
 
 
 ```{r check residual normal distribution for freq models}
-dtibble(
+tibble(
   rt = resid(fq_intr3way$rt),
   pe = resid(fq_intr3way$pe),
   lisas = resid(fq_intr3way$lisas),
