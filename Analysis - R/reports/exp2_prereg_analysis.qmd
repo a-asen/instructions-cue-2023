@@ -1638,7 +1638,29 @@ if(save_figures_to_outputs){
 
 #### Effect over diagnostic trial 
 
+```{r , include=FALSE}
+d_ex |> 
+  filter(!is.na(congruent)) |>
+  mutate(
+    .by = c(id, inducer_run, post_cue),
+    Trial = 1:length(post_cue),
+    Congruency = fct_rev(ifelse(congruent==T, "Congruent", "Incongruent")),
+    Cue = fct_rev(ifelse(post_cue==T, "Post-cue", "Pre-cue")),
+    post_cue_n = ifelse(post_cue==T, seq_along(Cue), NA),
+  ) |>
+  filter(post_cue==T) |>
+  summarise(
+    .by = c(id, post_cue_n, congruent),
+    rt = mean(rt),
+    pe = 1-mean(correct_response) 
+  )  |>
+  lm(rt ~ congruent * post_cue_n, data = _) |> summary()
+```
+
+This part is non-sig. Leave out.
+
 ##### By run type
+
 
 ```{r ressponse time across trial number split by cue-run}
 #| fig-width: 6
