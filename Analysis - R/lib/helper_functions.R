@@ -185,6 +185,92 @@ generate_diagnostic_lengths <- function(len = 100, d_min = 4, d_max = 16){
 }
 
 
+# Bayesian functions
+
+# COEFFICIENT
+bay_eff_prob <- function(model, var){
+  # Get the probability that the effect ({var}) is positive/negative
+  da <- as.matrix(model)
+  m <- mean(da[, var])
+
+  if(m >= 0){
+    fmt_APA_numbers( (sum( da[, var]>=0 ) / length( da[, var])), .p=T )
+  } else if(m<0){
+    fmt_APA_numbers( 1 - sum(da[, var]>=0) / length(da[, var]), .p=T )
+  }
+}
+
+bay_erate <- function(model, var){
+  # Estimate the evidence ration
+  da <- as.matrix(model)
+  m <- mean(da[, var])
+
+  if(m>=0){
+    fmt_APA_numbers(
+      sum(da[, var]>=0) / sum(da[, var]<0),
+      .chr=T )
+  } else if(m<0){
+    fmt_APA_numbers(
+      sum(da[, var]<=0) / sum(da[, var]>0),
+      .chr=T )
+  }
+}
+
+bayes_coefs_to_table <- function(model, group, rm_vars=NULL, partial_matching=TRUE){
+  vars <- variables(model)
+
+  if(!is.null(rm_vars)){
+    if(partial_matching){
+      map(rm_vars, \(var){
+        vars[str_detect(vars, var)]
+      }) |> unlist() -> remove_variables
+    } else {
+      remove_variables <- rm_vars
+    }
+
+    vars_ex <- setdiff(vars, c("sigma", "lprior", "lp__", remove_variables))
+  }
+
+  vars_ex <-  variables(model)[1:length(rownames(fixef(model)))]
+
+  fixef(model) |>
+    as_tibble() |>
+    mutate(
+      .before=1,
+      names = rownames(fixef(model)),
+      across(where(is.double), ~fmt_APA_numbers(.x, .chr=T)),
+      Est.Error=NULL,
+      group=group) |>
+    mutate(
+      .after="Estimate",
+      pdir = map_vec(
+        vars_ex, \(x){ bay_eff_prob(model, x) }),
+      erat = map_vec(
+        vars_ex, \(x){ bay_erate(model, x) }) ) |>
+    filter(!(names == "Intercept"))
+}
+
+bayes_model_fit <- function(model, group){
+  as.matrix(model) -> m1
+
+  sigma <- mean(m1[,"sigma"]) |> fmt_APA_numbers()
+  sigma_l <- hdi(m1[,"sigma"])[2] |> fmt_APA_numbers()
+  sigma_h <- hdi(m1[,"sigma"])[3] |> fmt_APA_numbers()
+  r2 <- bayes_R2(model) |> fmt_APA_numbers(.low_val = T)
+  loo_a <- loo(model)$estimates["looic",] |> fmt_APA_numbers()
+
+  tibble(
+    names    = c("Model fit", "Sigma (subject)", "R^2", "LOOIC"),
+    group    = group,
+    Estimate = c("", sigma, r2[1], loo_a[1]),
+    pdir     = c("", bay_eff_prob(m1, "sigma"), rep("", 2)),
+    erat     = c("", bay_erate(m1, "sigma"), rep("", 2)),
+    Q2.5     = c("", sigma_l, r2[3], paste("SE = ", loo_a[2])),
+    Q97.5    = c("", sigma_h, r2[4], ""),
+  )
+}
+
+
 
 
 
