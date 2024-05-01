@@ -31,6 +31,22 @@ library(BayesFactor)  # model comparison, not used
 source("../lib/helper_functions.R")
 ```
 
+```{r, include=FALSE}
+citation("tidyverse")
+citation("broom")
+citation("gt")
+citation("rstatix")
+citation("emmeans")
+citation("pbapply")
+citation("afex")
+citation("lme4")
+citation("brms")
+citation("cmdstanr")
+citation("bayestestR")
+citation("BayesFactor")
+```
+
+
 ```{r parameters, include=FALSE}
 run_bayesian_models <- FALSE
 save_bayes_models <- FALSE
