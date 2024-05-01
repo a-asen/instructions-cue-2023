@@ -1,6 +1,6 @@
 # Instructions and preparation
 
-In this project we investigated whether the instruction-based congruency effect could be adjusted to the appearance of a cue. The associated work can be found at [Munin]().
+In this project, we investigated whether the instruction-based congruency effect could be adjusted to the appearance of a cue. The associated work can be found at [Munin]().
 
 
 --- 
@@ -25,7 +25,7 @@ before the cue, in line with prior research
 
 ### Accessibility
 
-All data and materials used in this thesis is freely and publicly available in the main Open Science Foundation (OSF) [repository](https://osf.io/tvkgp/), and this Github repository. Under the "Analyses - R" folder, you can find all material related to the data analyses. Under the "Task - jsPsych", you can find the task coded in JavaScript using the [jsPsych](https://www.jspsych.org/) library.
+All data and materials used in this thesis is freely and publicly available in the main Open Science Foundation (OSF) [repository](https://osf.io/tvkgp/), and this GitHub repository. Under the "Analyses - R" folder, you can find all material related to the data analyses. Under the "Task - jsPsych", you can find the task coded in JavaScript using the [jsPsych](https://www.jspsych.org/) library.
 Both experiments in the thesis were preregistered at OSF:
 - [Experiment 1](https://osf.io/fu2w4)
 - [Experiment 2](https://osf.io/9ejyx)
@@ -33,4 +33,4 @@ Both experiments in the thesis were preregistered at OSF:
 
 ### Analyse
 
-Each experiment has an associated analyses script in the "Analyses - R/reports" folder. They can be used to generate the outputs used for the thesis. Additional analyses scripts can be found under src.
+Each experiment has an associated analyses script in the "Analyses - R/reports" folder. They can be used to generate the outputs used for the thesis. Additional analysis scripts can be found under src.
