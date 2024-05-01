@@ -1,5 +1,5 @@
 cff-version: 1.2.0
-message: "If you use this software, please cite it as below."
+message: "Cite the main thesis if you use any associated files/scripts/materials."
 authors:
 - family-names: "Aasen"
   given-names: "Steffen Rygg"
@@ -7,7 +7,7 @@ authors:
 - family-names: "Martiny-Hüenger"
   given-names: "Torsten"
   orcid: "https://orcid.org/0000-0003-3855-2890"
-title: "Instructions cue reversal"
-doi:
-date-released:
-url:
+title: "Adjusting the Instruction-Based Congruency Effect to an Explicit cue Requires Practise"
+doi: 
+date-released: 2024-05-01
+url: 
