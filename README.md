@@ -21,7 +21,7 @@ before the cue but present after the cue. The analysis revealed the expected pat
 considering time as an interacting factor in the analysis. Thus, only the later parts of the
 experiment indicated the expected pattern, while the earlier and middle parts of the
 experiment did not. The evidence suggests that practice is necessary to attenuate preparation
-before the cue, in line with prior research
+before the cue, in line with prior research.
 
 ### Accessibility
 
